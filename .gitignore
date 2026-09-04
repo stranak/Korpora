@@ -1,0 +1,7 @@
+# manatee-open is its own git repo (separate remote/history); not nested here
+# until it's pushed to a fork and wired in as a submodule.
+/manatee-open/
+
+# Swift Package Manager build output
+ManateeKit/.build/
+ManateeKit/.swiftpm/
