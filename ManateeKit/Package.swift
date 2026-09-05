@@ -94,6 +94,10 @@ let package = Package(
             name: "manateekit-cli",
             dependencies: ["ManateeKit"]
         ),
+        .testTarget(
+            name: "ManateeKitTests",
+            dependencies: ["ManateeKit"]
+        ),
     ],
     cxxLanguageStandard: .cxx14
 )
