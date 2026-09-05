@@ -10,14 +10,12 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
         static let operations = NSToolbarItem.Identifier("operations")
-        static let clearGroups = NSToolbarItem.Identifier("clearGroups")
     }
 
     private var sortButton: NSButton?
     private var filterButton: NSButton?
     private var shuffleButton: NSButton?
     private var sampleButton: NSButton?
-    private var clearGroupsButton: NSButton?
 
     convenience init(document: ConcordanceDocument) {
         let viewController = ConcordanceViewController(document: document)
@@ -42,7 +40,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.operations, .flexibleSpace, ItemID.clearGroups]
+        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, .flexibleSpace, ItemID.operations]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -74,14 +72,13 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
         case ItemID.operations:
-            let button = makeButton(symbol: "list.bullet", label: "Operations", target: viewController,
+            // Icon carried over from the old standalone "Clear Groups"
+            // button - merged into this one, since both are fundamentally
+            // "review and cancel active operations" (see
+            // OperationsPopoverController).
+            let button = makeButton(symbol: "xmark.circle", label: "Operations", target: viewController,
                                      action: #selector(ConcordanceViewController.operationsTapped(_:)))
             return makeItem(identifier, label: "Operations", view: button)
-        case ItemID.clearGroups:
-            let button = makeButton(symbol: "xmark.circle", label: "Clear Groups", target: viewController,
-                                     action: #selector(ConcordanceViewController.clearGroupsTapped(_:)))
-            clearGroupsButton = button
-            return makeItem(identifier, label: "Clear Groups", view: button)
         default:
             return nil
         }
@@ -106,11 +103,14 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     /// Custom-view toolbar items don't auto-validate - called from
     /// `ConcordanceViewController.refresh()` instead, mirroring KonText's own
     /// mutual-exclusion rule (line groups vs. sort/filter/shuffle/sample).
+    /// The Operations button stays enabled regardless - reviewing/removing
+    /// *existing* operations (including bulk-clearing line groups) doesn't
+    /// conflict with an active line-group view the way starting a *new*
+    /// sort/filter/shuffle/sample would.
     func updateToolbarState(hasLineGroups: Bool) {
         sortButton?.isEnabled = !hasLineGroups
         filterButton?.isEnabled = !hasLineGroups
         shuffleButton?.isEnabled = !hasLineGroups
         sampleButton?.isEnabled = !hasLineGroups
-        clearGroupsButton?.isEnabled = hasLineGroups
     }
 }

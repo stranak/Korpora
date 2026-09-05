@@ -97,7 +97,7 @@ Confirmed product decisions (from earlier in this project):
 | Phase | Engine (ManateeKit/CManatee) | AppKit UI | Visually verified |
 |---|---|---|---|
 | 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
-| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + Operations popover (2026-09-05) | **partial — sort (toolbar + header-click), sample, filter, and the Operations popover all confirmed by user; row context menu and undo/redo not yet (re-)verified since the 2026-09-05 additions** |
+| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + merged Operations/Clear-Groups popover (2026-09-05) | **partial — sort, sample, filter, Operations popover, and row context menu (line group/filter-to-selection/copy) all confirmed by user; multi-row selection bug found & fixed; merged popover and multi-row line-group assignment not yet re-verified** |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings (bug found & fixed), Sort, and subcorpus creation/query all confirmed by user; row context menu still outstanding; see verification log** |
 | 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
@@ -137,8 +137,10 @@ test` → 17/17).
   bug note below for why.
 - `Controllers/ConcordanceWindowController.swift` /
   `ConcordanceViewController.swift`: one window per document, native
-  tabbing. Toolbar (Sort/Filter/Shuffle/Sample/Clear Groups, custom
-  `NSButton`-backed items). Query bar (`CQLQueryField`) + status label +
+  tabbing. Toolbar (Sort/Filter/Shuffle/Sample/Operations, custom
+  `NSButton`-backed items — Operations replaced a separate Clear Groups
+  button, see Phase 1's writeup below). Query bar (`CQLQueryField`) + status
+  label +
   `NSTableView` (Group/Left/Match/Right columns via
   `NSTableViewDiffableDataSource`). Row context menu: assign line group,
   filter to selection, copy.
@@ -213,8 +215,11 @@ test` → 17/17).
   scratch against a fresh `LiveConcordance` (Manatee can't remove a middle
   operation, only replay).
 - Toolbar mutual exclusion: once any line-group exists, Sort/Filter/
-  Shuffle/Sample disable and Clear Groups enables (mirrors KonText's own
-  rule) — verified visually earlier.
+  Shuffle/Sample disable (mirrors KonText's own rule) — verified visually
+  earlier. (Originally a separate "Clear Groups" button also enabled at
+  this point; since the 2026-09-05 merge into the Operations popover, that
+  button no longer exists — Operations stays enabled unconditionally, see
+  below.)
 - **Column-header click-to-sort (added 2026-09-05):** clicking the Left/
   Match/Right column header sorts by `word` at that anchor (span 1);
   clicking the same header again toggles ascending/descending, matching
@@ -240,7 +245,7 @@ test` → 17/17).
   apps' three-state cycle, which doesn't appear to be a documented/current
   HIG convention.
 - **Operations popover (added 2026-09-05):** a new toolbar button
-  ("Operations", `list.bullet`) lists every active sort/filter/shuffle/
+  ("Operations", `xmark.circle`) lists every active sort/filter/shuffle/
   sample with a per-row remove button (`OperationsPopoverController`) —
   requested after manual testing found that Undo alone (which can only
   unwind the *most recent* operation) wasn't flexible enough to drop one
@@ -249,12 +254,29 @@ test` → 17/17).
   `ConcordanceDocument` gained `removeOperation(at:)`, which reuses the same
   `setOperations` path every other mutation goes through — so removing one
   operation this way is itself undoable via Cmd-Z, consistent with
-  everything else. Line-group operations are deliberately excluded from this
-  list (they already have their own bulk "Clear Groups" button, and there
-  can be many of them - one per line group assignment). This button stays
-  enabled even when line groups are active (unlike Sort/Filter/Shuffle/
-  Sample), since reviewing/removing *existing* operations doesn't conflict
-  with an active line-group view the way starting a *new* one would.
+  everything else. This button stays enabled even when line groups are
+  active (unlike Sort/Filter/Shuffle/Sample), since reviewing/removing
+  *existing* operations doesn't conflict with an active line-group view the
+  way starting a *new* one would.
+- **Merged into "Clear Groups" (2026-09-05):** the separate "Clear Groups"
+  toolbar button was folded into the Operations popover after user
+  feedback that having two separate "cancel things" affordances was
+  confusing — the button's icon (`xmark.circle`, "cancel/clear") was
+  clearer than the list-style "Operations" icon it replaced, but the
+  popover-with-a-list *mechanism* was the better interaction, so line
+  groups now show as one aggregate row ("Line groups (N lines tagged)",
+  since there can be many individual line-group operations) inside the
+  same popover, with its own remove button calling the existing
+  `performClearLineGroups()`. There is now exactly one toolbar item for
+  reviewing/canceling active state, not two.
+- **Real bug found and fixed (2026-09-05):** the concordance table couldn't
+  select more than one row — Cmd-click and Shift-click both behaved like a
+  plain click. Root cause: `NSTableView.allowsMultipleSelection` defaults
+  to `false`, and since this table is built entirely programmatically (no
+  Interface Builder, where the default checkbox is checked), nothing ever
+  turned it on. One-line fix in `ConcordanceViewController.setUpTableView()`.
+  This is also what the row context menu's `assignLineGroup`/`targetedRows()`
+  multi-row path was written to support but couldn't actually reach before.
 - Tests in `ManateeKitTests.swift` + `LiveConcordanceTests.swift` +
   `Corpora/CorporaTests/ConcordanceOperationTests.swift` (the `descending`
   flag, `singleLevelSort` extraction, `summary` text, and `removeOperation`
@@ -408,7 +430,7 @@ returns exactly the original 10 matches, same order, same content.
    `doc`, no brackets/prefix): `author="twain"` → docs 1+2 (61 tokens),
    `genre="fiction"` → docs 1+2+3 (91 tokens), `genre="news"` → docs 4+5
    (60 tokens).
-4. Spot-check Phase 1's toolbar (Sort/Filter/Shuffle/Sample/Clear Groups),
+4. Spot-check Phase 1's toolbar (Sort/Filter/Shuffle/Sample/Operations),
    the row context menu, undo/redo, and Settings (Cmd-,) with real
    interaction (clicking, typing).
 5. Record results in this file's status table and this section; file any
@@ -481,6 +503,20 @@ project's convention is everything visible except `.git` and tool-managed
 build directories (`.build`, `.swiftpm`). Still outstanding: the row
 context menu (assign line group, filter-to-selection, copy) and undo/redo
 across the newer additions (header-click-sort, Operations popover).
+
+**2026-09-05, row context menu tested, two more findings:** everything
+worked except multi-row selection. **Real bug found and fixed:** Cmd-click/
+Shift-click couldn't select more than one row at all — `NSTableView.
+allowsMultipleSelection` defaults to `false` and nothing had turned it on
+for this programmatically-built table (see Phase 1's writeup above).
+**UX feedback addressed:** having both a standalone "Clear Groups" button
+and a separate "Operations" popover felt like two overlapping ways to
+cancel things — merged into one Operations button (keeping the clearer
+"cancel" icon, `xmark.circle`) whose popover now also lists line groups as
+one aggregate, removable row. **Not yet re-verified**: multi-row line-group
+assignment (`assignLineGroup`'s `targetedRows()` path, which needed
+multi-selection to ever be reachable) and the merged Operations/Clear
+Groups popover.
 
 ## Phase 3 (sketch, not started) — Analysis views
 

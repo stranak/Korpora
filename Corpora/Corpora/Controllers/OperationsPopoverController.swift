@@ -2,18 +2,30 @@ import Cocoa
 
 /// Content of the toolbar's Operations popover - lists every active sort/
 /// filter/shuffle/sample with a per-row remove button, for undoing a single
-/// step without unwinding everything after it via Cmd-Z. Line-group
-/// operations don't appear here; they already have their own bulk "Clear
-/// Groups" toolbar button.
+/// step without unwinding everything after it via Cmd-Z. Also folds in bulk
+/// line-group clearing (formerly a separate "Clear Groups" toolbar button -
+/// merged here since both are fundamentally "review and cancel active
+/// operations"). Line groups still appear as one aggregate row, not one per
+/// line, since there can be many of them.
 final class OperationsPopoverController: NSViewController {
     /// (index into the document's full operations array, display summary).
     var operations: [(index: Int, summary: String)] = [] {
         didSet { if isViewLoaded { rebuildRows() } }
     }
+    /// Number of individual line-group assignments currently active, shown
+    /// as one aggregate row rather than one per line.
+    var lineGroupCount: Int = 0 {
+        didSet { if isViewLoaded { rebuildRows() } }
+    }
     var onRemove: ((Int) -> Void)?
+    var onClearLineGroups: (() -> Void)?
+
+    /// Sentinel `NSButton.tag` marking the line-groups row's remove button,
+    /// distinguishing it from a real `operations` index (always >= 0).
+    private static let lineGroupsTag = -1
 
     private let stack = NSStackView()
-    private let emptyLabel = NSTextField(labelWithString: "No active sort, filter, shuffle, or sample.")
+    private let emptyLabel = NSTextField(labelWithString: "No active sort, filter, shuffle, sample, or line groups.")
     private static let width: CGFloat = 320
 
     override func loadView() {
@@ -48,23 +60,30 @@ final class OperationsPopoverController: NSViewController {
 
     private func rebuildRows() {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        emptyLabel.isHidden = !operations.isEmpty
-        stack.isHidden = operations.isEmpty
+        let isEmpty = operations.isEmpty && lineGroupCount == 0
+        emptyLabel.isHidden = !isEmpty
+        stack.isHidden = isEmpty
 
         for (index, summary) in operations {
-            let row = makeRow(index: index, summary: summary)
+            let row = makeRow(tag: index, summary: summary)
+            stack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        if lineGroupCount > 0 {
+            let summary = "Line group\(lineGroupCount == 1 ? "" : "s") (\(lineGroupCount) line\(lineGroupCount == 1 ? "" : "s") tagged)"
+            let row = makeRow(tag: Self.lineGroupsTag, summary: summary)
             stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
 
         view.layoutSubtreeIfNeeded()
-        let contentHeight = operations.isEmpty
+        let contentHeight = isEmpty
             ? emptyLabel.fittingSize.height + 24
             : stack.fittingSize.height + 24
         preferredContentSize = NSSize(width: Self.width, height: max(contentHeight, 44))
     }
 
-    private func makeRow(index: Int, summary: String) -> NSView {
+    private func makeRow(tag: Int, summary: String) -> NSView {
         let row = NSView()
         let label = NSTextField(labelWithString: summary)
         label.font = .systemFont(ofSize: 12)
@@ -75,7 +94,7 @@ final class OperationsPopoverController: NSViewController {
             image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Remove") ?? NSImage(),
             target: self, action: #selector(removeTapped(_:)))
         removeButton.isBordered = false
-        removeButton.tag = index
+        removeButton.tag = tag
         removeButton.translatesAutoresizingMaskIntoConstraints = false
 
         row.addSubview(label)
@@ -92,6 +111,10 @@ final class OperationsPopoverController: NSViewController {
     }
 
     @objc private func removeTapped(_ sender: NSButton) {
-        onRemove?(sender.tag)
+        if sender.tag == Self.lineGroupsTag {
+            onClearLineGroups?()
+        } else {
+            onRemove?(sender.tag)
+        }
     }
 }

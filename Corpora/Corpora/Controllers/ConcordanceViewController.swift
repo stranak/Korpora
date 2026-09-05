@@ -128,26 +128,30 @@ final class ConcordanceViewController: NSViewController {
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
-    @objc func clearGroupsTapped(_ sender: Any) {
-        document.performClearLineGroups()
-    }
-
     @objc func operationsTapped(_ sender: NSButton) {
         let popover = NSPopover()
         let controller = OperationsPopoverController()
-        controller.operations = document.operations.enumerated()
-            .filter { !$0.element.isLineGroupOperation }
-            .map { (index: $0.offset, summary: $0.element.summary) }
+        updateOperationsPopover(controller)
         controller.onRemove = { [weak self, weak controller] index in
-            guard let self else { return }
+            guard let self, let controller else { return }
             document.removeOperation(at: index)
-            controller?.operations = document.operations.enumerated()
-                .filter { !$0.element.isLineGroupOperation }
-                .map { (index: $0.offset, summary: $0.element.summary) }
+            updateOperationsPopover(controller)
+        }
+        controller.onClearLineGroups = { [weak self, weak controller] in
+            guard let self, let controller else { return }
+            document.performClearLineGroups()
+            updateOperationsPopover(controller)
         }
         popover.contentViewController = controller
         popover.behavior = .transient
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
+    private func updateOperationsPopover(_ controller: OperationsPopoverController) {
+        controller.operations = document.operations.enumerated()
+            .filter { !$0.element.isLineGroupOperation }
+            .map { (index: $0.offset, summary: $0.element.summary) }
+        controller.lineGroupCount = document.operations.filter(\.isLineGroupOperation).count
     }
 
     // MARK: - Table view
@@ -156,6 +160,10 @@ final class ConcordanceViewController: NSViewController {
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.style = .plain
         tableView.headerView = NSTableHeaderView()
+        // NSTableView.allowsMultipleSelection defaults to false - only
+        // matters for a programmatically-created table like this one, since
+        // Interface Builder's default checkbox state is checked.
+        tableView.allowsMultipleSelection = true
 
         let group = NSTableColumn(identifier: .init(Column.group.rawValue))
         group.title = ""
