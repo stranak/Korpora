@@ -8,9 +8,13 @@ final class ConcordanceViewController: NSViewController {
     private let document: ConcordanceDocument
     private let queryField = CQLQueryField()
     private let statusLabel = NSTextField(labelWithString: "")
-    private let tableView = NSTableView()
+    private let tableView = SortableTableView()
     private let scrollView = NSScrollView()
     private var dataSource: NSTableViewDiffableDataSource<Section, Int>!
+    // Guards against `syncSortIndicators` (which assigns `tableView.
+    // sortDescriptors` to mirror the document's actual current sort) being
+    // mistaken for a user header click and re-applied as a new operation.
+    private var isSyncingSortIndicators = false
 
     weak var windowController: ConcordanceWindowController?
 
@@ -146,22 +150,26 @@ final class ConcordanceViewController: NSViewController {
         left.title = "Left"
         left.resizingMask = .userResizingMask
         left.width = 270
+        left.sortDescriptorPrototype = NSSortDescriptor(key: Column.left.rawValue, ascending: true)
 
         let kwic = NSTableColumn(identifier: .init(Column.kwic.rawValue))
         kwic.title = "Match"
         kwic.resizingMask = .userResizingMask
         kwic.width = 160
+        kwic.sortDescriptorPrototype = NSSortDescriptor(key: Column.kwic.rawValue, ascending: true)
 
         let right = NSTableColumn(identifier: .init(Column.right.rawValue))
         right.title = "Right"
         right.resizingMask = .autoresizingMask
         right.width = 270
+        right.sortDescriptorPrototype = NSSortDescriptor(key: Column.right.rawValue, ascending: true)
 
         tableView.addTableColumn(group)
         tableView.addTableColumn(left)
         tableView.addTableColumn(kwic)
         tableView.addTableColumn(right)
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        tableView.onSortDescriptorsChange = { [weak self] in self?.headerSortChanged($0) }
 
         dataSource = NSTableViewDiffableDataSource<Section, Int>(tableView: tableView) { [weak self] _, column, _, id in
             self?.makeCell(for: column, rowID: id) ?? NSView()
@@ -170,6 +178,62 @@ final class ConcordanceViewController: NSViewController {
 
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
+    }
+
+    /// Header click (or programmatic assignment from `syncSortIndicators`)
+    /// changed `tableView.sortDescriptors`. AppKit already computed the
+    /// correct ascending/descending toggle for a re-click on the same
+    /// column before calling this - see `SortableTableView`.
+    private func headerSortChanged(_ descriptors: [NSSortDescriptor]) {
+        guard !isSyncingSortIndicators,
+              let descriptor = descriptors.first,
+              let key = descriptor.key,
+              let column = Column(rawValue: key) else { return }
+        let anchor: SortAnchor
+        switch column {
+        case .left: anchor = .left
+        case .kwic: anchor = .kwic
+        case .right: anchor = .right
+        case .group: return
+        }
+        let level = SortLevel(attribute: "word", anchor: anchor, span: 1)
+        document.performSort(SortCriteria(level), descending: !descriptor.ascending)
+    }
+
+    /// Mirrors the document's actual current sort (however it was set - a
+    /// header click, the toolbar's Sort popover, or after undo/redo) onto
+    /// the column headers' indicator triangles. A sort that isn't a
+    /// single-level "word" sort on one of these columns clears every
+    /// indicator, since it doesn't correspond to any header.
+    private func syncSortIndicators() {
+        isSyncingSortIndicators = true
+        defer { isSyncingSortIndicators = false }
+
+        var matchedColumn: Column?
+        var matchedAscending = true
+        if let (level, descending) = document.operations.last(where: { $0.singleLevelSort != nil })?.singleLevelSort,
+           level.attribute == "word" {
+            switch level.anchor {
+            case .left: matchedColumn = .left
+            case .kwic: matchedColumn = .kwic
+            case .right: matchedColumn = .right
+            }
+            matchedAscending = !descending
+        }
+
+        for column in tableView.tableColumns {
+            guard let identifier = Column(rawValue: column.identifier.rawValue), identifier != .group else { continue }
+            if identifier == matchedColumn {
+                tableView.setIndicatorImage(
+                    NSImage(named: matchedAscending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator"),
+                    in: column)
+            } else {
+                tableView.setIndicatorImage(nil, in: column)
+            }
+        }
+        tableView.sortDescriptors = matchedColumn.map {
+            [NSSortDescriptor(key: $0.rawValue, ascending: matchedAscending)]
+        } ?? []
     }
 
     private func makeCell(for column: NSTableColumn?, rowID: Int) -> NSView {
@@ -207,6 +271,7 @@ final class ConcordanceViewController: NSViewController {
         snapshot.reloadItems(ids)
         dataSource.apply(snapshot, animatingDifferences: true)
         windowController?.updateToolbarState(hasLineGroups: document.hasLineGroups)
+        syncSortIndicators()
     }
 
     // MARK: - Row context menu

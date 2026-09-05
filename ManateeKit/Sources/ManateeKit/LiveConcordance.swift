@@ -3,7 +3,7 @@ import CManatee
 /// Where a sort key is read from, relative to a concordance hit - matches
 /// Manatee's own sort-context convention (`-1<0` = left, `0<0~0>0` = the
 /// match itself, `1>0` = right; see conccrit.cc/concctx.cc).
-public enum SortAnchor: Sendable, Codable {
+public enum SortAnchor: Sendable, Codable, Equatable {
     case left, kwic, right
 }
 

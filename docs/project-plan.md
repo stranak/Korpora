@@ -215,7 +215,33 @@ test` → 17/17).
 - Toolbar mutual exclusion: once any line-group exists, Sort/Filter/
   Shuffle/Sample disable and Clear Groups enables (mirrors KonText's own
   rule) — verified visually earlier.
-- Tests in `ManateeKitTests.swift` + `LiveConcordanceTests.swift`.
+- **Column-header click-to-sort (added 2026-09-05):** clicking the Left/
+  Match/Right column header sorts by `word` at that anchor (span 1);
+  clicking the same header again toggles ascending/descending, matching
+  standard macOS table behavior (`NSTableColumn.sortDescriptorPrototype` +
+  `Corpora/Corpora/Views/SortableTableView.swift`, a tiny `NSTableView`
+  subclass that observes `sortDescriptors` changes directly, since
+  `NSTableViewDiffableDataSource` — our data source — doesn't forward the
+  optional `sortDescriptorsDidChange` data-source callback). Each click is a
+  real, undoable `ConcordanceOperation.sort` (Cmd-Z undoes it), consistent
+  with the toolbar's Sort popover. Manatee itself has no native descending
+  sort (`LiveConcordance.sort` is always ascending — see the "Reverse"
+  finding below), so `ConcordanceOperation.sort` gained a `descending` flag
+  that's never sent to Manatee; `ConcordanceDocument.replay()` just reverses
+  the already-ascending-sorted display rows as its last step when set. The
+  header indicator triangles are synced from whatever sort is actually
+  active in `document.operations` (`syncSortIndicators()` in
+  `ConcordanceViewController`), regardless of whether it came from a header
+  click, the toolbar popover, or undo/redo — a sort that isn't a
+  single-level `word` sort on one of these three columns just clears every
+  indicator, since it doesn't correspond to a header. A third click does
+  *not* clear the sort back to raw order — this mirrors AppKit's own native
+  two-state (ascending/descending) click behavior rather than older Mac
+  apps' three-state cycle, which doesn't appear to be a documented/current
+  HIG convention.
+- Tests in `ManateeKitTests.swift` + `LiveConcordanceTests.swift` +
+  `Corpora/CorporaTests/ConcordanceOperationTests.swift` (the `descending`
+  flag and `singleLevelSort` extraction, including a JSON round-trip).
 
 **Real bugs found and fixed along the way:**
 - A genuine upstream bug in `manatee-open`: `concord/concgrp.cc`'s
@@ -360,6 +386,15 @@ tool) should run items 1–4 and update this log and the status table.
   reference app), just relabel it — the checkbox now reads "Reverse (by
   word ending)", and `SortLevel.reverse` in ManateeKit gained a doc comment
   explaining the same thing.
+
+**2026-09-05, added but not yet manually verified:** column-header
+click-to-sort (see Phase 1's writeup above). Build and the new
+`ConcordanceOperationTests` cases pass, but nobody has clicked a Left/
+Match/Right header yet — check: does clicking sort correctly, does a second
+click flip to descending with the indicator triangle following, and does
+the indicator correctly disappear/move if you then use the toolbar's Sort
+popover with a different attribute (e.g. `lemma`), and reappear correctly
+after Cmd-Z?
 
 ## Phase 3 (sketch, not started) — Analysis views
 

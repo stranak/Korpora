@@ -86,8 +86,8 @@ final class ConcordanceDocument: NSDocument {
 
     // MARK: - Operations (each undoable - see `ConcordanceOperation`)
 
-    func performSort(_ criteria: SortCriteria, unique: Bool = false) {
-        appendOperation(.sort(criteria, unique: unique))
+    func performSort(_ criteria: SortCriteria, unique: Bool = false, descending: Bool = false) {
+        appendOperation(.sort(criteria, unique: unique, descending: descending))
     }
 
     func performFilter(_ spec: PNFilterSpec) {
@@ -140,6 +140,13 @@ final class ConcordanceDocument: NSDocument {
         let rightContext = rightContext
         let kwicAttr = kwicAttr
         let operations = operations
+        // The most recent .sort operation's flag wins - later operations
+        // (e.g. a filter after a descending sort) don't reset it, matching
+        // how a fresh .sort operation is the only thing that changes it.
+        let descendingSort = operations.reversed().lazy.compactMap { op -> Bool? in
+            if case .sort(_, _, let descending) = op { return descending }
+            return nil
+        }.first ?? false
         Task { @MainActor in
             do {
                 let corpus = try await Corpus(name: corpusName)
@@ -161,7 +168,19 @@ final class ConcordanceDocument: NSDocument {
                 var newRows: [ConcordanceRow] = []
                 newRows.reserveCapacity(lines.count)
                 for (offset, line) in lines.enumerated() {
+                    // linegroup(at:) is keyed to Manatee's own view order, so
+                    // look it up before any display-only reversal below.
                     newRows.append(ConcordanceRow(id: offset, line: line, group: await live.linegroup(at: offset)))
+                }
+                if descendingSort {
+                    // Manatee's own sort is always ascending (see
+                    // ConcordanceOperation.sort's doc comment) - descending is
+                    // purely a display-order flip, so `id` (== row.rows index,
+                    // per ConcordanceViewController.makeCell) must be
+                    // reassigned to match the new positions.
+                    newRows = newRows.reversed().enumerated().map { i, row in
+                        ConcordanceRow(id: i, line: row.line, group: row.group)
+                    }
                 }
                 rows = newRows
                 let corpusDescription: String
