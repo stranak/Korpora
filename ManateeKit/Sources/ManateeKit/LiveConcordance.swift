@@ -16,6 +16,9 @@ public struct SortLevel: Sendable, Codable {
     public var anchor: SortAnchor
     public var span: Int
     public var caseInsensitive: Bool
+    /// Manatee's "retrograde" option (the `r` flag) - compares each word
+    /// spelled backwards, e.g. to sort by word ending/suffix rather than by
+    /// word start. Not a sort-direction toggle; every sort is ascending.
     public var reverse: Bool
 
     public init(attribute: String, anchor: SortAnchor, span: Int = 1,

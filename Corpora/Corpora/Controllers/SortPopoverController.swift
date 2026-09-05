@@ -11,7 +11,11 @@ final class SortPopoverController: NSViewController {
     private let anchorPopUp = NSPopUpButton()
     private let spanField = NSTextField(string: "5")
     private let caseInsensitiveCheckbox = NSButton(checkboxWithTitle: "Ignore case", target: nil, action: nil)
-    private let reverseCheckbox = NSButton(checkboxWithTitle: "Reverse", target: nil, action: nil)
+    // Not a sort-direction toggle - every sort here is ascending. This is
+    // Manatee's own "retrograde" option (the `r` flag in SortCriteria's
+    // criteriaString): it compares each word spelled backwards, e.g. for
+    // sorting by word ending/suffix rather than by word start.
+    private let reverseCheckbox = NSButton(checkboxWithTitle: "Reverse (by word ending)", target: nil, action: nil)
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 190))

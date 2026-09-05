@@ -99,7 +99,7 @@ Confirmed product decisions (from earlier in this project):
 | 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
 | 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done | yes (screenshots, earlier session) |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
-| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **no — no available tool can click through macOS AppKit UI; see verification log** |
+| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **partial — user manually verified Settings (bug found & fixed) and Sort (confirmed correct); subcorpus flow (item 3) still outstanding; see verification log** |
 | 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
@@ -325,6 +325,41 @@ test` → 17/17).
 Whoever next has a way to actually drive the AppKit UI (a human, a
 Terminal session with Accessibility permission re-granted, or a future
 tool) should run items 1–4 and update this log and the status table.
+
+**2026-09-05, user manual click-through (items 1, 4):**
+
+- Subcorpus flow (item 3) not yet reported on.
+- **Real bug found and fixed:** Settings… was greyed out in the menu and
+  Cmd-, did nothing. Root cause: `AppDelegate.makeMainMenu()` was a `static
+  func`, so `self` inside it was the `AppDelegate` *type*, not the running
+  instance — `settingsItem.target = self` pointed the menu item at the
+  class object, which doesn't implement the instance method
+  `showSettings(_:)`, so AppKit's automatic menu validation disabled it.
+  Fixed by making `makeMainMenu` an instance method.
+- **Reported as broken, turned out not to be:** "sorting seemed not to
+  work." Traced end-to-end (toolbar button → popover → `ConcordanceDocument.
+  performSort` → `LiveConcordance.sort`) and found no defect — confirmed by
+  reproducing the user's exact report with the default Sort settings
+  (attribute `word`, anchor `Match`, ascending) against the dev corpus's
+  `[tag="JJ"][tag="NN"]` query: raw order is `brown fox, lazy dog, curious
+  cat, sleepy cat`; sorted order is `brown fox, curious cat, lazy dog,
+  sleepy cat` — only the middle two rows swap, easy to miss on a 4-line
+  result set. `LiveConcordanceTests.testSortOrdersByKwicAttribute` already
+  covers exactly this case.
+- **Real (pre-existing) UX bug found while chasing the above:** the Sort
+  popover's "Reverse" checkbox does not toggle ascending/descending order —
+  there is no such toggle anywhere in this UI; every sort is ascending on
+  the chosen key. "Reverse" is Manatee's own `r` ("retrograde") sort flag:
+  it compares each word's *spelling reversed* (e.g. sorting by word ending/
+  suffix), confirmed by reading `manatee-open/concord/conccrit.cc`'s
+  `strip_options`/`str2retro` and reproducing the user's observed
+  `brown fox, curious cat, sleepy cat, lazy dog` result by hand from the
+  reversed-spelling comparison. This matches KonText's own sort form
+  faithfully but reads as a direction flip to anyone unfamiliar with that
+  convention. Decision: keep the feature exactly as-is (matches the
+  reference app), just relabel it — the checkbox now reads "Reverse (by
+  word ending)", and `SortLevel.reverse` in ManateeKit gained a doc comment
+  explaining the same thing.
 
 ## Phase 3 (sketch, not started) — Analysis views
 

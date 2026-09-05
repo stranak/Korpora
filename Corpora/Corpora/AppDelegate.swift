@@ -2,7 +2,7 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.mainMenu = Self.makeMainMenu()
+        NSApp.mainMenu = makeMainMenu()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private static func makeMainMenu() -> NSMenu {
+    private func makeMainMenu() -> NSMenu {
         let main = NSMenu()
 
         let appMenuItem = NSMenuItem()
