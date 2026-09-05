@@ -23,6 +23,7 @@
 		6E56D19B4B2D73E51D47847A /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196F3E82C872642B3C56905B /* SortableTableView.swift */; };
 		78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777B79F44224A872C8862850 /* ConcordanceOperation.swift */; };
 		80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */; };
+		82230583E5DEB6A9188B3F80 /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */; };
 		972A82C87A877EE9C96F5D83 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B153CDFFF68143E5723299BB /* main.swift */; };
 		97945D900550F11D6B3BB5FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E5FBE061C9D0960D0F0BD6 /* AppDelegate.swift */; };
 		D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F56CC63630EA28304391DEA /* SortPopoverController.swift */; };
@@ -49,6 +50,7 @@
 		2482C8B330CDE8B79158832E /* KWICCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICCellView.swift; sourceTree = "<group>"; };
 		25829CE0B1184479409C9C1F /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		2BEC6F15BA4380A2D97DEDD5 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsPopoverController.swift; sourceTree = "<group>"; };
 		337937E6760E63BDB464FABC /* CorporaDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorporaDocumentController.swift; sourceTree = "<group>"; };
 		4E28E03EBFB51A81A2086343 /* CorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
@@ -116,6 +118,7 @@
 				B8707E5EE04A324077AEEBD4 /* FilterSheetController.swift */,
 				D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */,
 				5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */,
+				31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */,
 				76275DF734870EDBA0975A28 /* SamplePopoverController.swift */,
 				6F56CC63630EA28304391DEA /* SortPopoverController.swift */,
 			);
@@ -279,6 +282,7 @@
 				42D6DA623C738CDAFB40406C /* KWICCellView.swift in Sources */,
 				06D95E63EEA83C14F34C247D /* NewConcordanceSheetController.swift in Sources */,
 				47D28927B4216981E7808861 /* NewSubcorpusPopoverController.swift in Sources */,
+				82230583E5DEB6A9188B3F80 /* OperationsPopoverController.swift in Sources */,
 				5147B2175F0C34D38FFC1569 /* SamplePopoverController.swift in Sources */,
 				67DFE992A86BA395057F5CB6 /* SettingsWindowController.swift in Sources */,
 				D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */,

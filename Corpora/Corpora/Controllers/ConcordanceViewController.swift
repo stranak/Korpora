@@ -132,6 +132,24 @@ final class ConcordanceViewController: NSViewController {
         document.performClearLineGroups()
     }
 
+    @objc func operationsTapped(_ sender: NSButton) {
+        let popover = NSPopover()
+        let controller = OperationsPopoverController()
+        controller.operations = document.operations.enumerated()
+            .filter { !$0.element.isLineGroupOperation }
+            .map { (index: $0.offset, summary: $0.element.summary) }
+        controller.onRemove = { [weak self, weak controller] index in
+            guard let self else { return }
+            document.removeOperation(at: index)
+            controller?.operations = document.operations.enumerated()
+                .filter { !$0.element.isLineGroupOperation }
+                .map { (index: $0.offset, summary: $0.element.summary) }
+        }
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
     // MARK: - Table view
 
     private func setUpTableView() {

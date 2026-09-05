@@ -45,4 +45,39 @@ import ManateeKit
         let extracted = try #require(decoded.singleLevelSort)
         #expect(extracted.descending)
     }
+
+    @Test func summaryDescribesEachOperationKind() {
+        let sort = ConcordanceOperation.sort(
+            SortCriteria(SortLevel(attribute: "word", anchor: .kwic)), unique: false, descending: false)
+        #expect(sort.summary == "Sort: word at Match, ascending")
+
+        let filter = ConcordanceOperation.filter(PNFilterSpec(positive: true, query: #"[word="fox"]"#))
+        #expect(filter.summary == #"Filter: keep lines matching [word="fox"]"#)
+
+        #expect(ConcordanceOperation.shuffle.summary == "Shuffle")
+        #expect(ConcordanceOperation.sample(lines: 1).summary == "Sample: 1 line")
+        #expect(ConcordanceOperation.sample(lines: 5).summary == "Sample: 5 lines")
+    }
+
+    // `ConcordanceDocument.replay()` no-ops when corpusName/initialQuery are
+    // empty, so a bare `ConcordanceDocument()` - with no corpus, window, or
+    // MANATEE_REGISTRY - is enough to test the operations-array bookkeeping
+    // itself, independent of the engine.
+    @Test func removeOperationDropsExactlyOneAndKeepsOrder() {
+        let doc = ConcordanceDocument()
+        doc.performSort(SortCriteria(SortLevel(attribute: "word", anchor: .kwic)))
+        doc.performSample(lines: 10)
+        doc.performShuffle()
+        #expect(doc.operations.count == 3)
+
+        doc.removeOperation(at: 1)
+        #expect(doc.operations.map(\.summary) == ["Sort: word at Match, ascending", "Shuffle"])
+    }
+
+    @Test func removeOperationIgnoresOutOfBoundsIndex() {
+        let doc = ConcordanceDocument()
+        doc.performSample(lines: 10)
+        doc.removeOperation(at: 5)
+        #expect(doc.operations.count == 1)
+    }
 }

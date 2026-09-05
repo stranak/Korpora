@@ -35,6 +35,39 @@ enum ConcordanceOperation: Codable {
         return (level, descending)
     }
 
+    /// A short, human-readable label for the Operations list - not used for
+    /// line-group operations, which have their own bulk "Clear Groups"
+    /// affordance instead of appearing here individually.
+    var summary: String {
+        switch self {
+        case .sort(let criteria, let unique, let descending):
+            let levels = criteria.levels.map { level -> String in
+                let anchor: String
+                switch level.anchor {
+                case .left: anchor = "Left"
+                case .kwic: anchor = "Match"
+                case .right: anchor = "Right"
+                }
+                var qualifiers: [String] = []
+                if level.caseInsensitive { qualifiers.append("ignore case") }
+                if level.reverse { qualifiers.append("by word ending") }
+                let qualifierSuffix = qualifiers.isEmpty ? "" : " (\(qualifiers.joined(separator: ", ")))"
+                return "\(level.attribute) at \(anchor)\(qualifierSuffix)"
+            }.joined(separator: ", ")
+            var suffix = descending ? "descending" : "ascending"
+            if unique { suffix += ", unique" }
+            return "Sort: \(levels), \(suffix)"
+        case .filter(let spec):
+            return "Filter: \(spec.positive ? "keep" : "remove") lines matching \(spec.query)"
+        case .shuffle:
+            return "Shuffle"
+        case .sample(let lines):
+            return "Sample: \(lines) line\(lines == 1 ? "" : "s")"
+        case .setLineGroup:
+            return "Line group"
+        }
+    }
+
     func apply(to live: LiveConcordance) async throws {
         switch self {
         case .sort(let criteria, let unique, _):

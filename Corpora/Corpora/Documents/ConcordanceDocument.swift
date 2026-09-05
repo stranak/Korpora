@@ -113,6 +113,19 @@ final class ConcordanceDocument: NSDocument {
         setOperations(operations.filter { !$0.isLineGroupOperation })
     }
 
+    /// Removes exactly one operation from the chain (e.g. a single sort or
+    /// filter from the Operations popover) and replays the rest - more
+    /// targeted than Undo, which can only unwind the most recent operation.
+    /// `index` is into the full `operations` array, not a filtered display
+    /// list, so callers showing a subset (see `OperationsPopoverController`)
+    /// must track true indices themselves.
+    func removeOperation(at index: Int) {
+        guard operations.indices.contains(index) else { return }
+        var newOperations = operations
+        newOperations.remove(at: index)
+        setOperations(newOperations)
+    }
+
     private func appendOperation(_ op: ConcordanceOperation) {
         setOperations(operations + [op])
     }

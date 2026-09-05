@@ -9,6 +9,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let filter = NSToolbarItem.Identifier("filter")
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
+        static let operations = NSToolbarItem.Identifier("operations")
         static let clearGroups = NSToolbarItem.Identifier("clearGroups")
     }
 
@@ -41,7 +42,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, .flexibleSpace, ItemID.clearGroups]
+        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.operations, .flexibleSpace, ItemID.clearGroups]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -72,6 +73,10 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                                      action: #selector(ConcordanceViewController.sampleTapped(_:)))
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
+        case ItemID.operations:
+            let button = makeButton(symbol: "list.bullet", label: "Operations", target: viewController,
+                                     action: #selector(ConcordanceViewController.operationsTapped(_:)))
+            return makeItem(identifier, label: "Operations", view: button)
         case ItemID.clearGroups:
             let button = makeButton(symbol: "xmark.circle", label: "Clear Groups", target: viewController,
                                      action: #selector(ConcordanceViewController.clearGroupsTapped(_:)))

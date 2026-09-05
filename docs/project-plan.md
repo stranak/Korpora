@@ -97,7 +97,7 @@ Confirmed product decisions (from earlier in this project):
 | Phase | Engine (ManateeKit/CManatee) | AppKit UI | Visually verified |
 |---|---|---|---|
 | 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
-| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done | yes (screenshots, earlier session) |
+| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + Operations popover (2026-09-05) | **partial — core toolbar ops confirmed by user (sort, sample, filter); header-click-sort confirmed; Operations popover not yet manually verified; row context menu/undo not yet re-verified since the 2026-09-05 additions** |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **partial — user manually verified Settings (bug found & fixed) and Sort (confirmed correct); subcorpus flow (item 3) still outstanding; see verification log** |
 | 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
@@ -239,9 +239,28 @@ test` → 17/17).
   two-state (ascending/descending) click behavior rather than older Mac
   apps' three-state cycle, which doesn't appear to be a documented/current
   HIG convention.
+- **Operations popover (added 2026-09-05):** a new toolbar button
+  ("Operations", `list.bullet`) lists every active sort/filter/shuffle/
+  sample with a per-row remove button (`OperationsPopoverController`) —
+  requested after manual testing found that Undo alone (which can only
+  unwind the *most recent* operation) wasn't flexible enough to drop one
+  specific sort or filter out of the middle of a chain. `ConcordanceOperation`
+  gained a `summary` computed property (human-readable label) and
+  `ConcordanceDocument` gained `removeOperation(at:)`, which reuses the same
+  `setOperations` path every other mutation goes through — so removing one
+  operation this way is itself undoable via Cmd-Z, consistent with
+  everything else. Line-group operations are deliberately excluded from this
+  list (they already have their own bulk "Clear Groups" button, and there
+  can be many of them - one per line group assignment). This button stays
+  enabled even when line groups are active (unlike Sort/Filter/Shuffle/
+  Sample), since reviewing/removing *existing* operations doesn't conflict
+  with an active line-group view the way starting a *new* one would.
 - Tests in `ManateeKitTests.swift` + `LiveConcordanceTests.swift` +
   `Corpora/CorporaTests/ConcordanceOperationTests.swift` (the `descending`
-  flag and `singleLevelSort` extraction, including a JSON round-trip).
+  flag, `singleLevelSort` extraction, `summary` text, and `removeOperation`
+  bookkeeping — the latter exercised via a bare `ConcordanceDocument()` with
+  no corpus, since `replay()` no-ops without one, so no MANATEE_REGISTRY is
+  needed for this class of test).
 
 **Real bugs found and fixed along the way:**
 - A genuine upstream bug in `manatee-open`: `concord/concgrp.cc`'s
@@ -301,9 +320,40 @@ test` → 17/17).
   `replay()` now opens the subcorpus via `Corpus.openSubcorpus(atPath:)`
   when set and queries against *that*. The status line reads "N hits in an
   M-token subcorpus "name"" vs. "...corpus" accordingly.
-- `Corpora/scripts/build-dev-corpus.sh` builds a 2-document dev corpus
-  (matching the test fixture, `doc id="1"`/`doc id="2"`) so there's
-  something real to create a subcorpus against when running from Xcode.
+- `Corpora/scripts/build-dev-corpus.sh` builds a 5-document dev corpus
+  (updated 2026-09-05 — was 2 documents, matching `id="1"`/`id="2"` only).
+  Deliberately **not** the same as `TestCorpusFixture` anymore: the ManateeKit
+  test fixture stays a minimal 2-`<doc>` corpus for fast, deterministic
+  automated tests, while the dev corpus needs enough real variety that
+  creating a subcorpus demonstrates an actual *subset* of documents, not
+  just "restrict to the one specific id you picked." Each `<doc>` now has
+  `id`/`author`/`genre`/`year` attributes:
+
+  | id | author | genre | year |
+  |---|---|---|---|
+  | 1 | twain | fiction | 1876 |
+  | 2 | twain | fiction | 1884 |
+  | 3 | austen | fiction | 1813 |
+  | 4 | reuters | news | 2020 |
+  | 5 | reuters | news | 2021 |
+
+  So e.g. `author="twain"` (structure `doc`) restricts to docs 1+2 (2 of 5),
+  `genre="fiction"` to docs 1+2+3 (3 of 5), `genre="news"` to docs 4+5.
+  Content still follows the original doc 1/2 pattern (DT-JJ-NN-VBZ
+  sentences, plus doc 1's original DT-JJ-JJ-NN-VBZ sentence testing that
+  `[tag="JJ"][tag="NN"]` doesn't match a JJ-JJ pair) — 41 tokens total,
+  verified via `swift run manateekit-cli testcorp '[tag="JJ"][tag="NN"]'`
+  against `.devcorpus/registry`: exactly the 10 expected JJ+NN matches
+  (brown fox, lazy dog, curious cat, sleepy cat, elegant lady, proud
+  gentleman, local market, global economy, annual report, modest profit),
+  one per sentence, in document order. Subcorpus creation itself with these
+  *specific* attribute names hasn't been separately verified — `RunCodeSnippet`
+  can't link CManatee's C++ symbols (JIT limitation, not a corpus defect),
+  so this relies on the same generic `create_subcorpus`/`openSubcorpus` code
+  path already covered by `SubcorpusTests` (which uses `id`, not `author`/
+  `genre`/`year` — Manatee's structural-attribute lookup doesn't special-case
+  any particular name, so there's no reason to expect different behavior,
+  but it's still worth the user's manual click-through confirming it).
 
 ### Verification log
 
@@ -334,13 +384,21 @@ test` → 17/17).
    scheme's `MANATEE_REGISTRY` already points at it (see `project.yml`).
 2. Build + run. The New Concordance sheet should show corpus `testcorp`,
    with an info label listing its attributes (word/lemma/tag) and
-   structures (doc (id), s), and a Subcorpus popup defaulting to "Whole
-   Corpus".
-3. Try "New Subcorpus…": name it e.g. `doc1`, structure `doc`, restrict-to
-   `id="1"` (see the semantic note above — no brackets, no prefix), Create.
-   Confirm it appears in the Subcorpus popup, and that selecting it +
-   searching (e.g. `[tag="JJ"][tag="NN"]`) restricts results to doc 1 only
-   and the status line says "...subcorpus "doc1"".
+   structures (doc (id, author, genre, year), s), and a Subcorpus popup
+   defaulting to "Whole Corpus".
+3. Try "New Subcorpus…" a few different ways (see the semantic note above —
+   no brackets, no attribute prefix):
+   - name `twain`, structure `doc`, restrict-to `author="twain"` → should
+     match docs 1+2 (2 of 5 documents, 17 tokens — doc 1 has 9, since its
+     first sentence has an extra adjective, "quick brown fox").
+   - name `fiction`, structure `doc`, restrict-to `genre="fiction"` → docs
+     1+2+3 (3 of 5, 25 tokens).
+   - name `news2021`, structure `doc`, restrict-to `year="2021"` → doc 5
+     only (8 tokens).
+   Confirm each appears in the Subcorpus popup, and that selecting one +
+   searching `[tag="JJ"][tag="NN"]` restricts results to exactly that
+   subset's matches (e.g. `twain` → brown fox, lazy dog, curious cat, sleepy
+   cat) with the status line reading "...subcorpus "name"".
 4. Spot-check Phase 1's toolbar (Sort/Filter/Shuffle/Sample/Clear Groups),
    the row context menu, undo/redo, and Settings (Cmd-,) with real
    interaction (clicking, typing).
@@ -392,8 +450,16 @@ fixed (font change in Appearance settings applied correctly). Sort
 confirmed working both via the toolbar's Sort popover and via clicking the
 Left/Match/Right column headers directly. Indicator-triangle/undo edge
 cases (switching between header-click and popover sorts, undo/redo) weren't
-specifically called out but no issues were reported. Still outstanding:
-the subcorpus creation/query flow (item 3), and the row context menu.
+specifically called out but no issues were reported. Sample and Filter also
+confirmed working. Feedback from this round: Undo alone wasn't flexible
+enough to remove one specific sort/filter/sample without unwinding
+everything after it — addressed by the new Operations popover (see Phase
+1's writeup above), **not yet manually verified**. Also: the dev corpus's 2
+documents weren't enough to demonstrate a real subcorpus subset — addressed
+by expanding it to 5 documents with `author`/`genre`/`year` attributes (see
+Phase 2's writeup above), also **not yet manually verified**. Still
+outstanding: the Operations popover, the expanded subcorpus flow, and the
+row context menu.
 
 ## Phase 3 (sketch, not started) — Analysis views
 
