@@ -55,7 +55,7 @@ schemes:
         # Concordance" sheet's corpus picker has something real to show when
         # running from Xcode. Not used by the shipped app in any real sense -
         # just a stand-in registry for interactive development.
-        MANATEE_REGISTRY: "$(SRCROOT)/.devcorpus/registry"
+        MANATEE_REGISTRY: "$(SRCROOT)/DevCorpus/registry"
     test:
       config: Debug
       targets:

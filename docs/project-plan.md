@@ -343,7 +343,7 @@ test` → 17/17).
   sentences, plus doc 1's original DT-JJ-JJ-NN-VBZ sentence testing that
   `[tag="JJ"][tag="NN"]` doesn't match a JJ-JJ pair) — 41 tokens total,
   verified via `swift run manateekit-cli testcorp '[tag="JJ"][tag="NN"]'`
-  against `.devcorpus/registry`: exactly the 10 expected JJ+NN matches
+  against `DevCorpus/registry`: exactly the 10 expected JJ+NN matches
   (brown fox, lazy dog, curious cat, sleepy cat, elegant lady, proud
   gentleman, local market, global economy, annual report, modest profit),
   one per sentence, in document order. Subcorpus creation itself with these
@@ -379,7 +379,7 @@ test` → 17/17).
   rejected the macOS target outright, and no other available tool can
   synthesize clicks/typing into an AppKit window. These remain open:
 
-1. Open `Corpora/Corpora.xcodeproj`. If `.devcorpus/` doesn't exist, run
+1. Open `Corpora/Corpora.xcodeproj`. If `DevCorpus/` doesn't exist, run
    `Corpora/scripts/build-dev-corpus.sh` once (idempotent). The Xcode
    scheme's `MANATEE_REGISTRY` already points at it (see `project.yml`).
 2. Build + run. The New Concordance sheet should show corpus `testcorp`,

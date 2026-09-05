@@ -6,11 +6,12 @@
 # fixture for fast, deterministic automated tests) - this one has 5 <doc>s
 # with author/genre/year attributes, so subcorpora actually restrict to a
 # real *subset* of documents rather than just one out of two. Safe to
-# re-run, it just regenerates .devcorpus/.
+# re-run, it just regenerates DevCorpus/. Not dot-prefixed - kept visible in
+# Finder/Xcode along with the rest of the project.
 set -e
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-CORPUS="$ROOT/.devcorpus"
+CORPUS="$ROOT/DevCorpus"
 
 rm -rf "$CORPUS"
 mkdir -p "$CORPUS/vert" "$CORPUS/registry" "$CORPUS/data"

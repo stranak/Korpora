@@ -93,7 +93,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "MANATEE_REGISTRY"
-            value = "$(SRCROOT)/.devcorpus/registry"
+            value = "$(SRCROOT)/DevCorpus/registry"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
