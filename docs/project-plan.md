@@ -387,14 +387,13 @@ tool) should run items 1–4 and update this log and the status table.
   word ending)", and `SortLevel.reverse` in ManateeKit gained a doc comment
   explaining the same thing.
 
-**2026-09-05, added but not yet manually verified:** column-header
-click-to-sort (see Phase 1's writeup above). Build and the new
-`ConcordanceOperationTests` cases pass, but nobody has clicked a Left/
-Match/Right header yet — check: does clicking sort correctly, does a second
-click flip to descending with the indicator triangle following, and does
-the indicator correctly disappear/move if you then use the toolbar's Sort
-popover with a different attribute (e.g. `lemma`), and reappear correctly
-after Cmd-Z?
+**2026-09-05, user manual click-through, continued:** Settings confirmed
+fixed (font change in Appearance settings applied correctly). Sort
+confirmed working both via the toolbar's Sort popover and via clicking the
+Left/Match/Right column headers directly. Indicator-triangle/undo edge
+cases (switching between header-click and popover sorts, undo/redo) weren't
+specifically called out but no issues were reported. Still outstanding:
+the subcorpus creation/query flow (item 3), and the row context menu.
 
 ## Phase 3 (sketch, not started) — Analysis views
 
