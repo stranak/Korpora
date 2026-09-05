@@ -15,6 +15,9 @@ final class ConcordanceViewController: NSViewController {
     // sortDescriptors` to mirror the document's actual current sort) being
     // mistaken for a user header click and re-applied as a new operation.
     private var isSyncingSortIndicators = false
+    // The Operations popover, while open, needs to be kept in sync with
+    // `refresh()` - see its use in `refresh()` for why.
+    private weak var activeOperationsPopover: OperationsPopoverController?
 
     weak var windowController: ConcordanceWindowController?
 
@@ -132,14 +135,15 @@ final class ConcordanceViewController: NSViewController {
         let popover = NSPopover()
         let controller = OperationsPopoverController()
         updateOperationsPopover(controller)
+        activeOperationsPopover = controller
         controller.onRemove = { [weak self, weak controller] index in
             guard let self, let controller else { return }
             document.removeOperation(at: index)
             updateOperationsPopover(controller)
         }
-        controller.onClearLineGroups = { [weak self, weak controller] in
+        controller.onClearLineGroup = { [weak self, weak controller] group in
             guard let self, let controller else { return }
-            document.performClearLineGroups()
+            document.performClearLineGroup(group)
             updateOperationsPopover(controller)
         }
         popover.contentViewController = controller
@@ -151,7 +155,12 @@ final class ConcordanceViewController: NSViewController {
         controller.operations = document.operations.enumerated()
             .filter { !$0.element.isLineGroupOperation }
             .map { (index: $0.offset, summary: $0.element.summary) }
-        controller.lineGroupCount = document.operations.filter(\.isLineGroupOperation).count
+        // Sourced from the concordance's current per-row group, not raw
+        // operation counts, so a line reassigned between groups is only
+        // ever counted under its actual current group.
+        let counts = Dictionary(grouping: document.rows.filter { $0.group != 0 }, by: \.group)
+            .mapValues(\.count)
+        controller.lineGroups = counts.keys.sorted().map { (group: $0, lineCount: counts[$0]!) }
     }
 
     // MARK: - Table view
@@ -298,6 +307,15 @@ final class ConcordanceViewController: NSViewController {
         dataSource.apply(snapshot, animatingDifferences: true)
         windowController?.updateToolbarState(hasLineGroups: document.hasLineGroups)
         syncSortIndicators()
+        // If the Operations popover is open, its line-group rows are sourced
+        // from `document.rows` (see `updateOperationsPopover`), which only
+        // becomes current once the async replay triggered by a remove/clear
+        // actually finishes - i.e. right here, not at the moment the button
+        // was clicked. Without this, the popover shows stale line-group
+        // counts until some *later* action happens to refresh it.
+        if let activeOperationsPopover {
+            updateOperationsPopover(activeOperationsPopover)
+        }
     }
 
     // MARK: - Row context menu
@@ -315,11 +333,12 @@ final class ConcordanceViewController: NSViewController {
     }
 
     @objc private func assignLineGroup(_ sender: NSMenuItem) {
-        // Each selected row becomes its own single-line operation - simple
-        // and correct, if not as compact an undo chain as a batched op would be.
-        for row in targetedRows() {
-            document.performSetLineGroup(rangeStart: row, rangeLen: 1, group: sender.tag)
-        }
+        // Each selected row still becomes its own `.setLineGroup` operation
+        // in the persisted chain, but as one batched operations-chain update
+        // (see `performSetLineGroups`) - appending them one at a time here
+        // used to fire one overlapping `replay()` per row and crash the
+        // engine on a multi-row selection.
+        document.performSetLineGroups(Array(targetedRows()), group: sender.tag)
     }
 
     @objc private func filterToSelection(_ sender: Any) {

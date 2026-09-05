@@ -88,6 +88,40 @@ Confirmed product decisions (from earlier in this project):
   (collocations, frequency distributions). Word sketches are explicitly out
   of scope.
 - **Packaging**: dev-only for now (no icon/signing/notarization work).
+- **Document persistence model**: dev-only choice, **revisit before real
+  release** — `ConcordanceDocument.isDocumentEdited` is hardcoded to
+  `false` (2026-09-05) so a concordance is disposable scratch state: running
+  sort/filter/shuffle/sample/line-group no longer dirties the document, so
+  closing a window or quitting never prompts to Save/Delete/Cancel, and
+  unsaved concordances are silently discarded. This was the right call
+  *during* active development/testing (constant quit/relaunch cycles were
+  getting interrupted by save prompts for throwaway test concordances), but
+  it's the opposite of how a finished, "modern macOS app" should feel —
+  every open concordance (query + operation chain, not the materialized
+  rows — see `DocumentState`) should transparently survive quit/relaunch
+  with no explicit Save, the same way Notes/TextEdit/Safari resume exactly
+  where you left off. Making that the real pre-release behavior needs:
+  1. Removing/reverting the `isDocumentEdited` override above (or gating it
+     behind a debug-only flag) so documents can autosave-and-resume instead
+     of always discarding.
+  2. Restoring `window.isRestorable = true` /
+     `NSQuitAlwaysKeepsWindows = true` (`Corpora/Corpora/Controllers/
+     ConcordanceWindowController.swift`, `Corpora/Corpora/Info.plist`) —
+     currently forced off because they caused a stuck-restoration-state bug
+     that silently swallowed a launch (no window, no error) after repeated
+     force-kills during dev testing (see Phase 0's bugs list). That
+     workaround needs a real root-cause fix instead of leaving restoration
+     disabled, or the "silent resume" this item wants can't come back
+     safely.
+  3. Reconsidering `AppDelegate.applicationShouldTerminate` (added
+     2026-09-05, always returns `.terminateNow`) — added as an explicit,
+     unconditional guarantee that the app can always quit instantly with no
+     alert, from a script or the system as well as the user, independent of
+     any document's edited state. A real persistence model doesn't
+     necessarily conflict with this (autosave-and-resume can still happen
+     on an unconditional-terminate path), but it needs to be re-examined
+     alongside items 1–2, not left as an accidental leftover from the
+     disposable-scratch model.
 - **Tests**: ManateeKit's tests are XCTest, not this workspace's usual Swift
   Testing convention — a known divergence, not something to rewrite
   speculatively.
@@ -517,6 +551,143 @@ one aggregate, removable row. **Not yet re-verified**: multi-row line-group
 assignment (`assignLineGroup`'s `targetedRows()` path, which needed
 multi-selection to ever be reachable) and the merged Operations/Clear
 Groups popover.
+
+**2026-09-05, multi-row selection re-verification, app crash found and fixed
+(Terminal session):** user confirmed Cmd-click/Shift-click multi-selection
+itself now works, but the app crashed when assigning several selected lines
+to a line group at once. Root cause: `ConcordanceDocument.replay()` opens a
+brand-new `Corpus`/`LiveConcordance` (a fresh Manatee handle) on every call,
+and `ConcordanceViewController.assignLineGroup` called
+`performSetLineGroup` once per selected row in a synchronous loop — each
+call independently ran `appendOperation` → `setOperations` → `replay()`,
+firing one unawaited `Task` per row. Manatee's thread-safety is only
+documented/assumed safe *within* one actor instance (see `LiveConcordance`'s
+doc comment); nothing serializes access *across* separate instances, so a
+multi-row assignment opened several concurrent handles and queries against
+the engine at once and crashed it. Fixed two ways:
+1. `ConcordanceDocument` gained `performSetLineGroups(_:group:)`, which
+   appends all the selected rows' `.setLineGroup` operations in one
+   `setOperations` call (one replay, one undo step) —
+   `assignLineGroup` now calls this instead of looping.
+2. `replay()` itself now serializes: a stored `currentReplayTask` is
+   awaited by the next `replay()` call before it touches the engine, so
+   even an unrelated pair of rapid actions (not just this one) can no
+   longer run concurrently.
+
+Verified: `xcodebuild -project Corpora.xcodeproj -scheme Corpora build` →
+**BUILD SUCCEEDED**.
+
+**2026-09-05, re-verified (user):** multi-row selection and multi-row
+line-group assignment both confirmed working — the crash is fixed.
+
+**2026-09-05, quit/close-anytime confirmed (user):** with
+`ConcordanceDocument.isDocumentEdited` hardcoded false and
+`AppDelegate.applicationShouldTerminate` returning `.terminateNow`
+unconditionally (both above), closing windows and quitting no longer
+prompts under any circumstance tested — matches the "disposable scratch
+state" decision recorded above. Remember this is explicitly a dev-time
+tradeoff to revisit before release (see the "Document persistence model"
+bullet).
+
+Also noteworthy from this session: the user was surprised the app reopened
+last session's concordance on launch. Traced to
+`ConcordanceDocument.override class var autosavesInPlace: Bool { true }` —
+NSDocument's own autosave/resume mechanism, which silently reopens
+previously-open autosaved documents on next launch. This is a *different*
+mechanism from the window-restoration bits already disabled elsewhere
+(`window.isRestorable = false`, `NSQuitAlwaysKeepsWindows = false`,
+`applicationSupportsSecureRestorableState`) — those don't affect it. Not
+changed; recorded here since it's easy to mistake for stuck window-
+restoration state (a previously-fixed bug, see Phase 0) rather than this
+separate, working-as-designed autosave path.
+
+**2026-09-05, Operations popover per-group listing confirmed working, then
+refined (user + Terminal session):** the merged Operations/Clear Groups
+popover itself confirmed working as-is. Follow-up UX request: list each
+line group separately instead of one aggregate "Line group(s) (N lines
+tagged)" row, so a single group can be cleared without wiping every group
+at once. Implemented:
+- `ConcordanceDocument.performClearLineGroups()` (cleared every line-group
+  operation) replaced with `performClearLineGroup(_ group:)`, which only
+  drops `.setLineGroup` operations for that specific group number and
+  replays — safe to filter by group number alone (ignoring position)
+  because sort/filter/shuffle/sample stay disabled the entire time any line
+  group exists, so every `.setLineGroup` operation in the chain runs
+  against the same, unchanging view order.
+- `OperationsPopoverController.lineGroupCount: Int` replaced with
+  `lineGroups: [(group: Int, lineCount: Int)]`, one removable row per
+  active group (group 0/"None" excluded — nothing meaningful to clear about
+  it), each row's remove button now calls `onClearLineGroup(group)`.
+- `ConcordanceViewController.updateOperationsPopover` now derives the
+  per-group counts from `document.rows`' actual current `group` field
+  (grouped/counted directly), not from raw operation counts — so a line
+  reassigned from one group to another is only ever counted under its
+  current group, not double-counted under a stale one.
+
+Verified: `xcodebuild -scheme Corpora build` → **BUILD SUCCEEDED**.
+
+**2026-09-05, re-verified, one lag bug found and fixed (user + Terminal
+session):** removing a group correctly updated the concordance table
+immediately, but the popover's own row for that group only disappeared
+after clicking a second time (on that row or any other). Root cause:
+`performClearLineGroup`'s `replay()` is async and only updates
+`document.rows` once the engine query actually finishes, but
+`ConcordanceViewController.operationsTapped`'s `onClearLineGroup`/`onRemove`
+handlers called `updateOperationsPopover` *synchronously*, immediately
+after kicking off that replay — always reading the pre-replay, stale
+`document.rows`. The main table didn't have this problem because
+`document.onResultsChanged` was already wired to `refresh()`, which runs
+*after* the replay completes; the popover just wasn't hooked into that same
+signal, so it only ever caught up on whatever *next* button click happened
+to call `updateOperationsPopover` again. Fixed by tracking the open popover
+(`ConcordanceViewController.activeOperationsPopover`, weak) and having
+`refresh()` itself call `updateOperationsPopover` on it when present, so it
+updates at the same time as the table rather than only at the next click.
+Verified: `xcodebuild -scheme Corpora build` → **BUILD SUCCEEDED**. Not yet
+manually re-verified by the user.
+
+**2026-09-05, build-warning cleanup (Terminal session):** user asked about
+~41 build warnings and whether they're worth fixing. Broke down into four
+buckets:
+1. **Fixed** — 3x "no 'async' operations occur within 'await' expression":
+   `try await Corpus(name:)` in `ConcordanceDocument.replay()` and
+   `NewConcordanceSheetController` (two call sites) — `Corpus.init(name:)`
+   is `throws`, not `async throws`, so the `await` was always a no-op.
+   Dropped it (kept `try`).
+2. **Fixed** — 2x "non-Sendable type 'OpaquePointer' ... cannot exit
+   actor-isolated context; this is an error in the Swift 6 language mode":
+   `LiveConcordance.init` reading `corpus.handle` (a different actor's
+   property) across isolation. `Corpus.handle`
+   (`ManateeKit/Sources/ManateeKit/ManateeKit.swift`) is now
+   `nonisolated(unsafe) let handle: OpaquePointer` — sound because it's
+   immutable and only ever a raw pointer *value*; the actors' whole job is
+   serializing the engine *calls* that use it, not gatekeeping the pointer
+   value itself, so this doesn't weaken the safety `Corpus`/`LiveConcordance`
+   being actors was for. This one was a real forward-compat issue (would
+   become a hard error under Swift 6 mode), worth fixing now rather than
+   later. `LiveConcordance.init` updated to read it without `await`
+   accordingly (`ManateeKit/Sources/ManateeKit/LiveConcordance.swift`).
+3. **Left alone, not worth it (dev-only project)** — ~38 linker warnings,
+   "object file ... was built for newer macOS version (26.0/27.0) than
+   being linked (13.0)", from `manatee-open`'s prebuilt
+   `libbuiltinmanatee.a` plus one for the Homebrew `libpcre2` dylib. Purely
+   a deployment-target mismatch between how `manatee-open` was built
+   locally and Corpora's Debug deployment target; harmless on the
+   development machine (always current macOS). Would need a `manatee-open`
+   build-config change (its own `configure`/Makefile invocation, not
+   anything in this repo) — worth revisiting only alongside real packaging/
+   distribution work, not now.
+4. **Left alone, upstream code** — 5x `-Wshorten-64-to-32` (implicit
+   64→32-bit integer narrowing) in `manatee-open` headers (`finlib/
+   regexplex.hh`, `finlib/generator.hh`, `concord/concord.hh` x2, `concord/
+   concget.hh`). Pre-existing upstream C++ code, not something this fork
+   has touched; no evidence of an actual bug behind any of them (line/token
+   counts fitting in `int` in practice for corpora this size). Not worth
+   chasing without a concrete symptom.
+
+Verified: rebuilt after 1–2 with `xcodebuild -scheme Corpora clean build`
+→ zero warnings left besides buckets 3–4; `cd ManateeKit && swift test` →
+17/17 still passing.
 
 ## Phase 3 (sketch, not started) — Analysis views
 

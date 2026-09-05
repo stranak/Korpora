@@ -2,27 +2,29 @@ import Cocoa
 
 /// Content of the toolbar's Operations popover - lists every active sort/
 /// filter/shuffle/sample with a per-row remove button, for undoing a single
-/// step without unwinding everything after it via Cmd-Z. Also folds in bulk
+/// step without unwinding everything after it via Cmd-Z. Also folds in
 /// line-group clearing (formerly a separate "Clear Groups" toolbar button -
 /// merged here since both are fundamentally "review and cancel active
-/// operations"). Line groups still appear as one aggregate row, not one per
-/// line, since there can be many of them.
+/// operations"), one row per active group so a single group can be cleared
+/// without touching the others.
 final class OperationsPopoverController: NSViewController {
     /// (index into the document's full operations array, display summary).
     var operations: [(index: Int, summary: String)] = [] {
         didSet { if isViewLoaded { rebuildRows() } }
     }
-    /// Number of individual line-group assignments currently active, shown
-    /// as one aggregate row rather than one per line.
-    var lineGroupCount: Int = 0 {
+    /// (group number, number of lines currently tagged with it) - one row
+    /// per active group, sorted by group number. Group 0 ("None") is never
+    /// included; there's nothing meaningful to clear about it.
+    var lineGroups: [(group: Int, lineCount: Int)] = [] {
         didSet { if isViewLoaded { rebuildRows() } }
     }
     var onRemove: ((Int) -> Void)?
-    var onClearLineGroups: (() -> Void)?
+    var onClearLineGroup: ((Int) -> Void)?
 
-    /// Sentinel `NSButton.tag` marking the line-groups row's remove button,
-    /// distinguishing it from a real `operations` index (always >= 0).
-    private static let lineGroupsTag = -1
+    /// A line-group row's `NSButton.tag` is encoded as `-(group + 1)` so it
+    /// can't collide with a real `operations` index (always >= 0).
+    private static func tag(forGroup group: Int) -> Int { -(group + 1) }
+    private static func group(fromTag tag: Int) -> Int { -(tag + 1) }
 
     private let stack = NSStackView()
     private let emptyLabel = NSTextField(labelWithString: "No active sort, filter, shuffle, sample, or line groups.")
@@ -60,7 +62,7 @@ final class OperationsPopoverController: NSViewController {
 
     private func rebuildRows() {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let isEmpty = operations.isEmpty && lineGroupCount == 0
+        let isEmpty = operations.isEmpty && lineGroups.isEmpty
         emptyLabel.isHidden = !isEmpty
         stack.isHidden = isEmpty
 
@@ -69,9 +71,9 @@ final class OperationsPopoverController: NSViewController {
             stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
-        if lineGroupCount > 0 {
-            let summary = "Line group\(lineGroupCount == 1 ? "" : "s") (\(lineGroupCount) line\(lineGroupCount == 1 ? "" : "s") tagged)"
-            let row = makeRow(tag: Self.lineGroupsTag, summary: summary)
+        for (group, lineCount) in lineGroups {
+            let summary = "Group \(group) (\(lineCount) line\(lineCount == 1 ? "" : "s"))"
+            let row = makeRow(tag: Self.tag(forGroup: group), summary: summary)
             stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
@@ -111,8 +113,8 @@ final class OperationsPopoverController: NSViewController {
     }
 
     @objc private func removeTapped(_ sender: NSButton) {
-        if sender.tag == Self.lineGroupsTag {
-            onClearLineGroups?()
+        if sender.tag < 0 {
+            onClearLineGroup?(Self.group(fromTag: sender.tag))
         } else {
             onRemove?(sender.tag)
         }

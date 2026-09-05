@@ -41,6 +41,21 @@ final class ConcordanceDocument: NSDocument {
 
     override class var autosavesInPlace: Bool { true }
 
+    /// A concordance is disposable scratch state by default - like a
+    /// KonText tab, not a file the user must explicitly keep or discard.
+    /// NSDocument's default `isDocumentEdited` tracks the undo manager, and
+    /// every `setOperations` call (sort/filter/shuffle/sample/line-group)
+    /// registers an undo action - so without this override, touching any
+    /// toolbar control would dirty the document and closing/quitting would
+    /// prompt to Save/Delete/Cancel. Explicit File > Save still works (see
+    /// `validateUserInterfaceItem` below), independent of this override.
+    override var isDocumentEdited: Bool { false }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(NSDocument.save(_:)) { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+
     override func makeWindowControllers() {
         let controller = ConcordanceWindowController(document: self)
         windowController = controller
@@ -106,11 +121,32 @@ final class ConcordanceDocument: NSDocument {
         appendOperation(.setLineGroup(rangeStart: rangeStart, rangeLen: rangeLen, group: group))
     }
 
-    /// Drops every line-group operation and replays, returning to the normal
-    /// sort/filter/shuffle/sample chain - Manatee has no "reset all labels
-    /// but keep every line" call of its own to mirror instead.
-    func performClearLineGroups() {
-        setOperations(operations.filter { !$0.isLineGroupOperation })
+    /// Assigns every given row to `group` as a single operation-chain update.
+    /// Must be used instead of calling `performSetLineGroup` once per row -
+    /// each call to `appendOperation` triggers its own `replay()`, and
+    /// `replay()` opens a brand-new `Corpus`/`LiveConcordance` (a fresh
+    /// Manatee handle) - firing one per selected row let multiple overlapping
+    /// handles hit the engine concurrently and crashed it.
+    func performSetLineGroups(_ rangeStarts: [Int], group: Int) {
+        guard !rangeStarts.isEmpty else { return }
+        let ops = rangeStarts.map { ConcordanceOperation.setLineGroup(rangeStart: $0, rangeLen: 1, group: group) }
+        setOperations(operations + ops)
+    }
+
+    /// Drops every `.setLineGroup` operation assigning `group` specifically
+    /// (every other group's assignments are untouched) and replays - lines
+    /// whose only assignment was to `group` revert to no group (Manatee's
+    /// own default); a line reassigned to a different group afterward is
+    /// unaffected, since its later operation is what's actually still in
+    /// effect. Safe to filter by group number alone, ignoring position,
+    /// because the toolbar disables sort/filter/shuffle/sample once any
+    /// line group exists - every `.setLineGroup` operation in the chain
+    /// therefore runs against the same, unchanging view order.
+    func performClearLineGroup(_ group: Int) {
+        setOperations(operations.filter {
+            guard case .setLineGroup(_, _, let g) = $0 else { return true }
+            return g != group
+        })
     }
 
     /// Removes exactly one operation from the chain (e.g. a single sort or
@@ -141,6 +177,15 @@ final class ConcordanceDocument: NSDocument {
 
     // MARK: - Query execution
 
+    /// Chains onto any in-flight replay instead of letting two run
+    /// concurrently - each `replay()` opens its own `Corpus`/`LiveConcordance`
+    /// (a fresh Manatee handle), and the engine's thread-safety under
+    /// concurrent access from separate handles is undocumented (see
+    /// `LiveConcordance`'s doc comment). Two operations queued back-to-back
+    /// before the first query resolves (e.g. `performSetLineGroups`, or any
+    /// future rapid double-action) would otherwise fire concurrently.
+    private var currentReplayTask: Task<Void, Never>?
+
     private func replay() {
         guard !corpusName.trimmingCharacters(in: .whitespaces).isEmpty,
               !initialQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
@@ -160,9 +205,11 @@ final class ConcordanceDocument: NSDocument {
             if case .sort(_, _, let descending) = op { return descending }
             return nil
         }.first ?? false
-        Task { @MainActor in
+        let previousReplay = currentReplayTask
+        currentReplayTask = Task { @MainActor in
+            await previousReplay?.value
             do {
-                let corpus = try await Corpus(name: corpusName)
+                let corpus = try Corpus(name: corpusName)
                 let queryCorpus: Corpus
                 if let subcorpusPath {
                     queryCorpus = try await corpus.openSubcorpus(atPath: subcorpusPath)

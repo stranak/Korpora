@@ -13,6 +13,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    /// The app must be closable at any time - by the user, by a script, by
+    /// the system at logout/shutdown - with no alert and nothing left
+    /// pending. `ConcordanceDocument.isDocumentEdited` already reports false
+    /// unconditionally (concordances are disposable scratch state, not
+    /// files the user must keep or discard - see docs/project-plan.md's
+    /// "Document persistence model" note), so AppKit's default unsaved-
+    /// document review has nothing to prompt about - but this makes that
+    /// guarantee explicit and unconditional rather than a side effect of
+    /// document state, so it can't regress if that state ever changes
+    /// without this being revisited too. Revisit both together per the
+    /// pre-release persistence TODO in the project plan.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        .terminateNow
+    }
+
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
     }

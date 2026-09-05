@@ -127,7 +127,7 @@ public actor LiveConcordance {
 
     public init(corpus: Corpus, cql: String) async throws {
         self.corpus = corpus
-        let corpusHandle = await corpus.handle
+        let corpusHandle = corpus.handle
         self.corpusHandle = corpusHandle
         var error: UnsafeMutablePointer<CChar>?
         guard let h = mtc_query(corpusHandle, cql, &error) else {

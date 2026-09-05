@@ -34,7 +34,13 @@ public actor Corpus {
 
     // Module-internal (not private) so `LiveConcordance` can open a query
     // against this corpus without re-exposing the raw handle publicly.
-    let handle: OpaquePointer
+    // `nonisolated(unsafe)` because it's an immutable raw pointer value -
+    // copying it across actor isolation is fine; it's the engine calls that
+    // *use* it that need serializing, and those stay actor-isolated (here
+    // and in `LiveConcordance`) regardless of how this property is
+    // annotated. Without this, Swift 6 mode treats reading it from another
+    // actor as an error (non-Sendable type exiting actor isolation).
+    nonisolated(unsafe) let handle: OpaquePointer
 
     public init(name: String) throws {
         var error: UnsafeMutablePointer<CChar>?
