@@ -131,9 +131,9 @@ Confirmed product decisions (from earlier in this project):
 | Phase | Engine (ManateeKit/CManatee) | AppKit UI | Visually verified |
 |---|---|---|---|
 | 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
-| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + merged Operations/Clear-Groups popover (2026-09-05) | **partial — sort, sample, filter, Operations popover, and row context menu (line group/filter-to-selection/copy) all confirmed by user; multi-row selection bug found & fixed; merged popover and multi-row line-group assignment not yet re-verified** |
+| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + merged Operations/Clear-Groups popover with one row per active group (2026-09-05) | **yes — sort, sample, filter, shuffle, multi-row selection, multi-row line-group assignment, per-group Operations popover (incl. live-refresh fix), and row context menu (filter-to-selection/copy) all confirmed by user; see verification log for the full trail of bugs found & fixed along the way** |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
-| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings (bug found & fixed), Sort, and subcorpus creation/query all confirmed by user; row context menu still outstanding; see verification log** |
+| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
 | 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
