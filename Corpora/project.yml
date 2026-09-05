@@ -1,0 +1,62 @@
+name: Corpora
+options:
+  bundleIdPrefix: cz.cuni.mff.ufal
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+packages:
+  ManateeKit:
+    path: ../ManateeKit
+
+targets:
+  Corpora:
+    type: application
+    platform: macOS
+    sources:
+      - path: Corpora
+    dependencies:
+      - package: ManateeKit
+        product: ManateeKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        ENABLE_HARDENED_RUNTIME: NO
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Corpora/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Corpora/Corpora.entitlements
+
+  CorporaTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: CorporaTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Corpora.app/Contents/MacOS/Corpora"
+    dependencies:
+      - target: Corpora
+
+schemes:
+  Corpora:
+    build:
+      targets:
+        Corpora: all
+        CorporaTests: [test]
+    run:
+      config: Debug
+      environmentVariables:
+        # A tiny dev-only corpus (scripts/build-dev-corpus.sh) so the "New
+        # Concordance" sheet's corpus picker has something real to show when
+        # running from Xcode. Not used by the shipped app in any real sense -
+        # just a stand-in registry for interactive development.
+        MANATEE_REGISTRY: "$(SRCROOT)/.devcorpus/registry"
+    test:
+      config: Debug
+      targets:
+        - CorporaTests

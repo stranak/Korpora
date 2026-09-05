@@ -1,0 +1,350 @@
+# Corpora: native AppKit corpus concordancer — status & handoff
+
+This is the living status/handoff document for this project. It lives at
+`docs/project-plan.md` in the repo (not `~/.claude/plans/` or anywhere
+outside the checkout) so any session — Terminal or Xcode — can read and
+update it, and so code comments can cite it by a stable path. See the root
+`CLAUDE.md` for the convention.
+
+## Division of labor
+
+- **Terminal Claude Code sessions**: engine-layer work (`ManateeKit`/
+  `CManatee`/`manatee-open`), XCTest, AppKit *code* changes, git/PR work,
+  planning.
+- **Xcode's built-in Claude agent**: building/running `Corpora.app` via
+  `BuildProject`/`RunAllTests`/`RunProject`, and — for anything that
+  actually needs a screen — `RenderPreview` for SwiftUI-only work.
+  **Correction (2026-09-05): `DeviceInteraction*` (the synthesize
+  screenshot/click/type tool) only supports iOS/watchOS/tvOS
+  *simulators*, not macOS app windows** — confirmed by trying it against
+  this project's `Corpora` scheme, which was rejected outright
+  ("device... not supported for Device Interaction"). There is currently
+  **no tool available to either session type that can click through
+  `Corpora`'s AppKit UI.** `BuildProject`/`RunAllTests`/`RunProject` +
+  `GetConsoleOutput` still let you confirm it builds, its non-UI tests
+  pass, and it launches without crashing/logging errors — that's the
+  ceiling until a macOS-capable interaction tool exists (or the
+  Terminal-side Accessibility permission gets revisited).
+
+(Earlier in this project, GUI verification was attempted from a Terminal
+session via `screencapture`/`osascript`, and the user withdrew that after a
+starker-than-expected macOS screen-recording permission prompt. That's why
+the division above exists — not because Terminal sessions technically can't
+launch the app, but because driving/inspecting its UI belongs to the Xcode
+agent's purpose-built tools instead.)
+
+## Repository state
+
+Three places hold parts of this work; know which before assuming something
+is "done":
+
+- **`github.com/stranak/mac-corpora`, branch `main`** — the pushed baseline.
+  Holds only the pre-Phase-0 engine: `.gitignore`, `ManateeKit/Package.swift`,
+  `ManateeKit/Sources/CManatee/{include/mtcbridge.h,mtcbridge.cc}`,
+  `ManateeKit/Sources/ManateeKit/ManateeKit.swift`,
+  `ManateeKit/Sources/manateekit-cli/main.swift`,
+  `scripts/setup-dev-machine.sh`. Nothing from Phases 0–2 was on the remote
+  until this session's commits.
+- **`github.com/stranak/manatee-open`, branch `macos-arm64-portability`** —
+  a fork of `czcorpus/manatee-open`, the C++ engine. Fully committed and
+  pushed, including the `delete_linegroups` heap-corruption fix (see Phase 1
+  bugs below). **Not yet opened as a PR to upstream** — the user declined
+  that step for now, so it's just sitting on the pushed branch.
+- **A SwiftUI shell (`ManateeKit/Sources/ManateeKitApp/`) existed briefly
+  as an early proof-of-concept** and was superseded by the AppKit `Corpora`
+  app described below (the user's explicit call, citing Daring Fireball's
+  SwiftUI-vs-AppKit commentary). It was dropped before ever reaching the
+  pushed history, so there's no commit to point to for that decision — this
+  paragraph is the record of it.
+
+`manatee-open` itself is **not pinned** by anything in `mac-corpora` — it's
+excluded via `.gitignore` and `scripts/setup-dev-machine.sh` only checks
+that a `manatee-open` checkout exists next to this repo, it doesn't clone or
+check out a branch. On a fresh machine, clone it explicitly and check out
+the right branch *before* running that script:
+
+```
+git clone -b macos-arm64-portability https://github.com/stranak/manatee-open.git
+```
+
+Otherwise the build silently uses unpatched upstream `manatee-open`,
+including the reverted `delete_linegroups` heap corruption.
+
+## Context
+
+`ManateeKit` wraps `manatee-open` (the C++ corpus-query engine that also
+powers KonText, ÚFAL/CNC's open-source corpus concordancer). **Corpora** is
+the native macOS app being built on top of it — AppKit rather than SwiftUI,
+aiming to cover most of KonText's functionality while adapting the workflow
+to native Mac idioms rather than porting the web UI verbatim.
+
+Confirmed product decisions (from earlier in this project):
+- **Reference app**: KonText (github.com/czcorpus/kontext) — verified by
+  cloning it and reading its actual server-side code, not just docs.
+- **Window model**: multi-window/tab, NSDocument-based — each query/
+  concordance is its own document.
+- **Feature priority**: (1) concordance operations (sort/filter/shuffle/
+  sample/line-groups), (2) corpus & subcorpus management, (3) analysis views
+  (collocations, frequency distributions). Word sketches are explicitly out
+  of scope.
+- **Packaging**: dev-only for now (no icon/signing/notarization work).
+- **Tests**: ManateeKit's tests are XCTest, not this workspace's usual Swift
+  Testing convention — a known divergence, not something to rewrite
+  speculatively.
+
+## Status summary
+
+| Phase | Engine (ManateeKit/CManatee) | AppKit UI | Visually verified |
+|---|---|---|---|
+| 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
+| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done | yes (screenshots, earlier session) |
+| Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
+| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **no — no available tool can click through macOS AppKit UI; see verification log** |
+| 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
+
+All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
+test` → 17/17).
+
+## Phase 0 — AppKit shell, NSDocument model, query parity (done)
+
+- `Corpora/Corpora.xcodeproj`, generated via `xcodegen` from
+  `Corpora/project.yml`, sibling to `ManateeKit/`. Depends on `ManateeKit`
+  as a local Swift package. Regenerate with `cd Corpora && xcodegen
+  generate` after adding/removing source files (Xcode won't pick them up on
+  its own).
+- `main.swift`: manual bootstrap (no storyboard). Calls
+  `AppSettings.shared.applyEnvironment()` and instantiates
+  `CorporaDocumentController` before `NSApplication.run()` — both must
+  happen before AppKit's automatic untitled-document-at-launch path fires,
+  which happens *very* early (before `applicationDidFinishLaunching`,
+  discovered the hard way).
+- `AppDelegate.swift`: programmatic main menu (App/File/Edit/Window + a
+  Settings… item, Cmd-,). Implements
+  `applicationSupportsSecureRestorableState` and disables window
+  restoration (see bugs below).
+- `Documents/ConcordanceDocument.swift`: the `NSDocument` subclass. Holds
+  `corpusName`, `subcorpusPath: String?`, `initialQuery`,
+  `leftContext`/`rightContext`/`kwicAttr`, `operations:
+  [ConcordanceOperation]`, `rows: [ConcordanceRow]`, `status`. Persists via
+  a `Codable` `DocumentState` JSON blob (query + operation chain only,
+  never the materialized rows). `makeWindowControllers()` either replays an
+  already-parameterized document or presents `NewConcordanceSheetController`
+  for a blank one.
+- `Controllers/CorporaDocumentController.swift`: an `NSDocumentController`
+  subclass, currently just a marker (installed early so it becomes
+  `NSDocumentController.shared`). The "ask for corpus + query" flow actually
+  lives in `ConcordanceDocument.makeWindowControllers`, not here — see the
+  bug note below for why.
+- `Controllers/ConcordanceWindowController.swift` /
+  `ConcordanceViewController.swift`: one window per document, native
+  tabbing. Toolbar (Sort/Filter/Shuffle/Sample/Clear Groups, custom
+  `NSButton`-backed items). Query bar (`CQLQueryField`) + status label +
+  `NSTableView` (Group/Left/Match/Right columns via
+  `NSTableViewDiffableDataSource`). Row context menu: assign line group,
+  filter to selection, copy.
+- `Controllers/FilterSheetController.swift`: the sheet behind the toolbar's
+  Filter button — a positive/negative sub-query over a token window around
+  each hit, matching KonText's own filter form (including its -5/5 default
+  window; builds a `PNFilterSpec`).
+- `Controllers/SortPopoverController.swift`: the toolbar's Sort popover —
+  a single sort level (multi-level sort is already in the model via
+  `SortCriteria`, but isn't worth a UI for until someone needs it).
+- `Controllers/SamplePopoverController.swift`: the toolbar's Sample
+  popover — an absolute line count, matching KonText's own sample form (no
+  percentage option; see `LiveConcordance.sample`'s doc comment).
+- `Views/CQLQueryField.swift`: auto-growing `NSTextView`-backed query
+  editor, basic CQL syntax coloring + keyword completion.
+- `Views/KWICCellView.swift`: styled table cells + the Group badge; font
+  comes from `AppSettings.resultsFont`.
+- `Controllers/NewConcordanceSheetController.swift`: corpus picker (from
+  `ManateeKit.CorpusRegistry.availableCorpusNames()`), also shows corpus
+  info and a subcorpus picker (Phase 2 — see below).
+- `Settings/`: `AppSettings` (UserDefaults-backed:
+  `corpusRegistryDirectories`, `resultsFontName`/`Size`),
+  `SettingsWindowController` (classic multi-pane `.preference`-style
+  toolbar), `GeneralSettingsViewController` (directory list),
+  `AppearanceSettingsViewController` (Font Panel picker).
+- `Corpora/Corpora.entitlements`: sandboxing explicitly disabled
+  (`com.apple.security.app-sandbox` = false) — needed for arbitrary
+  registry/corpus-directory access during dev; revisit before any real
+  distribution.
+
+**Real bugs found and fixed along the way:**
+- AppKit's automatic "open untitled document at launch" calls
+  `openUntitledDocumentAndDisplay(false)` and shows the window through a
+  *separate* internal path — code gated on `displayDocument == true` there
+  never runs at launch. Fixed by moving the "present the new-concordance
+  sheet" logic into `ConcordanceDocument.makeWindowControllers()` instead of
+  the document-controller override.
+- macOS window-state restoration could silently swallow a launch (no
+  window, no error) after repeated force-kills during dev testing. Fixed
+  with `applicationSupportsSecureRestorableState() -> true`,
+  `window.isRestorable = false`, `NSQuitAlwaysKeepsWindows = false` in
+  Info.plist. For manual dev launches, pass `-ApplePersistenceIgnoreState
+  YES` as a process argument to bypass any stuck restoration state.
+- `NSTableViewDiffableDataSource` left stale cells on screen when only a
+  row's *content* changed (e.g. a line-group assignment) without its `id`
+  changing — diffable data sources only re-render on identity/order
+  changes. Fixed by calling `snapshot.reloadItems(_:)` for the current ids
+  on every refresh.
+
+## Phase 1 — Concordance operations (done)
+
+- `ManateeKit/Sources/CManatee/include/mtcbridge.h` /
+  `ManateeKit/Sources/CManatee/mtcbridge.cc`: `mtc_kwic_open` now uses
+  `RS(true)` (reflects the concordance's current *view*, i.e. sort/shuffle
+  order — it used to always render raw order). New:
+  `mtc_concordance_sort(conc, criteria, uniq, error)`,
+  `mtc_concordance_shuffle`, `mtc_concordance_reduce(size)` (sample),
+  `mtc_concordance_set_collocation` + `mtc_concordance_pnfilter` (filter),
+  `mtc_concordance_set_linegroup`/`get_linegroup`/`delete_linegroups`.
+- `ManateeKit/Sources/ManateeKit/LiveConcordance.swift`: a new actor
+  keeping one live `Concordance` handle open across operations (the actual
+  Phase 1 gap — `Corpus.query(_:)` used to open-then-discard a handle per
+  call). `sort(_:unique:)`, `shuffle()`, `sample(lines:)`, `filter(_:)`,
+  `setLineGroup(rangeStart:rangeLen:group:)`, `linegroup(at:)`,
+  `deleteLineGroups(_:invert:)`, `kwicLines(...)`. Plus
+  `SortCriteria`/`SortLevel`/`SortAnchor` and `PNFilterSpec`/`MatchRank`
+  (all `Codable` + `Sendable`).
+- `Corpora/Corpora/Documents/ConcordanceOperation.swift`: the `Codable`
+  enum (`.sort`, `.filter`, `.shuffle`, `.sample`, `.setLineGroup`) that's
+  actually persisted and undone — `ConcordanceDocument.setOperations`
+  registers `NSUndoManager` actions and replays the whole chain from
+  scratch against a fresh `LiveConcordance` (Manatee can't remove a middle
+  operation, only replay).
+- Toolbar mutual exclusion: once any line-group exists, Sort/Filter/
+  Shuffle/Sample disable and Clear Groups enables (mirrors KonText's own
+  rule) — verified visually earlier.
+- Tests in `ManateeKitTests.swift` + `LiveConcordanceTests.swift`.
+
+**Real bugs found and fixed along the way:**
+- A genuine upstream bug in `manatee-open`: `concord/concgrp.cc`'s
+  `delete_linegroups` freed a `malloc`'d buffer with C++ `delete` (heap
+  corruption, manifesting as a crash in an unrelated *later* call). Fixed
+  and committed to `stranak/manatee-open`, branch `macos-arm64-portability`,
+  pushed to origin (see Repository state above).
+- A use-after-free in `LiveConcordance` itself: it stored a corpus's raw
+  pointer without keeping the parent `Corpus` actor alive, so ARC could
+  free it out from under a still-live concordance.
+- An inverted `includeKwic`/`exclude_kwic` polarity bug in
+  `LiveConcordance.filter`.
+
+## Phase 2 — Corpus & subcorpus management (engine done + tested; AppKit UI implemented)
+
+### Engine (ManateeKit/CManatee) — done, 17/17 tests passing
+
+- Shim additions: `mtc_corpus_attr_count`/`attr_name`,
+  `mtc_corpus_struct_count`/`struct_name`,
+  `mtc_corpus_struct_attr_count`/`struct_attr_name` — read the
+  already-parsed `Corpus::conf` (`CorpInfo`) tree, no engine work needed.
+  `mtc_create_subcorpus(corp, subcPath, structName, query, error)`,
+  `mtc_subcorpus_open(parent, subcPath, error)` — the latter returns a
+  plain `MTCCorpus`, since `SubCorpus` *is a* `Corpus` in C++, so every
+  existing call (`mtc_query`, sort/filter/etc.) works on it unchanged.
+- `Corpus.name` (new stored property), `Corpus.info() -> CorpusInfo`
+  (`attributes: [String]`, `structures: [StructureInfo]`),
+  `Corpus.createSubcorpus(named:structure:query:) -> String` (path),
+  `Corpus.openSubcorpus(atPath:) -> Corpus`.
+- `ManateeKit/Sources/ManateeKit/SubcorpusStore.swift`: where subcorpus
+  `.subc` files live (`~/Library/Application
+  Support/Corpora/Subcorpora/<corpusName>/<subcorpusName>.subc`) and how to
+  list them.
+- **Important discovered semantic** (cost a debugging cycle): `create_subcorpus`'s
+  `query` parameter is evaluated with the *structure itself* as the corpus,
+  so structural attributes are unprefixed and **CQL brackets are not
+  used**. E.g. to restrict to `<doc id="1">`, the query is `id="1"` — not
+  `[id="1"]`, not `[doc.id="1"]`.
+- Also fixed: `mtc_corpus_size` used `Corpus::size()`, which always reports
+  the *parent* corpus's full token count — only `search_size()` is
+  overridden by `SubCorpus`. Switched to `search_size()` (a harmless no-op
+  for regular corpora, correct for subcorpora).
+- Tests: `CorpusInfoTests.swift`, `SubcorpusTests.swift`.
+
+### AppKit UI — implemented
+
+- `NewConcordanceSheetController` was extended: selecting a corpus now
+  fetches and shows its `CorpusInfo` (attributes + structures) in an info
+  label, and a new Subcorpus popup lists
+  `SubcorpusStore.availableSubcorpora(for:)` plus "Whole Corpus" and "New
+  Subcorpus…". `onCommit` signature is now `(corpusName, subcorpusPath:
+  String?, query)`.
+- `Corpora/Corpora/Controllers/NewSubcorpusPopoverController.swift`: name
+  field, structure popup (from `CorpusInfo.structures`), a CQL restriction
+  field, Create button — calls `Corpus.createSubcorpus`.
+- `ConcordanceDocument` gained `subcorpusPath: String?` (persisted).
+  `replay()` now opens the subcorpus via `Corpus.openSubcorpus(atPath:)`
+  when set and queries against *that*. The status line reads "N hits in an
+  M-token subcorpus "name"" vs. "...corpus" accordingly.
+- `Corpora/scripts/build-dev-corpus.sh` builds a 2-document dev corpus
+  (matching the test fixture, `doc id="1"`/`doc id="2"`) so there's
+  something real to create a subcorpus against when running from Xcode.
+
+### Verification log
+
+**2026-09-05, Xcode agent session:**
+
+- `xcodegen generate` re-run after adding a smoke test
+  (`Corpora/CorporaTests/ConcordanceOperationTests.swift`, a
+  `ConcordanceOperation` Codable round-trip + `isLineGroupOperation` check —
+  the directory was previously empty despite `project.yml` wiring it up as
+  a test target source).
+- `BuildProject` (buildForTesting) → **succeeded** on the `Corpora` scheme.
+- `RunAllTests` → **2/2 passed** (`CorporaTests`, i.e. the new smoke test —
+  this is everything the scheme's test plan currently covers; it does not
+  include ManateeKit's suite).
+- `cd ManateeKit && swift test` → **17/17 passed**.
+- `RunProject` → app launched successfully (PID captured); `GetConsoleOutput`
+  showed only benign macOS system noise (Intents-framework registration,
+  ViewBridge disconnects) — no crash, no app-level error output.
+- **Not confirmed — tooling gap, see the Division of labor correction
+  above:** the actual click-through items below (New Concordance sheet
+  contents, subcorpus creation/selection/query restriction, status line
+  phrasing, Phase 1 toolbar/undo/Settings interaction). `DeviceInteraction*`
+  rejected the macOS target outright, and no other available tool can
+  synthesize clicks/typing into an AppKit window. These remain open:
+
+1. Open `Corpora/Corpora.xcodeproj`. If `.devcorpus/` doesn't exist, run
+   `Corpora/scripts/build-dev-corpus.sh` once (idempotent). The Xcode
+   scheme's `MANATEE_REGISTRY` already points at it (see `project.yml`).
+2. Build + run. The New Concordance sheet should show corpus `testcorp`,
+   with an info label listing its attributes (word/lemma/tag) and
+   structures (doc (id), s), and a Subcorpus popup defaulting to "Whole
+   Corpus".
+3. Try "New Subcorpus…": name it e.g. `doc1`, structure `doc`, restrict-to
+   `id="1"` (see the semantic note above — no brackets, no prefix), Create.
+   Confirm it appears in the Subcorpus popup, and that selecting it +
+   searching (e.g. `[tag="JJ"][tag="NN"]`) restricts results to doc 1 only
+   and the status line says "...subcorpus "doc1"".
+4. Spot-check Phase 1's toolbar (Sort/Filter/Shuffle/Sample/Clear Groups),
+   the row context menu, undo/redo, and Settings (Cmd-,) with real
+   interaction (clicking, typing).
+5. Record results in this file's status table and this section; file any
+   defects found as new work above rather than silently fixing and
+   forgetting.
+
+Whoever next has a way to actually drive the AppKit UI (a human, a
+Terminal session with Accessibility permission re-granted, or a future
+tool) should run items 1–4 and update this log and the status table.
+
+## Phase 3 (sketch, not started) — Analysis views
+
+Collocations via `CollocItems` (`concord/concstat.hh`) — per-word
+freq/count plus MI/T-score/logDice-family association measures. Frequency
+distributions/word lists via `Corpus::freq_dist` and
+`count_structattr_vals`. Likely surfaces as new window/panel types (or new
+`NSDocument` subclasses) driven off an existing `LiveConcordance`. No shim
+work exists yet — plan this properly when it's next up.
+
+## Key files
+
+- `ManateeKit/Sources/CManatee/include/mtcbridge.h`,
+  `ManateeKit/Sources/CManatee/mtcbridge.cc` — the whole C shim surface
+- `ManateeKit/Sources/ManateeKit/ManateeKit.swift`, `LiveConcordance.swift`,
+  `SubcorpusStore.swift`, `CorpusRegistry.swift` — the Swift engine API
+- `ManateeKit/Tests/ManateeKitTests/` — 17 passing tests; run with `cd
+  ManateeKit && swift test`
+- `manatee-open/concord/concgrp.cc` — the fixed upstream bug, on
+  `stranak/manatee-open`'s `macos-arm64-portability` branch (pushed, not
+  yet a PR)
+- `Corpora/` — the Xcode project and all AppKit sources; `project.yml` for
+  xcodegen; `scripts/build-dev-corpus.sh` for the dev-only test corpus
