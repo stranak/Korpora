@@ -62,10 +62,15 @@ LANGUAGE "en"
 ENCODING "utf-8"
 
 ATTRIBUTE word
-ATTRIBUTE lemma { }
-ATTRIBUTE tag { }
-STRUCTURE doc { ATTRIBUTE id }
-STRUCTURE s { }
+ATTRIBUTE lemma {
+}
+ATTRIBUTE tag {
+}
+STRUCTURE doc {
+    ATTRIBUTE id
+}
+STRUCTURE s {
+}
 EOF
 export MANATEE_REGISTRY="$TESTDIR/registry"
 "$ROOT/manatee-open/src/encodevert" -v -c testcorp > /dev/null
