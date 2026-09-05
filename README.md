@@ -1,1 +1,1 @@
-Native MacOS concordancer built on top of [manatee-open](https://github.com/czcorpus/manatee-open).
+Native MacOS corpus manager built on top of [manatee-open](https://github.com/czcorpus/manatee-open). Aiming at similar feature set as [Kontext](https://github.com/czcorpus/kontext), but all in native Mac app, following Macintosh Human Interface Guidelines.
