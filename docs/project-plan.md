@@ -97,9 +97,9 @@ Confirmed product decisions (from earlier in this project):
 | Phase | Engine (ManateeKit/CManatee) | AppKit UI | Visually verified |
 |---|---|---|---|
 | 0 — AppKit shell, NSDocument, query parity | done | done | yes (screenshots, earlier session) |
-| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + Operations popover (2026-09-05) | **partial — core toolbar ops confirmed by user (sort, sample, filter); header-click-sort confirmed; Operations popover not yet manually verified; row context menu/undo not yet re-verified since the 2026-09-05 additions** |
+| 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + Operations popover (2026-09-05) | **partial — sort (toolbar + header-click), sample, filter, and the Operations popover all confirmed by user; row context menu and undo/redo not yet (re-)verified since the 2026-09-05 additions** |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
-| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **partial — user manually verified Settings (bug found & fixed) and Sort (confirmed correct); subcorpus flow (item 3) still outstanding; see verification log** |
+| 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings (bug found & fixed), Sort, and subcorpus creation/query all confirmed by user; row context menu still outstanding; see verification log** |
 | 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
@@ -339,21 +339,37 @@ test` → 17/17).
 
   So e.g. `author="twain"` (structure `doc`) restricts to docs 1+2 (2 of 5),
   `genre="fiction"` to docs 1+2+3 (3 of 5), `genre="news"` to docs 4+5.
-  Content still follows the original doc 1/2 pattern (DT-JJ-NN-VBZ
-  sentences, plus doc 1's original DT-JJ-JJ-NN-VBZ sentence testing that
-  `[tag="JJ"][tag="NN"]` doesn't match a JJ-JJ pair) — 41 tokens total,
-  verified via `swift run manateekit-cli testcorp '[tag="JJ"][tag="NN"]'`
-  against `DevCorpus/registry`: exactly the 10 expected JJ+NN matches
-  (brown fox, lazy dog, curious cat, sleepy cat, elegant lady, proud
-  gentleman, local market, global economy, annual report, modest profit),
-  one per sentence, in document order. Subcorpus creation itself with these
-  *specific* attribute names hasn't been separately verified — `RunCodeSnippet`
-  can't link CManatee's C++ symbols (JIT limitation, not a corpus defect),
-  so this relies on the same generic `create_subcorpus`/`openSubcorpus` code
-  path already covered by `SubcorpusTests` (which uses `id`, not `author`/
-  `genre`/`year` — Manatee's structural-attribute lookup doesn't special-case
-  any particular name, so there's no reason to expect different behavior,
-  but it's still worth the user's manual click-through confirming it).
+  **Subcorpus creation itself is confirmed working** — the user tested
+  `year="2021"` (doc 5 only) and got the expected 8-line/30-token result
+  with 2 `[tag="JJ"][tag="NN"]` hits.
+  - Each doc still has one `[JJ][NN]` sentence (10 total: brown fox, lazy
+    dog, curious cat, sleepy cat, elegant lady, proud gentleman, local
+    market, global economy, annual report, modest profit — doc 1's first
+    sentence keeps an extra leading JJ, "quick", testing that `[JJ][NN]`
+    doesn't match a JJ-JJ pair), but **every sentence is now padded with
+    >=5 tokens of repeated filler on each side of the match** (15 tokens
+    per sentence, 16 for doc 1's illustrative one; 151 tokens total; each
+    doc is ~30 tokens, except doc 1 at 31). This was a deliberate fix, not
+    the original design — see the next bullet.
+
+**Real bug found and fixed (2026-09-05, dev corpus only, not app code):**
+filtering a concordance for `[word="fox"]` was also keeping the "lazy dog"
+line. Traced precisely: the two words were only 4 raw token positions
+apart in the *original* 2-document corpus's back-to-back 4-5-token
+sentences, well inside the Filter feature's default ±5-token search
+window (`FilterSheetController`'s `leftOffset`/`rightOffset` defaults,
+matching KonText's own convention). Confirmed via
+`manatee-open/concord/concctx.cc`'s `prepare_context`: the window is a
+literal ±5 raw-position range around the match, with no sentence-boundary
+awareness for a plain numeric offset. **Not a defect in
+`LiveConcordance.filter`/`mtc_concordance_set_collocation`/Manatee's
+`Concordance::set_collocation`** — verified by hand with
+`manateekit-cli testcorp '[word="fox"]'` / `'[word="dog"]'`, showing they sat
+in each other's context window even at the KWIC display's own wider ±10.
+Fixed by padding every sentence so unrelated content words are always
+>5 tokens apart (see above) — re-verified the same way, "fox"'s ±10
+context no longer contains "dog" at all, and the `[JJ][NN]` query still
+returns exactly the original 10 matches, same order, same content.
 
 ### Verification log
 
@@ -386,19 +402,12 @@ test` → 17/17).
    with an info label listing its attributes (word/lemma/tag) and
    structures (doc (id, author, genre, year), s), and a Subcorpus popup
    defaulting to "Whole Corpus".
-3. Try "New Subcorpus…" a few different ways (see the semantic note above —
-   no brackets, no attribute prefix):
-   - name `twain`, structure `doc`, restrict-to `author="twain"` → should
-     match docs 1+2 (2 of 5 documents, 17 tokens — doc 1 has 9, since its
-     first sentence has an extra adjective, "quick brown fox").
-   - name `fiction`, structure `doc`, restrict-to `genre="fiction"` → docs
-     1+2+3 (3 of 5, 25 tokens).
-   - name `news2021`, structure `doc`, restrict-to `year="2021"` → doc 5
-     only (8 tokens).
-   Confirm each appears in the Subcorpus popup, and that selecting one +
-   searching `[tag="JJ"][tag="NN"]` restricts results to exactly that
-   subset's matches (e.g. `twain` → brown fox, lazy dog, curious cat, sleepy
-   cat) with the status line reading "...subcorpus "name"".
+3. ~~Try "New Subcorpus…"~~ — **done**, confirmed 2026-09-05 with
+   `year="2021"` (doc 5 only, 8 lines/30 tokens, 2 `[tag="JJ"][tag="NN"]`
+   hits). Other useful restrictions if revisiting (structure is always
+   `doc`, no brackets/prefix): `author="twain"` → docs 1+2 (61 tokens),
+   `genre="fiction"` → docs 1+2+3 (91 tokens), `genre="news"` → docs 4+5
+   (60 tokens).
 4. Spot-check Phase 1's toolbar (Sort/Filter/Shuffle/Sample/Clear Groups),
    the row context menu, undo/redo, and Settings (Cmd-,) with real
    interaction (clicking, typing).
@@ -457,9 +466,21 @@ everything after it — addressed by the new Operations popover (see Phase
 1's writeup above), **not yet manually verified**. Also: the dev corpus's 2
 documents weren't enough to demonstrate a real subcorpus subset — addressed
 by expanding it to 5 documents with `author`/`genre`/`year` attributes (see
-Phase 2's writeup above), also **not yet manually verified**. Still
-outstanding: the Operations popover, the expanded subcorpus flow, and the
-row context menu.
+Phase 2's writeup above), also **not yet manually verified**.
+
+**2026-09-05, user manual click-through, continued again:** Operations
+popover confirmed working. Subcorpus flow confirmed working (`year="2021"`
+→ doc 5 only, 8 lines/30 tokens, 2 hits). New finding: filtering
+`[word="fox"]` was also keeping the "lazy dog" line — a dev-corpus sizing
+bug (short, back-to-back sentences put unrelated words within the Filter
+feature's default ±5-token window), not an app defect; fixed by padding
+every sentence with filler so unrelated content words are always >5 tokens
+apart (see Phase 2's writeup above for the full trace). Also renamed the
+dev corpus from `Corpora/.devcorpus/` to `Corpora/DevCorpus/` — the
+project's convention is everything visible except `.git` and tool-managed
+build directories (`.build`, `.swiftpm`). Still outstanding: the row
+context menu (assign line group, filter-to-selection, copy) and undo/redo
+across the newer additions (header-click-sort, Operations popover).
 
 ## Phase 3 (sketch, not started) — Analysis views
 

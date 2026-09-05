@@ -8,6 +8,18 @@
 # real *subset* of documents rather than just one out of two. Safe to
 # re-run, it just regenerates DevCorpus/. Not dot-prefixed - kept visible in
 # Finder/Xcode along with the rest of the project.
+#
+# Every sentence is padded with >=5 tokens of filler on each side of its
+# [JJ][NN] target pair (repeated verbatim, not meant to read as prose) -
+# discovered the hard way that with short, back-to-back sentences, the
+# Filter feature's default +/-5 token window reaches into a *neighboring*
+# sentence's unrelated content word (e.g. filtering for "fox" was also
+# keeping the next sentence's "dog", since they were only 4 tokens apart in
+# the raw token stream). This isn't a bug in Concordance::set_collocation
+# or LiveConcordance.filter - see concord/concctx.cc's prepare_context - the
+# window is genuinely +/-5 raw positions from the match, same as KonText's
+# own default; the old 4-5 token sentences just didn't leave it anywhere
+# else to land.
 set -e
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
@@ -19,73 +31,183 @@ mkdir -p "$CORPUS/vert" "$CORPUS/registry" "$CORPUS/data"
 cat > "$CORPUS/vert/test.vert" << 'EOF'
 <doc id="1" author="twain" genre="fiction" year="1876">
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 quick	quick	JJ
 brown	brown	JJ
 fox	fox	NN
-jumps	jump	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 lazy	lazy	JJ
 dog	dog	NN
-sleeps	sleep	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 </doc>
 <doc id="2" author="twain" genre="fiction" year="1884">
 <s>
-a	a	DT
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
+the	the	DT
 curious	curious	JJ
 cat	cat	NN
-purrs	purr	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 sleepy	sleepy	JJ
 cat	cat	NN
-yawns	yawn	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 </doc>
 <doc id="3" author="austen" genre="fiction" year="1813">
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 elegant	elegant	JJ
 lady	lady	NN
-smiles	smile	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 <s>
-a	a	DT
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
+the	the	DT
 proud	proud	JJ
 gentleman	gentleman	NN
-bows	bow	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 </doc>
 <doc id="4" author="reuters" genre="news" year="2020">
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 local	local	JJ
 market	market	NN
-grows	grow	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 <s>
-a	a	DT
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
+the	the	DT
 global	global	JJ
 economy	economy	NN
-shifts	shift	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 </doc>
 <doc id="5" author="reuters" genre="news" year="2021">
 <s>
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
 the	the	DT
 annual	annual	JJ
 report	report	NN
-shows	show	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 <s>
-a	a	DT
+he	he	PRP
+often	often	RB
+saw	see	VBD
+that	that	DT
+morning	morning	NN
+near	near	IN
+the	the	DT
 modest	modest	JJ
 profit	profit	NN
-rises	rise	VBZ
+moving	move	VBG
+slowly	slowly	RB
+beyond	beyond	IN
+some	some	DT
+valley	valley	NN
+quietly	quietly	RB
 </s>
 </doc>
 EOF
