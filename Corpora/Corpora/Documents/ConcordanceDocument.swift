@@ -27,6 +27,15 @@ final class ConcordanceDocument: NSDocument {
     private(set) var rows: [ConcordanceRow] = []
     private(set) var status: String = ""
 
+    /// The `LiveConcordance` behind the most recently *successful* replay -
+    /// kept around (rather than discarded once `rows` is fetched, as before)
+    /// so Phase 3 features (collocations, frequency distributions) have a
+    /// live handle reflecting the document's current sort/filter/sample/
+    /// line-group state to run against, without re-executing the whole
+    /// operation chain from scratch. `nil` before the first successful query
+    /// and after a failed replay (see `replay()`'s catch branch).
+    private var liveConcordance: LiveConcordance?
+
     /// Once any line-group operation exists, sort/filter/shuffle/sample are
     /// disabled - mirrors KonText's own mutual-exclusion rule, since a fresh
     /// sort/sample would silently invalidate the view line-group
@@ -243,6 +252,7 @@ final class ConcordanceDocument: NSDocument {
                     }
                 }
                 rows = newRows
+                liveConcordance = live
                 let corpusDescription: String
                 if let subcorpusPath {
                     let subcorpusName = (subcorpusPath as NSString).lastPathComponent
@@ -254,10 +264,39 @@ final class ConcordanceDocument: NSDocument {
                 status = "\(lines.count) hit\(lines.count == 1 ? "" : "s") in a \(corpusDescription)"
             } catch {
                 rows = []
+                liveConcordance = nil
                 status = "\(error)"
             }
             onResultsChanged?()
         }
+    }
+
+    // MARK: - Analysis (collocations, frequency distributions)
+
+    enum AnalysisError: Error, CustomStringConvertible {
+        case noResultsYet
+        var description: String {
+            switch self {
+            case .noResultsYet: return "Run a query first."
+            }
+        }
+    }
+
+    /// Top collocates of the current query's hits - see `CollocationSpec`.
+    /// Reflects whatever sort/filter/sample/line-groups are currently
+    /// applied, since it runs against `liveConcordance` directly rather than
+    /// replaying the operation chain again.
+    func collocations(_ spec: CollocationSpec) async throws -> [CollocationItem] {
+        guard let liveConcordance else { throw AnalysisError.noResultsYet }
+        return try await liveConcordance.collocations(spec)
+    }
+
+    /// Frequency distribution of the current query's hits - see
+    /// `FrequencyCriterion`. Same "reflects the current view" behavior as
+    /// `collocations(_:)`.
+    func frequencyDistribution(_ criteria: [FrequencyCriterion], minFrequency: Int = 1) async throws -> [FrequencyItem] {
+        guard let liveConcordance else { throw AnalysisError.noResultsYet }
+        return try await liveConcordance.frequencyDistribution(criteria, minFrequency: minFrequency)
     }
 
     // MARK: - Persistence (query + operation chain only, never the materialized rows)

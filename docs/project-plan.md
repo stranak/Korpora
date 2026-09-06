@@ -134,7 +134,7 @@ Confirmed product decisions (from earlier in this project):
 | 1 — sort/filter/shuffle/sample/line-groups | done, 17 tests passing (cumulative) | done, plus header-click-sort + merged Operations/Clear-Groups popover with one row per active group (2026-09-05) | **yes — sort, sample, filter, shuffle, multi-row selection, multi-row line-group assignment, per-group Operations popover (incl. live-refresh fix), and row context menu (filter-to-selection/copy) all confirmed by user; see verification log for the full trail of bugs found & fixed along the way** |
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
-| 3 — collocations, frequency distributions | not started (sketch only) | not started | n/a |
+| 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -689,14 +689,133 @@ Verified: rebuilt after 1–2 with `xcodebuild -scheme Corpora clean build`
 → zero warnings left besides buckets 3–4; `cd ManateeKit && swift test` →
 17/17 still passing.
 
-## Phase 3 (sketch, not started) — Analysis views
+## Phase 3 — Collocations & frequency distributions (engine + AppKit UI done)
 
-Collocations via `CollocItems` (`concord/concstat.hh`) — per-word
-freq/count plus MI/T-score/logDice-family association measures. Frequency
-distributions/word lists via `Corpus::freq_dist` and
-`count_structattr_vals`. Likely surfaces as new window/panel types (or new
-`NSDocument` subclasses) driven off an existing `LiveConcordance`. No shim
-work exists yet — plan this properly when it's next up.
+Full plan (research, decisions, exact signatures) is preserved at
+`/Users/stranak/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/plans/ethereal-scribbling-yeti.md`
+from the planning session — this section is the as-built summary.
+
+**Confirmed with the user before building:** both features ship together
+(they share almost all the plumbing); results are plain auxiliary windows,
+**not** `NSDocument`s — a disposable, re-runnable report view fed by the
+current concordance's live handle, not a persisted/undoable artifact. This
+matches the concordance document's own current disposable-by-default
+behavior (see "Document persistence model" above) rather than fighting it.
+
+### Engine (ManateeKit/CManatee)
+
+- **Collocations** wrap `concord/concstat.hh`'s `CollocItems` — per-word
+  freq/co-occurrence-count plus any `corp/bgrstat.cc` association measure
+  computed on demand. New shim: `mtc_colloc_open`/`_next`/`_get_item`/
+  `_get_freq`/`_get_cnt`/`_get_bgr`/`_close`
+  (`ManateeKit/Sources/CManatee/`). `CollocItems` starts already positioned
+  at its best-scoring item (unlike `KWICLines`, which starts before its
+  first line) — `mtc_colloc_next` tracks a `started` flag internally so it
+  can still offer the same `while (mtc_colloc_next(items))` calling
+  convention as `mtc_kwic_next`.
+- **Frequency distributions** wrap `Corpus::freq_dist`'s struct-out overload
+  (`corp/corpus.hh`). `count_structattr_vals`, named in the original
+  sketch, turned out to be **SWIG-only Python sugar with no real C++
+  declaration** (only referenced in `manatee-open/api/manatee.i`'s `%extend
+  Corpus` block) — `freq_dist` with a structural-attribute criteria string
+  (e.g. `"doc.author 0"`) already produces the same result through the
+  header-declared API, so nothing extra was needed for that case. New
+  shim: `mtc_freq_dist_open`/`_count`/`_get_word`/`_get_freq`/`_get_norm`/
+  `_close` — a "count + index-based getters" shape (like
+  `mtc_corpus_attr_name`) rather than a step-iterator, since `freq_dist`
+  computes its whole result up front; the shim sorts by frequency
+  descending itself, since `freq_dist` returns bins in unspecified
+  `unordered_map` order.
+- `ManateeKit/Sources/ManateeKit/LiveConcordance.swift` gained
+  `AssociationMeasure` (a curated subset of `bgr_*` codes with real KonText
+  UI usage: logDice/MI/MI³/T-score/log-likelihood/Dice — the shim accepts
+  any valid code, so this can grow later without a shim change),
+  `CollocationSpec`/`CollocationItem`, `FrequencyCriterion`/`FrequencyItem`,
+  and `LiveConcordance.collocations(_:)`/`frequencyDistribution(_:minFrequency:)`.
+- Tests: `ManateeKit/Tests/ManateeKitTests/CollocationTests.swift`,
+  `FrequencyDistributionTests.swift` — including a hand-verified exact
+  logDice value (`14 + log2(2*f_AB/(f_A+f_B))`, where `f_B` is the *node*
+  concordance's line count, not the collocate's own frequency — got this
+  backwards on the first attempt and had to fix the test, not the shim,
+  once the real computed value (12.678...) proved correct by hand).
+
+**Real bug found and fixed along the way (2026-09-06, unrelated to Phase 3
+itself):** running the full `swift test` suite deleted a real subcorpus
+(`year="2021"`, created during Phase 2's manual verification) from
+`~/Library/Application Support/Corpora/Subcorpora/testcorp/`. Root cause:
+`TestCorpusFixture.corpusName` was also `"testcorp"` — the exact same name
+as the real dev corpus — and `SubcorpusTests.tearDown()` unconditionally
+deletes `SubcorpusStore.directory(for:)` for that name, a real, permanent,
+shared location, not the fixture's own temp directory. Fixed by renaming
+the fixture's corpus to `"mkittest"`, which can never collide with a real
+corpus name again. Recovering the lost subcorpus just means recreating it
+via "New Subcorpus…" the same way as before — it was disposable
+verification data, not anything load-bearing.
+
+### AppKit UI
+
+- Two new toolbar buttons on `ConcordanceWindowController`
+  ("Collocations"/"Frequencies"), each opening a config sheet
+  (`CollocationSheetController`/`FrequencySheetController`, modeled
+  directly on `FilterSheetController`'s structure) that populates its
+  attribute picker from `Corpus(name: document.corpusName).info()` —
+  exactly `NewConcordanceSheetController.refreshForSelectedCorpus`'s
+  existing pattern, no new plumbing needed. Wired in
+  `ConcordanceViewController.collocationsTapped`/`frequenciesTapped`.
+- `ConcordanceDocument` now **retains its current `LiveConcordance`**
+  across replays (`private var liveConcordance`) instead of letting it fall
+  out of scope once KWIC lines are fetched, as it did through Phase 2 — the
+  necessary foundation for either new feature to have a live handle
+  reflecting the document's actual current sort/filter/sample/line-group
+  state to run against. Exposed via `ConcordanceDocument.collocations(_:)`/
+  `frequencyDistribution(_:minFrequency:)`, both throwing
+  `AnalysisError.noResultsYet` if called before any query has succeeded.
+- Results open in `CollocationWindowController`/`FrequencyWindowController`
+  (new, one file each, window + view controller together since they're
+  small) — plain `NSWindowController`s wrapping a static-snapshot
+  `NSTableView` (client-side sort on the already-fetched array + manual
+  `reloadData()`, no diffable-data-source machinery needed, unlike the main
+  KWIC table). `ConcordanceViewController.auxiliaryWindowControllers` keeps
+  them alive while shown (nothing else would - they're not documents, not
+  added via `addWindowController`) and drops each entry once its window's
+  `willCloseNotification` fires. Deliberately **do not auto-refresh** when
+  the underlying concordance changes later - re-running requires reopening
+  via the toolbar button, consistent with the "disposable, re-run anytime"
+  decision above.
+- Collocations/Frequencies stay enabled even when line groups are active
+  (same rationale as the Operations button - they're read-only queries
+  against the current view, not new mutating operations, so they don't
+  conflict with an active line-group view the way a fresh sort/filter/
+  shuffle/sample would).
+
+Verified: `cd ManateeKit && swift test` → 25/25 passing;
+`xcodebuild -scheme Corpora clean build` → **BUILD SUCCEEDED**, zero new
+warnings; `xcodebuild -scheme Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06, manually click-tested end-to-end (user):** both toolbar
+buttons, attribute/measure/window fields, column-header sorting, closing/
+reopening, and quit-anytime-no-prompt behavior all confirmed working
+against the dev corpus (`[tag="NN"]` → 30 hits, since the dev corpus's
+`morning`/`valley` filler is also tagged NN alongside the 10 real target
+nouns - not a bug, just this corpus's construction). One result initially
+looked surprising - collocations at window `-1..0` returned only `that`
+and `some`, both scoring an identical 13.000 - but this is exactly correct:
+`that` precedes every `morning` hit (cnt=10) and `some` precedes every
+`valley` hit (cnt=10), both with corpus-wide freq=10, while each real
+adjective (brown/lazy/curious/...) only co-occurs once and is correctly
+filtered out by the sheet's default Min. collocation frequency = 3.
+Hand-verified: `14 + log2(2*10/(10+30)) = 13.0` exactly, using `f_B` =
+`viewsize()` = 30 (total `[tag="NN"]` hits) and `N` = 150 (corpus size) -
+confirms the shim's math is correct, not a coincidence. Lowering Min.
+collocation frequency to 1 surfaces the individual adjectives too, each
+with freq=1, cnt=1, as expected. The one skipped item (running Collocations/
+Frequencies before any successful query, to see the `AnalysisError.
+noResultsYet` alert) turned out to be unreachable via the UI - canceling
+the initial "New Concordance" sheet closes the window instead, which is
+existing, correct, pre-Phase-3 behavior (a blank document has nothing to
+show) - the error path itself is still covered by
+`CollocationTests.testCollocationsThrowsForUnknownAttribute`-style
+automated tests, just not reachable this particular way by hand.
 
 ## Key files
 
@@ -704,7 +823,7 @@ work exists yet — plan this properly when it's next up.
   `ManateeKit/Sources/CManatee/mtcbridge.cc` — the whole C shim surface
 - `ManateeKit/Sources/ManateeKit/ManateeKit.swift`, `LiveConcordance.swift`,
   `SubcorpusStore.swift`, `CorpusRegistry.swift` — the Swift engine API
-- `ManateeKit/Tests/ManateeKitTests/` — 17 passing tests; run with `cd
+- `ManateeKit/Tests/ManateeKitTests/` — 25 passing tests; run with `cd
   ManateeKit && swift test`
 - `manatee-open/concord/concgrp.cc` — the fixed upstream bug, on
   `stranak/manatee-open`'s `macos-arm64-portability` branch (pushed, not

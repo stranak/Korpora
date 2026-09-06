@@ -9,11 +9,15 @@
 /* Begin PBXBuildFile section */
 		06D95E63EEA83C14F34C247D /* NewConcordanceSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */; };
 		08F3ED97D8A5D735E42881CC /* AppearanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */; };
+		23C3A0108368B4A92F2F8C0F /* CollocationWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19DEC833DE746210048C6DE /* CollocationWindowController.swift */; };
 		2D358B79B4437ECF7E297333 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEC6F15BA4380A2D97DEDD5 /* AppSettings.swift */; };
+		32E2858B137C9318279B497B /* CollocationSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */; };
 		39910E9FAD2844CEB020E76C /* ConcordanceWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4810F7FA8E9F739726A906 /* ConcordanceWindowController.swift */; };
 		3FCAE537B000E155792BE412 /* ManateeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 545FDF0433E6120EB8D317C9 /* ManateeKit */; };
 		42D6DA623C738CDAFB40406C /* KWICCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2482C8B330CDE8B79158832E /* KWICCellView.swift */; };
+		47ACA34AF24BB537A9705721 /* FrequencySheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */; };
 		47D28927B4216981E7808861 /* NewSubcorpusPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */; };
+		494FFB3DDC7FC94E5C2E60E6 /* FrequencyWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D8CB27F099A49990068107 /* FrequencyWindowController.swift */; };
 		4A0BAEFB5DCA88CD327B2A36 /* CorporaDocumentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 337937E6760E63BDB464FABC /* CorporaDocumentController.swift */; };
 		5147B2175F0C34D38FFC1569 /* SamplePopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76275DF734870EDBA0975A28 /* SamplePopoverController.swift */; };
 		5ECA53D14CF01740C22D2F3A /* ConcordanceOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */; };
@@ -56,8 +60,11 @@
 		5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
 		6F56CC63630EA28304391DEA /* SortPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortPopoverController.swift; sourceTree = "<group>"; };
 		76275DF734870EDBA0975A28 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
+		76D8CB27F099A49990068107 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
 		777B79F44224A872C8862850 /* ConcordanceOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceOperation.swift; sourceTree = "<group>"; };
+		91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationSheetController.swift; sourceTree = "<group>"; };
 		9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
+		9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencySheetController.swift; sourceTree = "<group>"; };
 		AE34D8B50FF0995A27583CCE /* Corpora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Corpora.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B153CDFFF68143E5723299BB /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		B1666A994CF31918D279B02E /* ConcordanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceViewController.swift; sourceTree = "<group>"; };
@@ -66,6 +73,7 @@
 		D0D17C2701F753914E2C6F2A /* Corpora.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Corpora.entitlements; sourceTree = "<group>"; };
 		D0DE5D6AB25194929C0CBD73 /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
 		D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConcordanceSheetController.swift; sourceTree = "<group>"; };
+		E19DEC833DE746210048C6DE /* CollocationWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationWindowController.swift; sourceTree = "<group>"; };
 		E1E5FBE061C9D0960D0F0BD6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceDocument.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -112,10 +120,14 @@
 		6D101A6027B7F27D9E0AF2B9 /* Controllers */ = {
 			isa = PBXGroup;
 			children = (
+				91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */,
+				E19DEC833DE746210048C6DE /* CollocationWindowController.swift */,
 				B1666A994CF31918D279B02E /* ConcordanceViewController.swift */,
 				0D4810F7FA8E9F739726A906 /* ConcordanceWindowController.swift */,
 				337937E6760E63BDB464FABC /* CorporaDocumentController.swift */,
 				B8707E5EE04A324077AEEBD4 /* FilterSheetController.swift */,
+				9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */,
+				76D8CB27F099A49990068107 /* FrequencyWindowController.swift */,
 				D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */,
 				5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */,
 				31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */,
@@ -272,12 +284,16 @@
 				2D358B79B4437ECF7E297333 /* AppSettings.swift in Sources */,
 				08F3ED97D8A5D735E42881CC /* AppearanceSettingsViewController.swift in Sources */,
 				DC819B1BEE7789EC6AEFDE12 /* CQLQueryField.swift in Sources */,
+				32E2858B137C9318279B497B /* CollocationSheetController.swift in Sources */,
+				23C3A0108368B4A92F2F8C0F /* CollocationWindowController.swift in Sources */,
 				80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */,
 				78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */,
 				E2A2F41A47453E237F323A14 /* ConcordanceViewController.swift in Sources */,
 				39910E9FAD2844CEB020E76C /* ConcordanceWindowController.swift in Sources */,
 				4A0BAEFB5DCA88CD327B2A36 /* CorporaDocumentController.swift in Sources */,
 				61237E8A161CE660673F237A /* FilterSheetController.swift in Sources */,
+				47ACA34AF24BB537A9705721 /* FrequencySheetController.swift in Sources */,
+				494FFB3DDC7FC94E5C2E60E6 /* FrequencyWindowController.swift in Sources */,
 				62F2B2241409CF37E39DCD16 /* GeneralSettingsViewController.swift in Sources */,
 				42D6DA623C738CDAFB40406C /* KWICCellView.swift in Sources */,
 				06D95E63EEA83C14F34C247D /* NewConcordanceSheetController.swift in Sources */,

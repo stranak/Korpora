@@ -94,6 +94,65 @@ int mtc_concordance_delete_linegroups(MTCConcordance *conc, const char *groups_s
 
 void mtc_free_string(char *s);
 
+/* -------------------- collocations --------------------
+ * Wraps concord/concstat.hh's CollocItems: the top `max_items` collocates of
+ * `attr_name` found within [from_w, to_w] tokens of each hit (negative =
+ * left of the hit, positive = right), ranked by association measure
+ * `sort_fun_code`. Only candidate words with corpus-wide frequency >=
+ * min_freq are even considered, and only those co-occurring with the node
+ * in at least min_bgr lines are kept. `sort_fun_code`/the `bgr_code` passed
+ * to mtc_colloc_get_bgr are single-char codes from corp/bgrstat.hh's
+ * bgr_known_fun_codes ("tm3lsprfCDd1") - e.g. 'd' = logDice (Manatee/
+ * KonText's own conventional default), 'm' = MI, 't' = T-score. */
+
+typedef struct MTCCollocItems MTCCollocItems;
+
+MTCCollocItems *mtc_colloc_open(MTCConcordance *conc, const char *attr_name,
+                                 char sort_fun_code, long long min_freq, long long min_bgr,
+                                 int from_w, int to_w, int max_items, char **error);
+void mtc_colloc_close(MTCCollocItems *items);
+
+/* Advances to the next collocate, best-scoring first (per sort_fun_code).
+ * Returns 0 once exhausted - fields below are only valid after this
+ * returns nonzero, same convention as mtc_kwic_next. */
+int mtc_colloc_next(MTCCollocItems *items);
+
+char *mtc_colloc_get_item(MTCCollocItems *items);      /* caller frees with mtc_free_string */
+long long mtc_colloc_get_freq(MTCCollocItems *items);  /* corpus-wide frequency of the collocate */
+long long mtc_colloc_get_cnt(MTCCollocItems *items);   /* co-occurrence count with the node */
+
+/* Recomputes any association measure for the *current* item on demand,
+ * independent of whichever code ranked/selected the top items at open time
+ * (CollocItems itself supports this - the raw counts needed are cached per
+ * item). Returns 0.0 for an unrecognized code (matches the engine's own
+ * fallback, bgr_null). */
+double mtc_colloc_get_bgr(MTCCollocItems *items, char bgr_code);
+
+/* -------------------- frequency distributions --------------------
+ * Wraps Corpus::freq_dist. `crit` uses the exact same criteria-string
+ * grammar as mtc_concordance_sort's `criteria` (e.g. "lemma/i 0", or a
+ * structural attribute like "doc.author 0"); only bins with count >=
+ * min_freq are kept. Unlike the collocation iterator above, the whole
+ * result set is computed up front, so it's exposed as count + index-based
+ * getters rather than a step-iterator (see mtc_corpus_attr_name for the
+ * same shape used elsewhere). Results are sorted by frequency, descending. */
+
+typedef struct MTCFreqDist MTCFreqDist;
+
+MTCFreqDist *mtc_freq_dist_open(MTCConcordance *conc, const char *crit,
+                                 long long min_freq, char **error);
+void mtc_freq_dist_close(MTCFreqDist *dist);
+
+int mtc_freq_dist_count(MTCFreqDist *dist);
+
+/* index in [0, mtc_freq_dist_count(dist)); out-of-range returns NULL/0. */
+char *mtc_freq_dist_get_word(MTCFreqDist *dist, int index);  /* caller frees */
+long long mtc_freq_dist_get_freq(MTCFreqDist *dist, int index);
+/* A per-struct-value token count, only meaningful when crit's first
+ * attribute is a structural attribute (e.g. "doc.author") - 0 otherwise.
+ * Usable to compute a relative/normalized frequency client-side. */
+long long mtc_freq_dist_get_norm(MTCFreqDist *dist, int index);
+
 /* -------------------- corpus introspection --------------------
  * Reads the registry metadata already parsed when the corpus was opened
  * (Corpus::conf) - no engine work, just walking the parsed CorpInfo tree, so

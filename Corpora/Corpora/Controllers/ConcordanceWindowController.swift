@@ -9,6 +9,8 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let filter = NSToolbarItem.Identifier("filter")
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
+        static let collocations = NSToolbarItem.Identifier("collocations")
+        static let frequencies = NSToolbarItem.Identifier("frequencies")
         static let operations = NSToolbarItem.Identifier("operations")
     }
 
@@ -40,7 +42,8 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, .flexibleSpace, ItemID.operations]
+        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample,
+         ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -71,6 +74,14 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                                      action: #selector(ConcordanceViewController.sampleTapped(_:)))
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
+        case ItemID.collocations:
+            let button = makeButton(symbol: "arrow.left.arrow.right", label: "Collocations", target: viewController,
+                                     action: #selector(ConcordanceViewController.collocationsTapped(_:)))
+            return makeItem(identifier, label: "Collocations", view: button)
+        case ItemID.frequencies:
+            let button = makeButton(symbol: "chart.bar", label: "Frequencies", target: viewController,
+                                     action: #selector(ConcordanceViewController.frequenciesTapped(_:)))
+            return makeItem(identifier, label: "Frequencies", view: button)
         case ItemID.operations:
             // Icon carried over from the old standalone "Clear Groups"
             // button - merged into this one, since both are fundamentally

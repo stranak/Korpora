@@ -1,14 +1,19 @@
 #include "mtcbridge.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <numeric>
 #include <sstream>
 #include <string>
+#include <vector>
 
+#include "bgrstat.hh"
 #include "corpus.hh"
 #include "concord.hh"
 #include "concget.hh"
+#include "concstat.hh"
 #include "cqpeval.hh"
 #include "subcorp.hh"
 
@@ -20,6 +25,24 @@ struct MTCConcordance {
 };
 struct MTCKwic {
     KWICLines *kl;
+};
+struct MTCCollocItems {
+    CollocItems *items;
+    // CollocItems starts already positioned at its first (best-scoring)
+    // item, unlike KWICLines (which starts before its first line) - this
+    // tracks whether mtc_colloc_next has been called yet, so it can offer
+    // the same "call advances, then tells you if a row is available"
+    // convention as mtc_kwic_next despite the different underlying protocol.
+    bool started;
+};
+struct MTCFreqDist {
+    std::vector<std::string> words;
+    std::vector<NumOfPos> freqs;
+    std::vector<NumOfPos> norms;
+    // freq_dist itself returns words/freqs/norms in unspecified (unordered_map)
+    // order - this holds a permutation of indices sorted by freqs descending,
+    // so mtc_freq_dist_get_* can index through it directly.
+    std::vector<size_t> order;
 };
 
 namespace {
@@ -316,6 +339,126 @@ int mtc_concordance_delete_linegroups(MTCConcordance *conc, const char *groups_s
 }
 
 void mtc_free_string(char *s) { free(s); }
+
+MTCCollocItems *mtc_colloc_open(MTCConcordance *conc, const char *attr_name,
+                                 char sort_fun_code, long long min_freq, long long min_bgr,
+                                 int from_w, int to_w, int max_items, char **error) {
+    if (!conc) {
+        set_error(error, "null concordance handle");
+        return nullptr;
+    }
+    if (!strchr(bgr_known_fun_codes, sort_fun_code)) {
+        set_error(error, "unrecognized association-measure code");
+        return nullptr;
+    }
+    try {
+        MTCCollocItems *mc = new MTCCollocItems;
+        mc->items = new CollocItems(conc->conc, std::string(attr_name), sort_fun_code,
+                                     static_cast<NumOfPos>(min_freq), static_cast<NumOfPos>(min_bgr),
+                                     from_w, to_w, max_items);
+        mc->started = false;
+        return mc;
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error computing collocations");
+        return nullptr;
+    }
+}
+
+void mtc_colloc_close(MTCCollocItems *items) {
+    if (!items)
+        return;
+    delete items->items;
+    delete items;
+}
+
+int mtc_colloc_next(MTCCollocItems *items) {
+    if (!items)
+        return 0;
+    if (items->started) {
+        if (items->items->eos())
+            return 0;
+        items->items->next();
+    }
+    items->started = true;
+    return items->items->eos() ? 0 : 1;
+}
+
+char *mtc_colloc_get_item(MTCCollocItems *items) {
+    return strdup(items->items->get_item());
+}
+
+long long mtc_colloc_get_freq(MTCCollocItems *items) {
+    return static_cast<long long>(items->items->get_freq());
+}
+
+long long mtc_colloc_get_cnt(MTCCollocItems *items) {
+    return static_cast<long long>(items->items->get_cnt());
+}
+
+double mtc_colloc_get_bgr(MTCCollocItems *items, char bgr_code) {
+    if (!items)
+        return 0.0;
+    return items->items->get_bgr(bgr_code);
+}
+
+MTCFreqDist *mtc_freq_dist_open(MTCConcordance *conc, const char *crit,
+                                 long long min_freq, char **error) {
+    if (!conc) {
+        set_error(error, "null concordance handle");
+        return nullptr;
+    }
+    try {
+        MTCFreqDist *fd = new MTCFreqDist;
+        // freq_dist takes ownership of the RangeStream and deletes it on
+        // every exit path - RS() must only be handed to it once.
+        RangeStream *rs = conc->conc->RS(true);
+        conc->conc->corp->freq_dist(rs, crit, static_cast<NumOfPos>(min_freq),
+                                     fd->words, fd->freqs, fd->norms);
+        fd->order.resize(fd->words.size());
+        std::iota(fd->order.begin(), fd->order.end(), 0);
+        std::sort(fd->order.begin(), fd->order.end(), [fd](size_t a, size_t b) {
+            return fd->freqs[a] > fd->freqs[b];
+        });
+        return fd;
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error computing frequency distribution");
+        return nullptr;
+    }
+}
+
+void mtc_freq_dist_close(MTCFreqDist *dist) {
+    delete dist;
+}
+
+int mtc_freq_dist_count(MTCFreqDist *dist) {
+    if (!dist)
+        return 0;
+    return static_cast<int>(dist->order.size());
+}
+
+char *mtc_freq_dist_get_word(MTCFreqDist *dist, int index) {
+    if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
+        return nullptr;
+    return strdup(dist->words[dist->order[index]].c_str());
+}
+
+long long mtc_freq_dist_get_freq(MTCFreqDist *dist, int index) {
+    if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
+        return 0;
+    return static_cast<long long>(dist->freqs[dist->order[index]]);
+}
+
+long long mtc_freq_dist_get_norm(MTCFreqDist *dist, int index) {
+    if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
+        return 0;
+    return static_cast<long long>(dist->norms[dist->order[index]]);
+}
 
 int mtc_corpus_attr_count(MTCCorpus *corp) {
     if (!corp)

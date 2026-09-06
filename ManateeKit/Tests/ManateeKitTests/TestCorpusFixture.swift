@@ -5,7 +5,14 @@ import Foundation
 /// uses, so sort/shuffle/sample/filter/line-group operations have more than
 /// one or two lines of non-trivial, repeated-tag data to operate on.
 struct TestCorpusFixture {
-    let corpusName = "testcorp"
+    // Deliberately not "testcorp" (2026-09-06): that's also the real dev
+    // corpus's name in the Corpora app, and SubcorpusStore keys subcorpus
+    // storage by corpus name alone in a permanent, shared
+    // ~/Library/Application Support/Corpora/Subcorpora/<name>/ directory -
+    // SubcorpusTests' teardown deleting that directory for "testcorp" once
+    // deleted a real subcorpus created via manual UI testing. A name unique
+    // to this fixture can never collide with a real corpus again.
+    let corpusName = "mkittest"
     private let tempDir: URL
 
     static func build() throws -> TestCorpusFixture {
@@ -41,7 +48,7 @@ struct TestCorpusFixture {
         }
         """
         try registryContent.write(
-            to: registryDir.appendingPathComponent("testcorp"), atomically: true, encoding: .utf8)
+            to: registryDir.appendingPathComponent("mkittest"), atomically: true, encoding: .utf8)
 
         // mtc_corpus_open reads MANATEE_REGISTRY via getenv() on every call (not
         // cached), so setting it here for this process is enough for the whole
@@ -57,7 +64,7 @@ struct TestCorpusFixture {
 
         let process = Process()
         process.executableURL = encodevert
-        process.arguments = ["-v", "-c", "testcorp"]
+        process.arguments = ["-v", "-c", "mkittest"]
         let outputPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = outputPipe

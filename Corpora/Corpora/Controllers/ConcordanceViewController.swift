@@ -18,6 +18,11 @@ final class ConcordanceViewController: NSViewController {
     // The Operations popover, while open, needs to be kept in sync with
     // `refresh()` - see its use in `refresh()` for why.
     private weak var activeOperationsPopover: OperationsPopoverController?
+    // Collocation/frequency results windows are plain NSWindowControllers,
+    // not NSDocuments (see docs/project-plan.md's Phase 3 writeup) - nothing
+    // else keeps them alive while shown, so this array does. Entries remove
+    // themselves on close (see `show(_:)` below).
+    private var auxiliaryWindowControllers: [NSWindowController] = []
 
     weak var windowController: ConcordanceWindowController?
 
@@ -161,6 +166,65 @@ final class ConcordanceViewController: NSViewController {
         let counts = Dictionary(grouping: document.rows.filter { $0.group != 0 }, by: \.group)
             .mapValues(\.count)
         controller.lineGroups = counts.keys.sorted().map { (group: $0, lineCount: counts[$0]!) }
+    }
+
+    @objc func collocationsTapped(_ sender: Any) {
+        let sheet = CollocationSheetController()
+        sheet.corpusName = document.corpusName
+        sheet.onRun = { [weak self] spec in
+            guard let self else { return }
+            Task { @MainActor in
+                do {
+                    let items = try await self.document.collocations(spec)
+                    self.show(CollocationWindowController(spec: spec, items: items))
+                } catch {
+                    self.showErrorAlert(error)
+                }
+            }
+        }
+        presentAsSheet(sheet)
+    }
+
+    @objc func frequenciesTapped(_ sender: Any) {
+        let sheet = FrequencySheetController()
+        sheet.corpusName = document.corpusName
+        sheet.onRun = { [weak self] criterion, minFrequency in
+            guard let self else { return }
+            Task { @MainActor in
+                do {
+                    let items = try await self.document.frequencyDistribution([criterion], minFrequency: minFrequency)
+                    self.show(FrequencyWindowController(criterion: criterion, items: items))
+                } catch {
+                    self.showErrorAlert(error)
+                }
+            }
+        }
+        presentAsSheet(sheet)
+    }
+
+    /// Shows a disposable auxiliary results window and keeps it alive (see
+    /// `auxiliaryWindowControllers`) until it's closed.
+    private func show(_ windowController: NSWindowController) {
+        auxiliaryWindowControllers.append(windowController)
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: windowController.window, queue: .main
+        ) { [weak self, weak windowController] _ in
+            guard let self, let windowController else { return }
+            auxiliaryWindowControllers.removeAll { $0 === windowController }
+        }
+        windowController.showWindow(nil)
+        windowController.window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func showErrorAlert(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn’t run the request"
+        alert.informativeText = "\(error)"
+        if let window = windowController?.window {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
     }
 
     // MARK: - Table view
