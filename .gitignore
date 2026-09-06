@@ -18,5 +18,9 @@ Corpora/*.xcodeproj/project.xcworkspace/xcuserdata/
 # hidden in this project; everything else should be visible in Finder/Xcode.
 Corpora/DevCorpus/
 
+# Real corpus data (e.g. vertical files picked for Corpus Import) - large,
+# not this project's own content, never meant to be tracked.
+/data/
+
 # Finder metadata
 .DS_Store

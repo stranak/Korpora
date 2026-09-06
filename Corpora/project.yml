@@ -2,7 +2,7 @@ name: Corpora
 options:
   bundleIdPrefix: cz.cuni.mff.ufal
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "27.0"
   createIntermediateGroups: true
 
 packages:
@@ -21,7 +21,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
-        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        MACOSX_DEPLOYMENT_TARGET: "27.0"
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
         ENABLE_HARDENED_RUNTIME: NO

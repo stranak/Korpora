@@ -3,6 +3,7 @@ import Cocoa
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
+        CorpusResidencyManager.shared.start()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -24,8 +25,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// document state, so it can't regress if that state ever changes
     /// without this being revisited too. Revisit both together per the
     /// pre-release persistence TODO in the project plan.
+    ///
+    /// One deliberate exception: a running corpus import (see
+    /// `ActiveImportTracker`) can represent hours of compile work on a real
+    /// corpus - quitting through it silently, the same way every other
+    /// window does, would be a much worse surprise than one confirmation
+    /// dialog. `CorpusImportSheetController` already cancels its own import
+    /// (terminating the `encodevert` subprocess cleanly) on
+    /// `willTerminateNotification` regardless of the answer here - this
+    /// alert only decides whether that's allowed to happen at all.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        .terminateNow
+        guard ActiveImportTracker.shared.isImporting else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "A corpus import is in progress"
+        alert.informativeText = "Quitting now will stop the compile. It can’t be resumed - you’ll need to start over."
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {

@@ -135,6 +135,7 @@ Confirmed product decisions (from earlier in this project):
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
+| 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -817,13 +818,365 @@ show) - the error path itself is still covered by
 `CollocationTests.testCollocationsThrowsForUnknownAttribute`-style
 automated tests, just not reachable this particular way by hand.
 
+## Phase 4 — Corpus import & memory residency (engine + AppKit UI done)
+
+Full plan (research, decisions) is preserved at
+`/Users/stranak/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/plans/ethereal-scribbling-yeti.md`
+from the planning session — this section is the as-built summary. Prompted
+by two things: (1) adding a corpus meant hand-writing a registry file and
+running `encodevert` from a terminal — not what a native macOS app should
+require — and (2) on very high-RAM hardware (the user's own example: a Mac
+Studio with 512GB), Manatee's default `mmap`-and-let-the-OS-page-cache-
+handle-it behavior leaves that RAM mostly idle for a corpus that would
+easily fit resident.
+
+**Confirmed with the user before building:** memory residency is
+best-effort warming (`mmap` + `madvise(MADV_WILLNEED)`), not true `mlock` —
+no special entitlements, always safe/reversible, no risk of starving the
+system if a free-memory estimate is ever wrong. Corpus import auto-detects
+attributes/structures by sniffing the vertical file, pre-filling an
+editable form rather than requiring the schema to be hand-described.
+
+### Part A — Import (`ManateeKit`)
+
+- `CompiledCorpusStore.swift` (new, mirrors `SubcorpusStore.swift`'s
+  pattern): a configurable base directory (env-var-mediated —
+  `CORPORA_COMPILED_CORPORA_DIRECTORY`, same design as `CorpusRegistry`
+  reading `MANATEE_REGISTRY`, keeping ManateeKit free of a UserDefaults
+  dependency) that **doubles as a real Manatee registry directory** — one
+  registry file per corpus directly inside it (required for Manatee's own
+  registry scan, which skips subdirectories entirely), with the actual
+  compiled binary indices and a small JSON metadata sidecar tucked into a
+  `.indices/<name>/` subdirectory instead (invisible to that scan, keeps
+  the visible directory just "one file per corpus"). This means an imported
+  corpus needs no separate wiring to appear in the New Concordance picker.
+- `CorpusImporter.swift` (new): `sniffSchema(verticalFile:)` reads up to
+  50,000 lines (not the whole file — real vertical files can be billions of
+  lines, and structures/columns are expected to appear and repeat early) via
+  `URL.lines`, using `Regex(pattern:)` construction rather than regex
+  *literal* syntax (`/pattern/`) — the literal syntax didn't parse
+  unambiguously in a `guard`/`wholeMatch(of:)` position here, so this had to
+  be switched during implementation. `importCorpus(...)` writes the
+  registry text (same format `TestCorpusFixture`/`build-dev-corpus.sh`
+  already hand-write) and drives `encodevert` as a subprocess, forwarding
+  its output line-by-line for a log-style progress UI (its own output isn't
+  a documented, parseable percentage, so indeterminate progress + visible
+  log is the honest MVP) and supporting cancellation.
+- `AppSettings` gained `compiledCorporaDirectory` and
+  `minimumFreeMemoryAfterResidency` (default 10 GB). **Real subtlety found
+  while wiring this up:** `applyEnvironment()` used to no-op entirely when
+  `corpusRegistryDirectories` was empty, specifically so the Xcode scheme's
+  own `MANATEE_REGISTRY` (pointing at `DevCorpus`) kept working until a real
+  preference was set. Naively always including the compiled-corpora
+  directory would have broken that by unconditionally overwriting
+  `MANATEE_REGISTRY`. Fixed by merging on top of whatever's already in the
+  environment (reading it back via `ProcessInfo`) rather than replacing it —
+  imported corpora and the Xcode dev corpus now both just work,
+  simultaneously.
+- UI: a new **Corpora** Settings pane (`CorporaSettingsViewController.swift`,
+  wired into `SettingsWindowController`) with a compiled-corpora directory
+  picker, a table of imported corpora, and an Import button opening
+  `CorpusImportSheetController.swift` — vertical-file picker, then a
+  pre-filled, editable schema form (name field, comma-separated attributes,
+  one-structure-per-line `name: attr1, attr2` text), then a progress sheet
+  (indeterminate spinner + scrolling log + Cancel) while `encodevert` runs.
+
+### Part B — Memory residency (`ManateeKit`)
+
+- `CorpusMemoryResidency.swift` (new) — deliberately has **no dependency on
+  CManatee/manatee-open**: warming works by `mmap`ing and
+  `madvise(MADV_WILLNEED)`-ing whatever files sit under a compiled corpus's
+  data directory directly, independent of Manatee's own separate `mmap` of
+  those same files at query time (both are `MAP_SHARED`, so they share the
+  same underlying page-cache pages — no engine change needed).
+  `availableMemory()` uses `host_statistics64`/`mach_host_self()` (Darwin),
+  summing free + inactive + purgeable pages — the same "reclaimable"
+  definition Activity Monitor's memory gauge uses. `canKeepResident(...)`
+  is factored out as pure arithmetic so it's unit-testable without mocking
+  the Mach call. `unwarm(directory:)` (`MADV_DONTNEED`) makes turning the
+  toggle off a considerate best-effort "let this go" rather than a no-op.
+- Per-corpus `keepResident` lives in `CompiledCorpusStore`'s metadata
+  sidecar (corpus-scoped data), not `AppSettings`.
+- UI: each row's "Keep in Memory" checkbox in the Corpora settings pane is
+  disabled (with an explanatory tooltip) when enabling it now would leave
+  less than `minimumFreeMemoryAfterResidency` free — recomputed on a 2s
+  timer while the pane is visible, alongside a simple two-color
+  `MemoryBarView` (total vs. currently-available, no charting library) and
+  the editable minimum-free-GB field.
+- `CorpusResidencyManager.swift` (new, `AppDelegate.applicationDidFinishLaunching`
+  calls its `start()`): re-checks `canKeepResident` against *current*
+  available memory for every `keepResident`-flagged corpus at launch
+  (available memory can differ session to session) and warms only those
+  that still pass, skipping (with an `NSLog`, not a blocking alert) any that
+  don't; also registers a `DispatchSource.makeMemoryPressureSource`
+  observer that proactively `unwarm`s every resident corpus on a `.critical`
+  system memory-pressure event, as a safety net for a mechanism that's only
+  ever a hint in the first place.
+
+### Tests
+
+`ManateeKit/Tests/ManateeKitTests/CorpusImporterTests.swift` (schema
+sniffing against a hand-written vertical fixture; a full import-then-query
+round trip through a real `encodevert` run) and
+`CorpusMemoryResidencyTests.swift` (`directorySize` against known file
+sizes; `canKeepResident`'s arithmetic against fabricated numbers, not the
+real Mach call; `warm`/`unwarm` don't throw against real files;
+`availableMemory()` is positive and ≤ `totalMemory`).
+
+Verified: `cd ManateeKit && swift test` → 32/32 passing;
+`xcodebuild -scheme Corpora clean build` → **BUILD SUCCEEDED**, zero
+warnings; `xcodebuild -scheme Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06, first real-corpus import attempt, three real bugs found and
+fixed (user):** importing a genuine large corpus (SYN2025, a Czech National
+Corpus release — 162,056,171 lines) instead of a toy fixture immediately
+surfaced problems a small dev corpus never would. `encodevert` itself
+crashed (signal 6/SIGABRT) somewhere past line ~130,000,000 — cause still
+**unexplained** (see below) — but getting to a diagnosable state took three
+rounds of fixes to this app's own import UI:
+
+- **Real bug (first suspected, corrected after user clarification): a
+  main-actor-blocking `Task`.** `CorpusImportSheetController.compileTapped()`
+  originally ran the import inside `Task { @MainActor in ... }`, but
+  `CorpusImporter.importCorpus` calls `Process.waitUntilExit()`
+  synchronously — exactly the blocking call its own doc comment already
+  warned callers to keep off the main actor. Initially suspected as the
+  cause of a "frozen window," but the user clarified the window was
+  actually **scrolling progress live and correctly the entire run** — the
+  freeze only happened *after* the crash. Fixed anyway (switched to
+  `Task.detached(priority: .utility)` with explicit `await MainActor.run
+  { }` hops for UI updates) since it's a real bug regardless, just not the
+  one actually observed here.
+- **Real bug, this one matching what was actually seen: unthrottled
+  per-chunk UI updates corrupted the text view's rendering.** The
+  screenshot the user shared showed a garbled, overlapping mess of
+  repeated/smeared text — not a frozen window, a *corrupted* one. Root
+  cause: `onProgress` hopped to the main actor and appended directly to the
+  `NSTextView` plus called `scrollToEndOfDocument` **on every single output
+  chunk**, with no bound on how large the view's content could grow.
+  `encodevert`'s output rate is unbounded — something going wrong partway
+  through very likely made it spew output (plausibly the same structural
+  warning repeating against a degenerate section of the file) far faster
+  than one-relayout-per-chunk could keep up with, which visibly corrupts
+  `NSTextView` rendering rather than just lagging behind. Fixed with a
+  `LogBuffer` (`CorpusImportSheetController.swift`) that `onProgress` just
+  appends to cheaply, drained into the view by a fixed 0.2s `Timer` instead
+  of once per chunk, with the displayed text itself capped at 200,000
+  characters (`maxDisplayedLogLength`) regardless of how much output
+  actually arrives.
+- **Real bug: the final chunk of `encodevert`'s output could be lost from
+  the error message entirely**, independent of the UI corruption above.
+  `Pipe`'s `readabilityHandler` drains asynchronously on a GCD-managed
+  queue and races with `waitUntilExit()` returning — the original code
+  read the accumulated output immediately after, with no guarantee the
+  handler had drained the last bytes yet, so the single most useful part
+  (whatever's right next to a crash) could be silently missing. This is
+  likely why the user's first failure report showed only encodevert's
+  memory-estimate line. Fixed by explicitly draining `readToEnd()` after
+  `waitUntilExit()` and after nil-ing the handler, before building the
+  error; `OutputCollector` (`ManateeKit/CorpusImporter.swift`) also now
+  caps retained text (keeping the tail) rather than growing unbounded, for
+  the same "unbounded output rate" reason as the `LogBuffer` fix above.
+- Also added: distinguishing a **crash** (`terminationReason ==
+  .uncaughtSignal` — `CorpusImportError.encodevertCrashed`, with a decoded
+  signal name like `SIGABRT`) from a **deliberate nonzero exit**
+  (`.encodevertFailed`) — `Process.terminationStatus` is overloaded to mean
+  either an exit code or a signal number depending on `terminationReason`,
+  and the original code only ever reported the raw number under one label
+  regardless of which it actually was.
+
+None of this is specific to SYN2025 or a `manatee-open`/`encodevert` defect
+— it's exactly the kind of thing that only shows up once you stop testing
+with tiny fixtures. The actual `encodevert` crash is **still unexplained**
+— none of the output captured so far (a non-fatal warning about an empty
+`<s>` structure around line 35,503,184, which processing continues right
+past) points at a specific cause, and the corrupted-rendering bug meant the
+actual tail of the log — the part that would show it — was never legible.
+Re-running the import with these fixes should surface the real output live,
+intact, and legible; **this needs to happen before Phase 4 can be
+considered manually verified.**
+
+Verified (that round): `cd ManateeKit && swift test` → 32/32 passing;
+`xcodebuild -scheme Corpora clean build` → **BUILD SUCCEEDED**, zero
+warnings; `xcodebuild -scheme Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06, screenshot showed real UI corruption (not a freeze), plus a
+"can't quit" bug — progress UI reworked, both fixed:** the user clarified
+the window was scrolling progress live and correctly the *entire* run; the
+freeze/garbled-text screenshot only happened *after* the crash. Root cause
+of the corruption: `onProgress` appended every single output chunk directly
+to the `NSTextView` and called `scrollToEndOfDocument` per chunk, with no
+cap on content size — if something near the crash made `encodevert` spew
+output far faster than that (plausibly the same structural warning
+repeating against a degenerate section of the file), `NSTextView`'s
+rendering visibly corrupts rather than just lagging. Separately, the user
+also couldn't quit the app afterward and had to force-kill it from Xcode —
+which also surfaced a real correctness gap: quitting the app didn't
+terminate an in-progress `encodevert` subprocess at all, which could have
+kept running orphaned. Used the opportunity to rework the whole progress UI
+properly rather than just patch the symptom, since the user separately
+asked for a real progress bar + collapsible log, and pause/cancel controls
+matching the macOS "gold standard":
+
+- `CorpusImporter.countLines(verticalFile:)` (new) — a fast pre-pass
+  counting raw `\n` bytes (not UTF-8 line decoding, which `sniffSchema`
+  already does but is too slow to run over hundreds of millions of lines) -
+  I/O-bound, not CPU-bound, so it stays fast even on a multi-GB file. Lets
+  the progress UI show a real determinate "N / total (X%) processed"
+  instead of an indeterminate spinner.
+- `LogBuffer` (`CorpusImportSheetController.swift`) now also parses the
+  latest "Processed N lines" out of each chunk (off the main actor, where
+  `onProgress` is actually called - a flood of output shouldn't turn into a
+  flood of regex work on the main thread either) alongside the existing
+  rate-limited raw-text buffering. A single 0.2s timer drains both into a
+  progress bar/status label and the (still-capped-at-200,000-characters)
+  raw log.
+- The raw log is now collapsed behind a "Show Log"/"Hide Log" disclosure
+  toggle, animating the sheet's size via `preferredContentSize`/
+  `NSWindow.animator().setContentSize` - matches the classic macOS
+  progress-dialog pattern (Installer.app, Software Update): a progress bar
+  and status line by default, full detail on demand, not forced on everyone
+  all the time.
+- **Cancel is now Cmd-. as well as a button** - the standard macOS "stop
+  this operation" key equivalent (distinct from Escape, which the schema
+  form's own Cancel already used).
+- **Pause/Resume**, via a new `CorpusImporter.ImportHandle` (handed to a new
+  `onStart` callback once the subprocess is actually running) wrapping
+  `Process.suspend()`/`.resume()` (SIGSTOP/SIGCONT under the hood) -
+  `encodevert` has no cooperative pause protocol of its own, but suspending
+  the whole process works for any subprocess.
+- **Real bug fixed: quitting the app didn't stop an in-progress import.**
+  `CorpusImportSheetController` now observes
+  `NSApplication.willTerminateNotification` and cancels its active import
+  task on it, which (via the existing `withTaskCancellationHandler`)
+  synchronously sends `encodevert` SIGTERM before the app process actually
+  exits - quitting mid-import (menu, Cmd-Q, or the Dock) no longer leaves an
+  orphaned subprocess running, and no longer requires a force-kill from
+  Xcode to recover from.
+
+Verified (that round): `cd ManateeKit && swift test` → 33/33 passing;
+`xcodebuild -scheme Corpora clean build` → **BUILD SUCCEEDED**, zero
+warnings; `xcodebuild -scheme Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06, second real-corpus attempt (SYN2025 again), three more real
+issues found via screenshots + confirmed-good control test (user):** tested
+the reworked progress UI against SYN2025 again, plus separately confirmed
+the small dev corpus (`Corpora/DevCorpus/vert`) imports with no problems at
+all - an important data point, since it pointed straight at scale/content
+as the trigger rather than the import feature being broken outright.
+
+- **Real bug, the serious one: the sheet's window grew to an enormous,
+  mostly-blank height, pushing Cancel off-screen** (screenshot: a window
+  ~2600pt tall with the buttons unreachable without raising screen
+  resolution) - and separately, a second screenshot showed the schema
+  review form and the compile log rendering **overlapping** in the same
+  space. Root cause, found by reasoning through the two screenshots
+  together with the "dev corpus is fine, SYN2025 isn't" data point: `
+  progressLog`/`structuresView` were bare `NSTextView()` instances used as
+  `NSScrollView` document views without the standard-but-easy-to-forget
+  setup (`widthTracksTextView`, `isVerticallyResizable`, etc.) - without it,
+  long unwrapped lines (real absolute paths like `/Users/.../
+  CompiledCorpora/.indices/syn2025/data/doc.title`, which only pile up in
+  volume once a corpus has 20+ attributes the way SYN2025 does and the tiny
+  dev corpus doesn't) don't wrap and can make the text view grow without
+  bound instead of staying clipped to its scroll view, dragging the whole
+  sheet's layout along with it. Fixed the actual configuration
+  (`CorpusImportSheetController.configureForScrolling(_:)`, applied to both
+  text views) *and*, as a hard backstop regardless of root cause: the sheet
+  no longer resizes itself at all - `fixedContentSize` is set once and never
+  changed again; the log disclosure toggle now only animates a constraint
+  within that fixed size, never `NSWindow.setContentSize`. Also added
+  `showForm()`/`showProgress()` as the only two places allowed to touch
+  `formStack`/`progressStack` visibility, so the two can no longer
+  desync and overlap the way they did.
+- **Real gap, not a bug: `sniffSchema` missed two real structures**
+  (`text`/`p`, per the user cross-referencing SYN2025's own published
+  documentation) - confirmed as a genuine limitation of scanning only the
+  first N lines of an arbitrarily large, heterogeneous file (some
+  structures apparently don't appear within the first 50,000 lines of this
+  particular corpus). Increased the default scan window 10x (50,000 →
+  500,000 lines) to reduce how often this happens, documented plainly that
+  no bounded scan can *guarantee* completeness, and leaned on the schema
+  form already being fully editable as the actual fix for whatever a scan
+  still misses - which is exactly how the user already worked around it
+  (per the wiki cross-reference in their report).
+- **Real inefficiency, now fixed:** `countLines` re-scanned the whole
+  vertical file from scratch on every Compile click, including retries on
+  the *same, unchanged* file after a cancel. Added `LineCountCache`
+  (`ManateeKit/CorpusImporter.swift`), keyed by file size + modification
+  date (cheap to check, correctly invalidates if the file is ever actually
+  replaced) - a second attempt on an unchanged file is now instant instead
+  of re-reading a multi-GB file again.
+- **Also implemented (agreed separately in this session):** quitting the
+  app while an import is running now shows a confirmation
+  (`AppDelegate.applicationShouldTerminate` + new `ActiveImportTracker`) -
+  a deliberate, narrow exception to the app's otherwise-unconditional
+  "closable at any time, no questions" rule from Phase 3/4's earlier work,
+  justified specifically because a real import can represent hours of
+  unrecoverable compute, unlike every other disposable window in this app.
+
+Verified (that round): `cd ManateeKit && swift test` → 34/34 passing;
+`xcodebuild -scheme Corpora clean build` → **BUILD SUCCEEDED**, zero
+warnings; `xcodebuild -scheme Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06, investigated the two warnings visible in the SYN2025 log
+screenshots, plus revisited the 41 Xcode build warnings (user):**
+
+- Traced both encodevert warnings from the earlier screenshot to their
+  source in `manatee-open/src/encodevert.cc`. `"opening structure (s) on
+  the same position, ignoring the previous empty one"` is
+  `err_open_same_str`, part of `encodevert`'s own `enc_err` framework for
+  tolerating messy real-world corpus data - **not** a sign of impending
+  failure. `"sh: mkregexattr: command not found"` / `"ERROR: failed to
+  create regular expression attribute ..."` traced to
+  `compile_regexopt()` (`encodevert.cc:303-315`) - explicitly an
+  **optional** per-attribute regex-query speedup (`mkregexattr`, a
+  separate tool built alongside `encodevert` in the same directory), not a
+  correctness step; the call is wrapped so failure is logged and skipped,
+  never fatal. Neither explains the still-unexplained SIGABRT crash from
+  earlier, but the `mkregexattr` gap was a real, fixable bug on this app's
+  side: `CorpusImporter.importCorpus` launched `encodevert` without a
+  `PATH` containing the directory `mkregexattr` actually lives in (only
+  found via `encodevert`'s own internal `system("mkregexattr ...")` call),
+  so it could never succeed. Fixed by prepending manatee-open's `src/`
+  directory to the child process's `PATH`.
+- **Real, if cosmetic, finding on a re-ask about the 41 Xcode build
+  warnings**: turned out to be worth revisiting - all 38 "object file...
+  was built for newer macOS version (26.0/27.0) than being linked (13.0)"
+  linker warnings plus the `libpcre2` one were a genuine, easily-fixable
+  deployment-target mismatch, not something to just live with. This
+  machine runs macOS 27.0; `Corpora/project.yml` still declared a "13.0"
+  deployment target left over from early dev-machine-agnostic assumptions
+  that no longer apply to an explicitly single-machine, dev-only app.
+  Raised both `deploymentTarget.macOS` and `MACOSX_DEPLOYMENT_TARGET` to
+  "27.0" (covers every object file's stated minimum) - **41 warnings down
+  to 6**, the remaining 6 being the already-assessed-as-low-priority 5
+  upstream C++ narrowing warnings plus 1 benign Xcode tooling log line.
+  `ManateeKit/Package.swift` still declares `.macOS(.v13)` for standalone
+  `swift build`/`swift test` runs from Terminal (a separate build path from
+  Xcode's), so those still show the same linker warnings - lower priority
+  since matching 26.0/27.0 there needs either a `swift-tools-version` bump
+  or a custom version-string API, and it doesn't affect what the user
+  actually sees in Xcode.
+
+Verified: `cd ManateeKit && swift build` (compiles; still shows the
+Package.swift-side linker warnings, expected) + `swift test` → 34/34
+passing; `xcodegen generate` + `xcodebuild -scheme Corpora clean build` →
+**BUILD SUCCEEDED**, warning count 41 → 6; `xcodebuild -scheme Corpora
+test` → 8/8 `CorporaTests` passing.
+
+**Still not manually click-tested end-to-end** — re-running the SYN2025
+import with all of this session's fixes (including the actual crash still
+being unexplained) is the next step, along with the original Keep in
+Memory toggle/guard verification.
+
 ## Key files
 
 - `ManateeKit/Sources/CManatee/include/mtcbridge.h`,
   `ManateeKit/Sources/CManatee/mtcbridge.cc` — the whole C shim surface
 - `ManateeKit/Sources/ManateeKit/ManateeKit.swift`, `LiveConcordance.swift`,
   `SubcorpusStore.swift`, `CorpusRegistry.swift` — the Swift engine API
-- `ManateeKit/Tests/ManateeKitTests/` — 25 passing tests; run with `cd
+- `ManateeKit/Tests/ManateeKitTests/` — 32 passing tests; run with `cd
   ManateeKit && swift test`
 - `manatee-open/concord/concgrp.cc` — the fixed upstream bug, on
   `stranak/manatee-open`'s `macos-arm64-portability` branch (pushed, not

@@ -7,12 +7,13 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     static let shared = SettingsWindowController()
 
     private enum Pane: String, CaseIterable {
-        case general, appearance
+        case general, appearance, corpora
 
         var title: String {
             switch self {
             case .general: return "General"
             case .appearance: return "Appearance"
+            case .corpora: return "Corpora"
             }
         }
 
@@ -20,6 +21,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             switch self {
             case .general: return "gearshape"
             case .appearance: return "textformat"
+            case .corpora: return "internaldrive"
             }
         }
 
@@ -29,6 +31,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             switch self {
             case .general: return GeneralSettingsViewController()
             case .appearance: return AppearanceSettingsViewController()
+            case .corpora: return CorporaSettingsViewController()
             }
         }
     }
