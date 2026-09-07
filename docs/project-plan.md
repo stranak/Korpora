@@ -1440,7 +1440,64 @@ this round); `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
 manually click-tested (widen/narrow context in a live window, confirm the
 KWIC columns actually grow/shrink and line groups survive) - next step.
 
-### 5.2 — Query history (not started)
+### 5.2 — Query history (done)
+
+Recalls recently run CQL queries, across every corpus/window in the app,
+from a new toolbar popover - mirrors KonText's own persistent query
+history rather than resetting every launch.
+
+- **New `QueryHistoryStore.swift`** (`Corpora/Corpora/Settings/`, alongside
+  `AppSettings` - same UserDefaults-backed precedent, though this isn't a
+  user-facing settings pane): `QueryHistoryEntry { corpusName,
+  subcorpusPath, query, date }`, stored as JSON under one UserDefaults key,
+  capped at 200 entries (newest first; oldest silently dropped past that).
+  Entries are **unique by (corpusName, subcorpusPath, query)** - `record(...)`
+  is an upsert: an existing match anywhere in the list is removed and
+  reinserted at the front with a refreshed timestamp, rather than appended
+  as a second row. (Changed after manual testing: the first version only
+  de-duped an exact repeat of the *immediately preceding* entry, so
+  re-running the same favorite query from the History popover kept
+  duplicating it at the top instead of just bumping its "last used" time -
+  the user caught this and asked for unique-queries-by-last-used instead of
+  a linear "historically true" log.) Recorded **unconditionally** at
+  submission time (like shell history) rather than only after a successful
+  search - "what did I just search for" is still worth recalling even if it
+  was a CQL typo, and gating on success would need moving the call into
+  `replay()`'s success branch for no real benefit.
+- **`ConcordanceDocument.runQuery(_:)`** now calls
+  `QueryHistoryStore.record(...)` before `replay()` - since both the
+  "New Concordance" sheet's Search button and the persistent query bar's
+  re-run already funnel through this one method, no second call site was
+  needed.
+- **New `HistoryPopoverController.swift`**: a scrollable list of the most
+  recent 20 entries (`QueryHistoryStore` itself keeps up to 200 - this is a
+  quick-recall list, not a searchable archive), each a full-width clickable
+  row showing corpus name + a manually-truncated (60 char) query + a
+  relative timestamp (`RelativeDateTimeFormatter`), plus a "Clear History"
+  button. Same stack-of-rows shape as `OperationsPopoverController`.
+- New toolbar item (`ConcordanceWindowController`'s `ItemID.history`, SF
+  Symbol `clock.arrow.circlepath`, placed first/leftmost - logically
+  precedes Sort/Filter/etc.) wired via
+  `ConcordanceViewController.historyTapped(_:)`: clicking a row loads that
+  entry's corpus/subcorpus/query into the current window and runs it via
+  the normal `runQuery` path. Not gated by line groups - running a
+  different query is always allowed, same as typing into the query bar.
+- **New `QueryHistoryStoreTests.swift`** (`Corpora/CorporaTests/`, `Swift
+  Testing`/`@testable import Corpora`, matching `ConcordanceOperationTests`'s
+  precedent): each test uses a throwaway `UserDefaults(suiteName:)` so
+  nothing touches the real `UserDefaults.standard`. Covers newest-first
+  ordering, the move-to-front-and-refresh-timestamp upsert, keeping repeats
+  that differ by corpus/subcorpus as distinct entries, ignoring blank
+  queries, the 200-entry cap keeping the most recent, and `clear()`.
+- **Not implemented / explicitly out of scope for this pass**: recalling
+  history from the "New Concordance" sheet itself (only an already-open
+  window's toolbar can recall history) - a reasonable follow-on if it turns
+  out to matter in practice, not done speculatively.
+
+Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 14/14 `CorporaTests` passing (6 new).
+Not yet manually click-tested (run a few queries, open History, confirm
+recall/Clear both work) - next step, same as 5.1's open item.
 
 ### 5.3 — Multi-attribute KWIC display + mouseover (not started)
 

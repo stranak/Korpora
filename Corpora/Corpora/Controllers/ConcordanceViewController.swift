@@ -136,6 +136,27 @@ final class ConcordanceViewController: NSViewController {
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
+    @objc func historyTapped(_ sender: NSButton) {
+        let popover = NSPopover()
+        let controller = HistoryPopoverController()
+        controller.entries = QueryHistoryStore.recentEntries()
+        controller.onSelect = { [weak self, weak popover] entry in
+            guard let self else { return }
+            queryField.text = entry.query
+            document.corpusName = entry.corpusName
+            document.subcorpusPath = entry.subcorpusPath
+            document.runQuery(entry.query)
+            popover?.close()
+        }
+        controller.onClear = { [weak controller] in
+            QueryHistoryStore.clear()
+            controller?.entries = []
+        }
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
     @objc func contextTapped(_ sender: NSButton) {
         let popover = NSPopover()
         let currentLeft = Int(document.leftContext.replacingOccurrences(of: "-", with: "")) ?? 10

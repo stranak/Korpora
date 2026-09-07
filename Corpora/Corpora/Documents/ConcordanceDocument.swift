@@ -105,6 +105,12 @@ final class ConcordanceDocument: NSDocument {
     func runQuery(_ cql: String) {
         initialQuery = cql
         operations = []
+        // Recorded unconditionally (see QueryHistoryStore's doc comment) -
+        // this covers both the initial "New Concordance" sheet's Search
+        // button (which sets corpusName/subcorpusPath then calls this) and
+        // the persistent query bar's re-run, with no separate call site
+        // needed at either.
+        QueryHistoryStore.record(corpusName: corpusName, subcorpusPath: subcorpusPath, query: cql)
         replay()
     }
 

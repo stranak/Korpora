@@ -14,6 +14,7 @@
 		2D358B79B4437ECF7E297333 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEC6F15BA4380A2D97DEDD5 /* AppSettings.swift */; };
 		32E2858B137C9318279B497B /* CollocationSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */; };
 		39910E9FAD2844CEB020E76C /* ConcordanceWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4810F7FA8E9F739726A906 /* ConcordanceWindowController.swift */; };
+		3BF0261122FE2F6048E727A4 /* HistoryPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951961934552F0583BFE9387 /* HistoryPopoverController.swift */; };
 		3FCAE537B000E155792BE412 /* ManateeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 545FDF0433E6120EB8D317C9 /* ManateeKit */; };
 		42D6DA623C738CDAFB40406C /* KWICCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2482C8B330CDE8B79158832E /* KWICCellView.swift */; };
 		47ACA34AF24BB537A9705721 /* FrequencySheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */; };
@@ -28,11 +29,13 @@
 		6E56D19B4B2D73E51D47847A /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196F3E82C872642B3C56905B /* SortableTableView.swift */; };
 		78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777B79F44224A872C8862850 /* ConcordanceOperation.swift */; };
 		80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */; };
+		817C5C05F371B7CE725642FE /* QueryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */; };
 		82230583E5DEB6A9188B3F80 /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */; };
 		8F3A4C94F3D445894BAF9E26 /* CorpusImportSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91009E795461A30103DE13D6 /* CorpusImportSheetController.swift */; };
 		93AE5FBEEF098D7679084F8E /* CorpusResidencyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3370C232287251C1FA430377 /* CorpusResidencyManager.swift */; };
 		972A82C87A877EE9C96F5D83 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B153CDFFF68143E5723299BB /* main.swift */; };
 		97945D900550F11D6B3BB5FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E5FBE061C9D0960D0F0BD6 /* AppDelegate.swift */; };
+		9A8A001D30BB0535DD4B24ED /* QueryHistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */; };
 		B525122C9FD4CF23BD36396D /* CorporaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2743F9CD0004FB8FE8CDBE /* CorporaSettingsViewController.swift */; };
 		D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F56CC63630EA28304391DEA /* SortPopoverController.swift */; };
 		DC819B1BEE7789EC6AEFDE12 /* CQLQueryField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DE5D6AB25194929C0CBD73 /* CQLQueryField.swift */; };
@@ -64,13 +67,16 @@
 		337937E6760E63BDB464FABC /* CorporaDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorporaDocumentController.swift; sourceTree = "<group>"; };
 		4B6B0A143CEEB8705B394747 /* ContextPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextPopoverController.swift; sourceTree = "<group>"; };
 		4E28E03EBFB51A81A2086343 /* CorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStore.swift; sourceTree = "<group>"; };
 		5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
 		6F56CC63630EA28304391DEA /* SortPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortPopoverController.swift; sourceTree = "<group>"; };
 		76275DF734870EDBA0975A28 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
 		76D8CB27F099A49990068107 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
 		777B79F44224A872C8862850 /* ConcordanceOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceOperation.swift; sourceTree = "<group>"; };
+		88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStoreTests.swift; sourceTree = "<group>"; };
 		91009E795461A30103DE13D6 /* CorpusImportSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusImportSheetController.swift; sourceTree = "<group>"; };
 		91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationSheetController.swift; sourceTree = "<group>"; };
+		951961934552F0583BFE9387 /* HistoryPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverController.swift; sourceTree = "<group>"; };
 		9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
 		9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencySheetController.swift; sourceTree = "<group>"; };
 		AE34D8B50FF0995A27583CCE /* Corpora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Corpora.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -141,6 +147,7 @@
 				B8707E5EE04A324077AEEBD4 /* FilterSheetController.swift */,
 				9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */,
 				76D8CB27F099A49990068107 /* FrequencyWindowController.swift */,
+				951961934552F0583BFE9387 /* HistoryPopoverController.swift */,
 				D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */,
 				5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */,
 				31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */,
@@ -178,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */,
+				88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */,
 			);
 			path = CorporaTests;
 			sourceTree = "<group>";
@@ -190,6 +198,7 @@
 				EA2743F9CD0004FB8FE8CDBE /* CorporaSettingsViewController.swift */,
 				3370C232287251C1FA430377 /* CorpusResidencyManager.swift */,
 				1DAABABBF8E66299CCC4CE24 /* GeneralSettingsViewController.swift */,
+				58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */,
 				25829CE0B1184479409C9C1F /* SettingsWindowController.swift */,
 			);
 			path = Settings;
@@ -288,6 +297,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5ECA53D14CF01740C22D2F3A /* ConcordanceOperationTests.swift in Sources */,
+				9A8A001D30BB0535DD4B24ED /* QueryHistoryStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,10 +325,12 @@
 				47ACA34AF24BB537A9705721 /* FrequencySheetController.swift in Sources */,
 				494FFB3DDC7FC94E5C2E60E6 /* FrequencyWindowController.swift in Sources */,
 				62F2B2241409CF37E39DCD16 /* GeneralSettingsViewController.swift in Sources */,
+				3BF0261122FE2F6048E727A4 /* HistoryPopoverController.swift in Sources */,
 				42D6DA623C738CDAFB40406C /* KWICCellView.swift in Sources */,
 				06D95E63EEA83C14F34C247D /* NewConcordanceSheetController.swift in Sources */,
 				47D28927B4216981E7808861 /* NewSubcorpusPopoverController.swift in Sources */,
 				82230583E5DEB6A9188B3F80 /* OperationsPopoverController.swift in Sources */,
+				817C5C05F371B7CE725642FE /* QueryHistoryStore.swift in Sources */,
 				5147B2175F0C34D38FFC1569 /* SamplePopoverController.swift in Sources */,
 				67DFE992A86BA395057F5CB6 /* SettingsWindowController.swift in Sources */,
 				D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */,

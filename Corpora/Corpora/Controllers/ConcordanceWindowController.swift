@@ -5,6 +5,7 @@ import Cocoa
 /// concordances can sit side by side as tabs - no custom tab UI needed.
 final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     enum ItemID {
+        static let history = NSToolbarItem.Identifier("history")
         static let sort = NSToolbarItem.Identifier("sort")
         static let filter = NSToolbarItem.Identifier("filter")
         static let shuffle = NSToolbarItem.Identifier("shuffle")
@@ -43,7 +44,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.context,
+        [ItemID.history, ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.context,
          ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
     }
 
@@ -55,6 +56,14 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         guard let viewController = window?.contentViewController as? ConcordanceViewController else { return nil }
         switch identifier {
+        case ItemID.history:
+            // Not tracked in a stored property/`updateToolbarState` -
+            // running a different query is always allowed regardless of
+            // line groups (`ConcordanceDocument.runQuery` resets the whole
+            // operation chain itself, same as typing into the query bar).
+            let button = makeButton(symbol: "clock.arrow.circlepath", label: "History", target: viewController,
+                                     action: #selector(ConcordanceViewController.historyTapped(_:)))
+            return makeItem(identifier, label: "History", view: button)
         case ItemID.sort:
             let button = makeButton(symbol: "arrow.up.arrow.down", label: "Sort", target: viewController,
                                      action: #selector(ConcordanceViewController.sortTapped(_:)))
