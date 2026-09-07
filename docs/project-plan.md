@@ -137,6 +137,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | not started | not started | not started - see Phase 6 writeup for the full roadmap |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -2164,6 +2165,480 @@ one actual failure. Per the user ("we will chase it if it appears
 again"): not investigated further unless it recurs, at which point
 capture Xcode console output (`GetConsoleOutput`) during the failing run
 itself, since that's the one class of evidence not yet gathered.
+
+## Phase 6 — Concordance UX, round 2 (KonText comparison) (not started)
+
+Phase 5 closed out the user's first KonText-comparison pass. This is
+round 2: another functional comparison against KonText (specifically
+informed by `korpus.cz`, a live KonText deployment) turned up 5 more
+gaps, plus two more raised mid-planning (`doc.title` always shown in
+KWIC; styling settings for fonts/colors). Research this session (Explore
+agents + `DocumentationSearch`/grep) turned up 3 more real gaps not on
+the user's list, which the user asked to include too. Every item below
+is either explicitly confirmed by the user via `AskUserQuestion` or a
+directly-requested addition - an agreed 11-item roadmap, not speculative
+scope.
+
+**Order** (user-confirmed "cheapest-first, biggest/most novel last" for
+the original 5, with later additions slotted in near related work):
+
+1. KWIC-centered window resizing
+2. `doc.title`-style structural attribute shown on every KWIC line
+3. KWIC / Sentence view switch
+4. Concordance settings tab (behavioral defaults)
+5. Appearance settings: concordance styling (fonts + colors)
+6. Extended context on the selected line
+7. New engine primitive: attribute value enumeration (shared foundation for 8 & 9)
+8. CQL attribute-name/value autocomplete
+9. Text-Types-style subcorpus creation
+10. Charts: Collocations/Frequency bar charts + concordance dispersion plot
+11. Concordance result pagination/streaming
+
+Each is scoped to be independently shippable/testable, matching how
+Phase 5's sub-phases were built and committed one at a time.
+
+### 6.1 — KWIC-centered window resizing (AppKit UI done)
+
+Built directly against today's 4-column set (`group`/`left`/`kwic`/
+`right`) rather than waiting on 6.2's new structural-attribute column,
+per explicit user direction to start Phase 6 at its first item - 6.2's
+future column just needs `resizingMask = []` (fixed) to slot in later
+without disturbing this.
+
+**Problem** (confirmed via Explore agent, `ConcordanceViewController.swift`
+`setUpTableView` ~:334-382): `columnAutoresizingStyle` was
+`.lastColumnOnlyAutoresizingStyle` and only the `right` column had
+`.autoresizingMask` — widening the window grew only the Right column;
+Left and Match(KWIC) stayed pixel-fixed, so the match visibly drifted
+left as the window widened instead of staying centered.
+
+**Fix**: `left` and `right` both now carry `[.userResizingMask,
+.autoresizingMask]` (equal starting widths, 270/270 - manual drag-resize
+still works on both, same as before, in addition to auto-grow), `kwic`
+stays `.userResizingMask` only (no auto-grow), `group` stays fixed;
+`tableView.columnAutoresizingStyle` changed to
+`.uniformColumnAutoresizingStyle` — this splits added/removed width
+across all `.autoresizingMask` columns, which with equal starting widths
+keeps Left and Right growing together and the Match column visually
+centered. Config-only change, no new code.
+
+Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
+`RunAllTests` → 32/32 `CorporaTests` passing (unaffected - no test
+exercises column-resize behavior). Not yet manually click-tested - next
+step: widen/narrow the window in Xcode and confirm Left/Right grow
+symmetrically together while Match stays visually centered.
+
+**Verify**: `BuildProject` + manual resize test in Xcode (widen/narrow the
+window, confirm Left/Right grow symmetrically and Match stays centered).
+
+### 6.2 — `doc.title`-style structural attribute on every KWIC line (not started)
+
+KonText (per `korpus.cz`) always shows a structural attribute (typically
+`doc.title`) on every concordance line — document identity at a glance,
+not just on click like the existing "Document Info…" popup.
+
+**Design**:
+- `ConcordanceDocument` gains `structuralAttributesToShow: [String] = []`
+  (mirrors `inlineAttributes`/`tooltipAttributes`'s shape) and a
+  `setStructuralAttributeDisplay(_:)` method calling `refetchDisplay()`,
+  same pattern as `setAttributeDisplay`.
+- `ConcordanceRow` gains `structuralAttributeValues: [String: String]`,
+  populated in `buildRows` by calling the *existing*
+  `Corpus.structuralAttributeValue(at:attribute:)` (built in Phase 5.4 for
+  "Document Info…") once per configured attribute per row - no new engine
+  API needed, just a new eager call site for an existing one.
+  - **Performance note**: this is one `pos2str` engine call per row per
+    attribute. Cheap per-call, but serial-per-row could add up for large
+    result sets - use a `TaskGroup` to fan the per-row calls out
+    concurrently within `buildRows` rather than a plain sequential
+    `for`/`await` loop. Revisit if still slow once 6.11 (pagination) caps
+    how many rows are ever materialized at once.
+- New fixed-width table column (e.g. "Doc", between `group` and `left`)
+  showing `structuralAttributeValues[the configured attribute]` — a
+  separate column, not mixed into `KWICFormatter`'s per-token segments,
+  since this value is constant for the whole line, not per-token. Text
+  color: the new `structuralAttributeColor` setting from 6.5.
+- `AttributeDisplayPopoverController` gains a second section, "Structural"
+  (checkboxes, no Inline/Hover split needed - just "shown as a column" on
+  or off), sourced from `Corpus.info().structures`' attributes rather than
+  `Corpus.info().attributes`.
+
+**Key files**: `ConcordanceDocument.swift`, `ConcordanceViewController.swift`
+(new column in `setUpTableView`/`makeCell`), `AttributeDisplayPopoverController.swift`.
+
+**Verify**: unit test on the row-building logic (mock corpus, assert the
+column value matches the enclosing doc's attribute); manual test with the
+dev/syn2025 corpus's `doc.title` or `doc.author`.
+
+### 6.3 — KWIC / Sentence view switch (not started)
+
+**Confirmed free ride** (Explore agent, `manatee-open/concord/concctx.cc`
+:174-280): `KWICLines`' left/right context parameters are already
+free-form `const char*` strings, not integers, all the way from Swift
+(`LiveConcordance.kwicLines(leftContext:rightContext:...)` →
+`mtcbridge.cc:195`'s `new KWICLines(...)`) — and manatee-open already
+parses Bonito/Sketch-Engine-style context specs including `"-1:s"`/`"1:s"`
+("expand to the enclosing `<s>` boundary"), with graceful fallback to
+±3 tokens if the structure doesn't exist or isn't found at that position.
+**Zero new bridge/engine code required.**
+
+**Design**:
+- A toolbar segmented control, "KWIC | Sentence" (separate from the
+  existing numeric Context popover, since it's a different concept -
+  KonText keeps them separate too).
+- Sentence mode calls a mode-aware context setter with
+  `leftContext = "-1:s"`, `rightContext = "1:s"` instead of numeric
+  strings; KWIC mode restores the last numeric width used.
+- One small bridge fix: `mtcbridge.cc:195`'s hardcoded `maxctx=100` would
+  truncate any sentence longer than 100 tokens - raise it to something
+  generous (e.g. 2000); no need to make it user-configurable for v1.
+- Table structure is unchanged (still Left/Match/Right columns) - a
+  sentence's pre-match/post-match text just naturally fills Left/Right
+  instead of a fixed token count. Existing single-line truncation
+  (`KWICCellView`'s `maximumNumberOfLines = 1`, from the Phase 5.3
+  row-overlap bug fix) stays as-is; 6.6's Extended Context popover is the
+  escape hatch for seeing a truncated line in full.
+
+**Key files**: `ConcordanceDocument.swift` (new mode-aware context
+setter), `ConcordanceWindowController.swift`/`ConcordanceViewController.swift`
+(new toolbar segmented control), `ManateeKit/Sources/CManatee/mtcbridge.cc`
+(`maxctx` literal).
+
+**Verify**: `swift test` (unchanged, no engine test needed for a config
+value); manual test toggling the switch on a corpus with real sentences,
+confirm each line's context stops at sentence boundaries.
+
+### 6.4 — Concordance settings tab (behavioral defaults) (not started)
+
+New `Settings/ConcordanceSettingsViewController.swift`, registered in
+`SettingsWindowController`'s `Pane` enum (`General`/`Appearance`/`Corpora`
+today - adding a case is the entire registration step, confirmed via
+Explore agent). Holds **global defaults for brand-new concordance
+documents** (not per-document overrides, which stay on the toolbar
+popovers) - `AppSettings.minimumFreeMemoryAfterResidency`'s getter/setter
+shape is the precedent for each new property.
+
+**New `AppSettings` properties** (all plain `UserDefaults`-backed,
+following the existing `Key` enum + computed-property pattern):
+- `defaultLeftContext: Int` / `defaultRightContext: Int` (default 10 each)
+- `defaultViewMode: String` ("kwic" / "sentence", default "kwic")
+- `defaultExtendedContextTokens: Int` (default e.g. 50 - feeds 6.6)
+
+`ConcordanceDocument`'s hardcoded property-declaration defaults
+(`leftContext = "-10"` etc., `ConcordanceDocument.swift:22-24`) change to
+read `AppSettings.shared` at declaration time (e.g.
+`var leftContext = "-\(AppSettings.shared.defaultLeftContext)"`) - this
+runs once per `ConcordanceDocument` instance at creation, which is
+correct for both the brand-new-document path (nothing currently sets
+these, per Explore agent's finding) and the reopen-a-saved-document path
+(`read(from:ofType:)` immediately overwrites them anyway).
+
+**Key files**: new `ConcordanceSettingsViewController.swift`,
+`SettingsWindowController.swift`, `AppSettings.swift`,
+`ConcordanceDocument.swift`.
+
+**Verify**: no engine involvement; `BuildProject`/`RunAllTests`, manual
+test that changing a default in Settings affects the *next* new
+concordance window, not already-open ones.
+
+### 6.5 — Appearance settings: concordance styling (fonts + colors) (not started)
+
+Prompted directly by the user - partly closing a loop flagged back in
+Phase 5.3 ("attributes are displayed... Start with grey. Later we'll
+make settings panel for that or something").
+
+**Fonts**:
+- The existing `AppSettings.resultsFontName`/`resultsFontSize`
+  (`AppearanceSettingsViewController`, already consumed by `KWICCellView`)
+  already *is* the concordance font, already independent from the rest of
+  the app's chrome (menus/buttons/labels, which stay on the system font
+  throughout). **Recommendation: don't add a separate general "UI font"
+  override** - that would cut against this project's own stated "stick to
+  the Macintosh HIG" preference (native Mac apps let you customize
+  *content* fonts, e.g. Mail's message list or Terminal, but not general
+  chrome - that's what System Settings' text size is for). Proceeding on
+  the reading "keep concordance/UI fonts separate" (already true) rather
+  than "add a UI font override" - flag if that's not what was meant.
+- **New**: per-script concordance fonts, for corpora mixing scripts (a
+  multilingual corpus, or loanwords/citations) where one font's glyph
+  coverage isn't ideal for all of them. New
+  `AppSettings.scriptFontOverrides: [String: String]` (Unicode script name
+  → font name, e.g. "Cyrillic" → "Helvetica"), edited via an add/remove
+  table in the Appearance pane (same list-editing pattern as
+  `GeneralSettingsViewController`'s registry-directories list). At
+  render time (`KWICFormatter`/`KWICCellView`'s attributed-string
+  building), classify each token's dominant script via a small,
+  dependency-free `UnicodeScript` classifier (code-point-range based -
+  Latin/Cyrillic/Greek/Arabic/Hebrew/CJK, generic "Other" bucket) and
+  apply the matching override font to that token's run if configured,
+  else fall back to `resultsFont`. Per-token granularity (not
+  per-character) is the practical v1 scope.
+
+**Colors**:
+- Positional (secondary) attribute color - currently hardcoded
+  `.secondaryLabelColor` (`KWICCellView`) - new
+  `AppSettings.positionalAttributeColor` (archived `NSColor`), edited via
+  a plain `NSColorWell`.
+- Structural attribute color (6.2's new column) - same pattern, new
+  `AppSettings.structuralAttributeColor`.
+- Alternating row background - `tableView.usesAlternatingRowBackgroundColors`
+  is currently hardcoded `true` with the system default tint; add an
+  on/off toggle plus an optional `NSColorWell` for a custom alternate-row
+  tint (empty/unset = system default).
+- Flagged as candidates, not committed (the ask didn't explicitly mention
+  these, calling them out per "whatever I missed"): CQL syntax-highlighting
+  colors (currently hardcoded systemRed/Purple/Orange/Teal in
+  `CQLQueryField.recolor()`), and a distinct match/keyword highlight color
+  for 6.6's Extended Context sheet.
+
+**Key files**: `AppSettings.swift` (new properties + an `NSColor`
+archiving helper), `Settings/AppearanceSettingsViewController.swift` (new
+sections), `KWICFormatter.swift`/`KWICCellView.swift` (consume the new
+settings), new small `UnicodeScript.swift` classifier (AppKit-free, no
+engine dependency - lives in `Corpora`, not `ManateeKit`, since it's a
+pure rendering concern).
+
+**Verify**: unit test `UnicodeScript` classification against
+representative code points per script; `BuildProject`/`RunAllTests`;
+manual test changing colors/fonts and confirming both the on-screen table
+and Print/PDF output (which already mirrors on-screen styling per
+Phase 5.5) reflect them.
+
+### 6.6 — Extended context on the selected line (not started)
+
+KonText's "concordance detail" view - see much wider context than the
+table row shows, for one specific hit.
+
+**Design** (uses the position-indexed lookup pattern from Phase 5.4, not
+a full requery): new bridge primitive
+`mtc_corpus_positional_attr_range(corpus, fromPosition, toPosition,
+attrName, error) -> char*` (space-joined tokens) - a straightforward
+extension of the *already proven* "call `PosAttr::pos2str` directly off a
+position, no live concordance needed" approach `mtc_corpus_get_struct_attr`
+established. Given a row's `position` (already on `KWICLine`) and its
+match length (`kwicTokens.count`), fetch
+`[position - N, position + matchLen + N)` for a generous `N` (default
+from 6.4's `defaultExtendedContextTokens`).
+
+- Trigger: a new "Extended Context…" row context-menu item, right next to
+  the existing "Document Info…" (`ConcordanceViewController.swift`'s
+  `menuNeedsUpdate`/`showDocumentInfo` is the exact precedent to copy -
+  same `tableView.clickedRow` pattern, single-row only, matches the
+  user's "if only one selected" framing since the context menu already
+  only makes sense for a single clicked row).
+- Display: a small sheet (not `NSAlert`, since context can be long and
+  needs scrolling) with a read-only, wrapped `NSTextView` showing the
+  wider context, the original match bolded/highlighted (we know its exact
+  token range within the fetched text).
+
+**Key files**: `mtcbridge.h`/`.cc` (new function), `ManateeKit.swift`
+(`Corpus.extendedContext(at:attribute:tokensBefore:tokensAfter:)` or
+similar), `ConcordanceDocument.swift` (thin wrapper, same shape as
+`structuralInfo(at:)`), new `ExtendedContextSheetController.swift`,
+`ConcordanceViewController.swift` (menu item).
+
+**Verify**: `ManateeKitTests` - new test against `TestCorpusFixture`
+asserting the fetched range matches expected surrounding words including
+across the target token itself; `RunAllTests` for the UI wiring; manual
+click-test.
+
+### 6.7 — New engine primitive: attribute value enumeration (not started)
+
+Shared foundation for 6.8 and 6.9, so land it once, on its own.
+
+**Confirmed via Explore agent** (`manatee-open/corp/wordlist.hh:43-51`,
+`corp/posattr.hh:71`, `corp/struct.cc:117-119,158`): `PosAttr` (and
+`StructPosAttr`, which forwards straight through - so structural
+attributes like `doc.author` use the *identical* interface, already
+deduplicated, no manual struct-instance iteration needed) already expose:
+- `id_range()` - O(1) count of distinct values (cheap enough to decide
+  checkbox-list vs. search-box in the UI before fetching anything)
+- `id2str(int id)` / `str2id(const char*)` - direct id↔value lookup
+- `regexp2strids(pattern, ignoreCase)` - lazy, filtered (id, string) pairs
+  for a search-as-you-type box (needed for high-cardinality attributes
+  like `lemma`)
+- `dump_str()` - the whole lexicon, for low-cardinality attributes like
+  `doc.author` where showing everything at once is reasonable
+
+None of this is exposed in `mtcbridge.h`/`.cc` today - 100% new bridge
+surface, but a thin wrapper (same shape as the existing attribute-name
+introspection functions `mtc_corpus_attr_count`/`_name`).
+
+**New bridge functions**: `mtc_corpus_attr_value_count(corpus, attrName,
+error) -> int` (wraps `id_range()`), `mtc_corpus_attr_values(corpus,
+attrName, error) -> char*` (delimiter-joined full dump, for
+low-cardinality use), `mtc_corpus_attr_values_matching(corpus, attrName,
+pattern, ignoreCase, error) -> char*` (wraps `regexp2strids`, for
+search-as-you-type on high-cardinality attributes).
+
+**Key files**: `mtcbridge.h`/`.cc`, `ManateeKit.swift` (new `Corpus`
+methods), new `ManateeKitTests` (fixture corpus already has `doc.id`,
+small `tag`/`lemma` lexicons - assert exact value lists and counts).
+
+### 6.8 — CQL attribute-name/value autocomplete (not started)
+
+`CQLQueryField`'s own doc comment already flags this as deferred
+("Attribute-name/tag-value completion needs corpus registry
+introspection, which isn't in the shim yet"). Now it is (6.7).
+
+**Design**: `CQLQueryField.InternalTextView.completions(forPartialWordRange:...)`
+currently only matches the hardcoded `keywords` array
+(`within`/`containing`/etc.). Extend it to also complete: attribute names
+(from `Corpus.info().attributes`, already available, no new engine work)
+when the caret is right after `[` or inside `[attr`, and attribute
+*values* (via 6.7's `regexp2strids`, prefix-filtered by what's typed so
+far) when the caret is inside a `="..."` value position for a recognized
+attribute name. Needs the CQL field to know which corpus it's editing
+against - currently `CQLQueryField` is corpus-agnostic; it'll need a
+`corpusName`/`Corpus` reference injected by whichever controller owns it
+(`ConcordanceViewController`, `NewConcordanceSheetController`).
+
+**Key files**: `CQLQueryField.swift`, its two owners for wiring the
+corpus reference through.
+
+**Verify**: new test coverage asserting completion candidates for a few
+caret positions against the fixture corpus's known attributes/values;
+manual test in both the query bar and the New Concordance sheet.
+
+### 6.9 — Text-Types-style subcorpus creation (not started)
+
+Today, `NewSubcorpusPopoverController` takes a free-text CQL restriction
+(`author="Twain"`, `queryField` is a plain `CQLQueryField`). KonText
+instead shows checkboxes of the actual distinct values for a chosen
+structural attribute.
+
+**Design**: replace the free-text field with an attribute pop-up
+(populated from `corpusInfo.structures[selected].attributes` - the same
+discovery already used for the structure pop-up itself) plus a checklist
+of that attribute's distinct values, fetched via 6.7 (`dump_str()` if
+`id_range()` is small, else a search field feeding `regexp2strids`).
+Selected values compile to the existing CQL restriction string format
+under the hood (`author="Twain"|author="Poe"` for OR-of-values) - so
+`Corpus.createSubcorpus`'s existing contract is unchanged, this only
+changes how the query STRING gets built, not how it's used.
+
+**Key files**: `NewSubcorpusPopoverController.swift` (main rework),
+reuses 6.7's new `Corpus` methods.
+
+**Verify**: `ManateeKitTests` unchanged (subcorpus creation API itself
+doesn't change); manual test creating a subcorpus via checkboxes and
+confirming its size/content matches picking the same values by hand via
+free-text CQL today.
+
+### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (not started)
+
+**User-confirmed approach**: Swift Charts + `NSHostingView` - the
+project's first SwiftUI usage, confirmed feasible with zero project-level
+changes needed (deployment target is already macOS 27, `ManateeKit`
+already targets macOS 13+; Explore agent confirmed no build-setting
+changes required beyond regenerating the Xcode project via `xcodegen` so
+new files are picked up).
+
+**Design**:
+- A reusable SwiftUI `BarChartView` (label + value pairs), used by both
+  `CollocationWindowController` (data already has exactly the right
+  shape: `CollocationItem.word`/`.score` or `.freq`) and
+  `FrequencyWindowController` (`FrequencyItem.word`/`.freq`) - both
+  currently plain `NSTableView`s with no charting (confirmed via Explore
+  agent). Add a toolbar segmented control, "Table | Chart", toggling
+  `window.contentViewController`'s content between the existing table and
+  a new `NSHostingController(rootView: BarChartView(...))`.
+- **Concordance dispersion plot**: a small histogram/strip-plot of hit
+  positions across the corpus (0-100%), using data *already on hand* -
+  every row's `position` (already on `KWICLine`) plus `corpusSize`
+  (already fetched in `replay()`) - no new engine work for the chart
+  itself. **Important design note**: build this from a lightweight
+  "positions of every hit" fetch that's independent of however many rows
+  happen to be materialized/paginated in the visible table (see 6.11) -
+  i.e. don't wire the dispersion plot to `document.rows`, wire it to a
+  new cheap position-only bridge call (`RS(true,0,0)` + `beg_at` per
+  index, skipping all token/text decoding) so it stays correct once 6.11
+  lands regardless of build order between the two.
+- Printing/exporting a chart is close to free once it exists: the
+  existing `NSPrintOperation`/`drawPageBorder` pattern
+  (`ConcordanceViewController.printConcordance`) works on any `NSView`
+  including an `NSHostingView`; "export" for these windows = print/export
+  whatever's currently shown (table or chart), matching the concordance
+  window's own existing behavior rather than adding a second code path.
+
+**Key files**: new `Views/BarChartView.swift` (SwiftUI), new bridge
+function for dispersion positions, `CollocationWindowController.swift`,
+`FrequencyWindowController.swift`, `ConcordanceWindowController.swift`
+(dispersion plot placement - likely a new toolbar button opening an
+auxiliary window, same `show(_:)` pattern as Collocations/Frequency).
+
+**Verify**: `BuildProject`(after `xcodegen generate`) to confirm the
+SwiftUI/AppKit bridge compiles cleanly; manual visual check (first
+SwiftUI content in the app - check dark mode, VoiceOver labels default
+reasonably); `ManateeKitTests` for the new position-fetch primitive.
+
+### 6.11 — Concordance result pagination/streaming (not started)
+
+Biggest, most structurally invasive item - deliberately last. **Explore
+agent's verdict: cheap in principle** - fetch depth is already orthogonal
+to the sort/filter/shuffle/sample operation chain (confirmed:
+`ConcordanceOperation.apply(to:)` only mutates manatee's own live view;
+`refetchDisplay()` already proves lines can be re-fetched independently
+of re-running operations) - but touches several call sites.
+
+**What already exists, engine-side** (no manatee-open changes needed):
+- `Concordance::RS(useview, beg, end)` (`concord.hh:173`) - O(1) seek to
+  a `[beg, end)` window, already used by the bridge with default
+  `beg=0, end=0` (whole set) at `mtcbridge.cc:193`.
+- `mtc_concordance_size` (`mtcbridge.cc:176`) - already exposes total hit
+  count cheaply, already surfaced as `LiveConcordance.count`
+  (`LiveConcordance.swift:250`) but currently **unused** by the app
+  (hit count today comes from `lines.count` after fetching everything).
+
+**Concrete changes needed** (all confirmed by Explore agent, no
+surprises):
+1. `mtc_kwic_open` + `LiveConcordance.kwicLines` gain `offset`/`limit`
+   parameters, bounding the `while mtc_kwic_next(kwic) != 0` loop
+   (`LiveConcordance.swift:361`).
+2. `buildRows` (`ConcordanceDocument.swift:368-379`) currently uses the
+   fetched-array offset as both row `id` and the argument to
+   `live.linegroup(at:)` - must become a real global index once fewer
+   than all lines are fetched.
+3. Descending sort is currently faked by reversing the *whole* materialized
+   array (`ConcordanceDocument.swift:374-378`) - needs to become index
+   arithmetic against the total count (`RS(true, total-end, total-beg)`
+   then reverse just that page) instead of an in-memory reverse.
+4. `ConcordanceViewController`'s diffable-snapshot feed, the CSV/TSV
+   exporter, and the Operations popover's line-group counts
+   (`updateOperationsPopover`) all currently assume `document.rows` holds
+   *everything* - each needs an explicit decision: does Export always
+   fetch the full set regardless of what's paginated on screen (almost
+   certainly yes - a user exporting expects everything, not just the
+   visible page), and does the line-group count in Operations need a
+   separate full-corpus-scoped query, or can it stay approximate/loading
+   for huge results?
+
+This item needs its own follow-up research/design pass immediately before
+implementation (specifically: nail down the exact `NSTableView`
+"load more on scroll" vs. "Next/Previous page" UX, and the Export
+full-fetch question above) rather than being fully speced now - flagging
+it here as the last, most-open-ended item in the roadmap rather than
+writing pseudocode that's likely to need revision once the UX is chosen.
+
+**Verify**: `ManateeKitTests` for windowed fetch correctness (assert
+`kwicLines(offset:limit:)` against a fixture with a known hit count
+returns the right slice); manual test against a real large corpus
+(syn2025) confirming responsiveness improves and line-groups/sort/filter
+still behave correctly across pages.
+
+### Verification (all of Phase 6)
+
+Same pattern as every prior phase in this project:
+- `cd ManateeKit && swift test` after any engine/bridge/Swift-API change.
+- `BuildProject(buildForTesting: true)` then `RunAllTests` after any
+  AppKit change (run `xcodegen generate` first if new files were added).
+- Manual click-through in Xcode for anything touching live UI/rendering
+  (per this project's division of labor - visual/interactive verification
+  happens in the Xcode agent session, not headless).
+- Update this section incrementally, one sub-phase at a time, following
+  the exact Phase 5 writeup pattern (engine/bridge summary → AppKit
+  summary → test counts → "not yet manually click-tested" caveat → wait
+  for user confirmation before commit) - not all at once at the end.
 
 ## Key files
 

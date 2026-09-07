@@ -347,9 +347,16 @@ final class ConcordanceViewController: NSViewController {
         group.maxWidth = 32
         group.resizingMask = []
 
+        // Left/Right both auto-resize (and start at equal widths) while
+        // Match only resizes by manual drag - combined with
+        // `.uniformColumnAutoresizingStyle` below, this keeps Left and
+        // Right growing together as the window widens, so Match (the
+        // actual keyword) stays visually centered instead of drifting
+        // left the way `.lastColumnOnlyAutoresizingStyle` (widening only
+        // the last column) used to make it.
         let left = NSTableColumn(identifier: .init(Column.left.rawValue))
         left.title = "Left"
-        left.resizingMask = .userResizingMask
+        left.resizingMask = [.userResizingMask, .autoresizingMask]
         left.width = 270
         left.sortDescriptorPrototype = NSSortDescriptor(key: Column.left.rawValue, ascending: true)
 
@@ -361,7 +368,7 @@ final class ConcordanceViewController: NSViewController {
 
         let right = NSTableColumn(identifier: .init(Column.right.rawValue))
         right.title = "Right"
-        right.resizingMask = .autoresizingMask
+        right.resizingMask = [.userResizingMask, .autoresizingMask]
         right.width = 270
         right.sortDescriptorPrototype = NSSortDescriptor(key: Column.right.rawValue, ascending: true)
 
@@ -369,7 +376,7 @@ final class ConcordanceViewController: NSViewController {
         tableView.addTableColumn(left)
         tableView.addTableColumn(kwic)
         tableView.addTableColumn(right)
-        tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         tableView.onSortDescriptorsChange = { [weak self] in self?.headerSortChanged($0) }
 
         dataSource = NSTableViewDiffableDataSource<Section, Int>(tableView: tableView) { [weak self] _, column, _, id in
