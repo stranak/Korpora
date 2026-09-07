@@ -101,12 +101,26 @@ final class CQLQueryField: NSView {
         storage.beginEditing()
         storage.removeAttribute(.foregroundColor, range: full)
         storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: full)
-
         Self.color(pattern: #"\"(?:[^\"\\]|\\.)*\""#, in: text, storage: storage, color: .systemRed)
         Self.color(pattern: #"\b(within|containing|meet|union|contains)\b"#, in: text, storage: storage, color: .systemPurple)
         Self.color(pattern: #"(!=|=|<|>|!)"#, in: text, storage: storage, color: .systemOrange)
         Self.color(pattern: #"</?[a-zA-Z][\w]*[^>]*>"#, in: text, storage: storage, color: .systemTeal)
         storage.endEditing()
+    }
+
+    /// The same CQL syntax coloring `recolor()` applies live, factored out
+    /// so a non-editable rendering (e.g. `ConcordanceViewController
+    /// .printConcordance`'s printed/PDF'd page header) can match it exactly
+    /// without needing a real `NSTextView` to hang it off of.
+    static func syntaxColoredAttributedString(for query: String, font: NSFont) -> NSAttributedString {
+        let text = query as NSString
+        let storage = NSTextStorage(
+            string: query, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        Self.color(pattern: #"\"(?:[^\"\\]|\\.)*\""#, in: text, storage: storage, color: .systemRed)
+        Self.color(pattern: #"\b(within|containing|meet|union|contains)\b"#, in: text, storage: storage, color: .systemPurple)
+        Self.color(pattern: #"(!=|=|<|>|!)"#, in: text, storage: storage, color: .systemOrange)
+        Self.color(pattern: #"</?[a-zA-Z][\w]*[^>]*>"#, in: text, storage: storage, color: .systemTeal)
+        return storage
     }
 
     private static func color(pattern: String, in text: NSString, storage: NSTextStorage, color: NSColor) {

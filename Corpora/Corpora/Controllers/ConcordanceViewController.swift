@@ -1,5 +1,6 @@
 import Cocoa
 import ManateeKit
+import UniformTypeIdentifiers
 
 final class ConcordanceViewController: NSViewController {
     private enum Section { case main }
@@ -251,6 +252,56 @@ final class ConcordanceViewController: NSViewController {
             }
         }
         presentAsSheet(sheet)
+    }
+
+    /// File-menu action (see `AppDelegate.makeMainMenu`) - resolved via the
+    /// responder chain rather than a direct target, so it's only enabled
+    /// while a concordance window is key.
+    @objc func exportConcordance(_ sender: Any?) {
+        guard let window = view.window else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.nameFieldStringValue = document.corpusName.isEmpty ? "Concordance.csv" : "\(document.corpusName).csv"
+        let accessory = ExportAccessoryView()
+        // Defaults to whatever's currently shown inline in the table, so
+        // the export matches what the user is looking at unless they say
+        // otherwise.
+        accessory.includeInlineAttributes = !document.inlineAttributes.isEmpty
+        panel.accessoryView = accessory
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            let format: ConcordanceExportFormat = url.pathExtension.lowercased() == "csv" ? .commaSeparated : .tabSeparated
+            let inlineAttributes = accessory.includeInlineAttributes ? self.document.inlineAttributes : []
+            let text = ConcordanceExporter.export(rows: self.document.rows, format: format, inlineAttributes: inlineAttributes)
+            do {
+                try text.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                self.showErrorAlert(error)
+            }
+        }
+    }
+
+    /// File-menu action (see `AppDelegate.makeMainMenu`) - hands the table
+    /// straight to the standard macOS print panel rather than building a
+    /// bespoke PDF export: the print panel already offers "Save as PDF",
+    /// so this covers both without a second code path.
+    @objc func printConcordance(_ sender: Any?) {
+        guard let window = view.window else { return }
+        tableView.printHeaderLines = [
+            CQLQueryField.syntaxColoredAttributedString(
+                for: document.initialQuery, font: .monospacedSystemFont(ofSize: 12, weight: .regular)),
+            NSAttributedString(string: document.status, attributes: [
+                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+            ]),
+        ]
+        let operation = NSPrintOperation(view: tableView)
+        // Room for `printHeaderLines`, drawn in `drawPageBorder` - without
+        // widening this, the header text would overlap the table's own
+        // first row rather than sitting above it.
+        operation.printInfo.topMargin = 54
+        operation.printInfo.horizontalPagination = .fit
+        operation.printInfo.verticalPagination = .automatic
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
 
     /// Shows a disposable auxiliary results window and keeps it alive (see
@@ -532,5 +583,33 @@ extension ConcordanceViewController: NSMenuDelegate {
         let infoItem = NSMenuItem(title: "Document Info…", action: #selector(showDocumentInfo(_:)), keyEquivalent: "")
         infoItem.target = self
         menu.addItem(infoItem)
+    }
+}
+
+/// The Export Concordance save panel's accessory view - one checkbox,
+/// self-contained rather than a separate file since it has no purpose
+/// outside `exportConcordance(_:)`.
+private final class ExportAccessoryView: NSView {
+    private let checkbox = NSButton(checkboxWithTitle: "Include Inline Attributes", target: nil, action: nil)
+
+    var includeInlineAttributes: Bool {
+        get { checkbox.state == .on }
+        set { checkbox.state = newValue ? .on : .off }
+    }
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 36))
+        checkbox.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(checkbox)
+        NSLayoutConstraint.activate([
+            checkbox.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            checkbox.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -18),
+            checkbox.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            checkbox.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }

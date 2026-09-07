@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		06D95E63EEA83C14F34C247D /* NewConcordanceSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7084FD1E5FA2E7D2D57931B /* NewConcordanceSheetController.swift */; };
 		08F3ED97D8A5D735E42881CC /* AppearanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */; };
+		13ABAE893BED56A58783E84A /* ConcordanceExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556B88C8063C6E5835FFD178 /* ConcordanceExporterTests.swift */; };
 		23C3A0108368B4A92F2F8C0F /* CollocationWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19DEC833DE746210048C6DE /* CollocationWindowController.swift */; };
 		2A23AA5973C8ABB13E8F6A44 /* ContextPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6B0A143CEEB8705B394747 /* ContextPopoverController.swift */; };
 		2D358B79B4437ECF7E297333 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEC6F15BA4380A2D97DEDD5 /* AppSettings.swift */; };
@@ -33,6 +34,7 @@
 		80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */; };
 		817C5C05F371B7CE725642FE /* QueryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */; };
 		82230583E5DEB6A9188B3F80 /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A96311940A0871E30AFEC5 /* OperationsPopoverController.swift */; };
+		8496EE9D90A3E6469FD4AAC0 /* ConcordanceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03AEA8290524BE7142C58EB0 /* ConcordanceExporter.swift */; };
 		86AB9809D12EF591C3ADF77C /* KWICFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E708C82DA0152C0688169FE7 /* KWICFormatterTests.swift */; };
 		8F3A4C94F3D445894BAF9E26 /* CorpusImportSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91009E795461A30103DE13D6 /* CorpusImportSheetController.swift */; };
 		93AE5FBEEF098D7679084F8E /* CorpusResidencyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3370C232287251C1FA430377 /* CorpusResidencyManager.swift */; };
@@ -57,6 +59,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03AEA8290524BE7142C58EB0 /* ConcordanceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporter.swift; sourceTree = "<group>"; };
 		04174C3CE2F98CB5830011DE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0AC8A96F3C7AE68B2C65FBA4 /* KWICFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICFormatter.swift; sourceTree = "<group>"; };
 		0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceOperationTests.swift; sourceTree = "<group>"; };
@@ -71,6 +74,7 @@
 		337937E6760E63BDB464FABC /* CorporaDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorporaDocumentController.swift; sourceTree = "<group>"; };
 		4B6B0A143CEEB8705B394747 /* ContextPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextPopoverController.swift; sourceTree = "<group>"; };
 		4E28E03EBFB51A81A2086343 /* CorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		556B88C8063C6E5835FFD178 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
 		58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStore.swift; sourceTree = "<group>"; };
 		5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
 		6F56CC63630EA28304391DEA /* SortPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortPopoverController.swift; sourceTree = "<group>"; };
@@ -116,6 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */,
+				03AEA8290524BE7142C58EB0 /* ConcordanceExporter.swift */,
 				777B79F44224A872C8862850 /* ConcordanceOperation.swift */,
 				0AC8A96F3C7AE68B2C65FBA4 /* KWICFormatter.swift */,
 			);
@@ -192,6 +197,7 @@
 		ACA485CA47117EF14F516243 /* CorporaTests */ = {
 			isa = PBXGroup;
 			children = (
+				556B88C8063C6E5835FFD178 /* ConcordanceExporterTests.swift */,
 				0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */,
 				E708C82DA0152C0688169FE7 /* KWICFormatterTests.swift */,
 				88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */,
@@ -305,6 +311,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				13ABAE893BED56A58783E84A /* ConcordanceExporterTests.swift in Sources */,
 				5ECA53D14CF01740C22D2F3A /* ConcordanceOperationTests.swift in Sources */,
 				86AB9809D12EF591C3ADF77C /* KWICFormatterTests.swift in Sources */,
 				9A8A001D30BB0535DD4B24ED /* QueryHistoryStoreTests.swift in Sources */,
@@ -324,6 +331,7 @@
 				32E2858B137C9318279B497B /* CollocationSheetController.swift in Sources */,
 				23C3A0108368B4A92F2F8C0F /* CollocationWindowController.swift in Sources */,
 				80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */,
+				8496EE9D90A3E6469FD4AAC0 /* ConcordanceExporter.swift in Sources */,
 				78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */,
 				E2A2F41A47453E237F323A14 /* ConcordanceViewController.swift in Sources */,
 				39910E9FAD2844CEB020E76C /* ConcordanceWindowController.swift in Sources */,

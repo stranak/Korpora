@@ -136,7 +136,7 @@ Confirmed product decisions (from earlier in this project):
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
-| 5 — concordance UX (context/history/KWIC attrs/doc info/export) | in progress - see Phase 5 writeup | in progress | in progress |
+| 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -1346,6 +1346,26 @@ corruption, the window growth ×2, the quit/orphan-process bug, the
 `mkregexattr` gap, the stale-directory corruption, and now the duplicate-
 `word`-attribute crash) has had a real, verified root cause and fix.
 
+### Backlog: corpus Settings UX (not started)
+
+Flagged 2026-09-07 after `syn2025` produced an intermittent bad query
+result and the user first assumed it needed a "delete this corpus"
+function - see Phase 5.5's inconclusive-bug writeup. Resolved: a delete
+function already exists (Settings → Corpora's "−" button, calls
+`CompiledCorpusStore.remove(_:)`, which removes the registry file,
+compiled indices, and metadata) - the user confirmed that's sufficient
+once they knew it was there, and explicitly dropped the "recompile"
+idea. One item remains, deferred by the user ("put a pin in it"):
+
+- **Two separate, confusingly-similar corpus lists in Settings** - not
+  yet investigated. General's "Corpus registry directories" (`AppSettings
+  .corpusRegistryDirectories`, plain search-path strings, Manatee's own
+  `MANATEE_REGISTRY` equivalent - see `GeneralSettingsViewController`) vs.
+  Corpora's compiled-corpora table (`CompiledCorpusStore`, corpora this
+  app itself imported/compiled, with size/residency). The latter's
+  `baseDirectory` is one of the former's entries under the hood, but
+  nothing in the UI currently explains that relationship.
+
 ## Phase 5 — Concordance UX enhancements, KonText-inspired (in progress)
 
 Prompted by the user asking to compare this app's concordance view against
@@ -2018,7 +2038,132 @@ in a real corpus with structural attributes (e.g. the dev corpus's
 `doc.author`/`doc.genre`/`doc.year`) and confirm "Document Info…" shows
 correct, real values.
 
-### 5.5 — Export concordance (not started)
+### 5.5 — Export concordance (AppKit UI done)
+
+Exports the concordance table's visible columns (Group, Left, Match,
+Right) to a CSV or TSV file - the last item on the Phase 5 roadmap. No
+engine/bridge work needed: everything required (`ConcordanceRow`/
+`KWICLine`) already exists on the AppKit side, so this is pure formatting
++ panel plumbing.
+
+- `Documents/ConcordanceExporter.swift` (new): AppKit-free
+  `ConcordanceExporter.export(rows:format:inlineAttributes:) -> String`,
+  mirroring `KWICFormatter`'s precedent of keeping formatting logic
+  separate from view/panel code so it's unit-testable without a live
+  corpus or window. Exports exactly the rows given (whatever sort/filter/
+  sample/line-groups are currently applied) rather than re-querying
+  anything. CSV quotes fields containing commas/quotes/newlines and
+  doubles embedded quotes (RFC 4180); TSV has no standard escaping
+  convention, so embedded tabs/newlines are replaced with spaces instead.
+  CRLF line endings.
+- `inlineAttributes` (default `[]`), when non-empty, appends each listed
+  attribute's value in brackets after its own word - e.g. `fox[NN]` -
+  rather than one combined suffix per cell, since Left/Match/Right can
+  each hold many words and a plain-text cell has no separate column/color
+  to hang a secondary attribute off of the way the on-screen KWIC display
+  does. Considered and dropped: an Excel (.xlsx) export with the on-screen
+  coloured-inline-attribute styling. Excel's format *does* support
+  per-run-formatted "rich text" within a single cell (`<r>`/`<rPr>` runs
+  in a shared string - the same mechanism Excel's own UI uses for
+  bold-part-of-a-cell), but the Swift library initially found for this
+  (`XLKit`) only exposes whole-cell formatting; the one that wraps a C
+  library exposing real rich-string runs (`xlsxwriter.swift`, over
+  `libxlsxwriter`) requires vendoring a C library rather than a plain SPM
+  checkout. Not worth the dependency weight without a concrete use case
+  requiring an actual `.xlsx` file - the brackets-in-CSV approach above
+  covers the same information losslessly.
+- `Controllers/ConcordanceViewController.swift`: new `exportConcordance(_:)`
+  action - an `NSSavePanel` (`.commaSeparatedText`/`.plainText` content
+  types, default filename from `document.corpusName`) presented as a sheet
+  on the window, with a small accessory view (`ExportAccessoryView`, one
+  checkbox: "Include Inline Attributes", defaulted to whatever's currently
+  shown inline on-screen). Format is chosen from the saved file's
+  extension (`.csv` → comma-separated, anything else → tab-separated).
+  Also new: `printConcordance(_:)`, handing `tableView` to a plain
+  `NSPrintOperation` - the standard macOS print panel already offers
+  "Save as PDF", so this covers the requested PDF export too without a
+  second, bespoke PDF-rendering code path. The printed/PDF'd table alone
+  omitted the query and hit-count/corpus-size status line shown live above
+  it on-screen (`queryField`/`statusLabel`, siblings of `tableView`, not
+  reachable by printing `tableView` in isolation) - rather than reparent
+  the live view hierarchy for the duration of a print job,
+  `SortableTableView` gained a `printHeaderLines: [String]` property drawn
+  via `NSView.drawPageBorder(with:)` (an AppKit pagination hook called
+  once per printed page specifically for header/footer/border marks,
+  outside the normal content-drawing path - never invoked during ordinary
+  on-screen display), so `printConcordance(_:)` sets
+  `tableView.printHeaderLines` right before printing and `printInfo
+  .topMargin` is widened to leave room for it. Styled to match the live
+  window rather than plain text (found lacking on first manual test,
+  2026-09-07): `printHeaderLines` is `[NSAttributedString]`, not
+  `[String]`. The query line reuses `CQLQueryField`'s own CQL syntax
+  coloring - factored out of its private `recolor()` into a new `static
+  func syntaxColoredAttributedString(for:font:)` so both the live editor
+  and this non-editable print rendering produce identical colors
+  (quoted values red, `within`/`containing`/etc. purple, operators
+  orange, `<tag>`s teal) without duplicating the regex table; the status
+  line matches `statusLabel`'s own font/`.secondaryLabelColor`.
+- `AppDelegate.swift`: "Export Concordance…" (⌘E) and "Print…" (⌘P) added
+  to the File menu, target `nil` so both resolve via the responder chain -
+  only `ConcordanceViewController` implements either selector, so AppKit's
+  standard menu validation disables both whenever no concordance window is
+  key, with no manual enablement logic needed.
+- Tests (`ConcordanceExporterTests.swift`, 10 tests): header + column
+  order, CSV comma-quoting, CSV embedded-quote-doubling, TSV tab/newline
+  replacement, empty-rows-is-just-the-header, multiple rows each on their
+  own line, plain words unchanged when `inlineAttributes` is omitted,
+  bracketed values appended per word, multiple attribute values joined
+  with `/` within one bracket, a token missing the requested attribute
+  left unbracketed.
+
+Verified: `xcodebuild -scheme Corpora build`/`test` (via
+`BuildProject(buildForTesting: true)`/`RunAllTests`) → **BUILD SUCCEEDED**,
+32/32 `CorporaTests` passing (10 in `ConcordanceExporterTests`). Not yet
+manually click-tested - next steps: run a query with an inline attribute
+configured, choose File → Export Concordance…, toggle "Include Inline
+Attributes" both ways, save as both `.csv` and `.txt`, and confirm both
+open correctly with the right columns/escaping/brackets; separately,
+File → Print… on a multi-page concordance and confirm the query/status
+header appears once per page above the table, the table itself paginates
+sensibly, and "Save as PDF" from the print panel produces a usable PDF.
+
+**Considered and dropped: Excel export.** Excel's `.xlsx` format *does*
+support per-run-formatted "rich text" within a single cell (`<r>`/`<rPr>`
+runs in a shared string - the same mechanism Excel's own UI uses for
+bold-part-of-a-cell) - so replicating the on-screen coloured-inline-
+attribute look wasn't ruled out by the file format, only by tooling: the
+Swift library first found for this (`XLKit`) only exposes whole-cell
+formatting, and the one that wraps a C library exposing real rich-string
+runs (`xlsxwriter.swift`, over `libxlsxwriter`) requires vendoring a C
+library rather than a plain SPM checkout. Not worth the dependency weight
+without a concrete use case requiring an actual `.xlsx` file - the
+brackets-in-CSV approach above covers the same information losslessly.
+
+**Investigated, inconclusive, not chased further: a one-off 0-hit result
+on a query's first run (2026-09-07).** Reported once:
+`[lemma="být"][word="k"]` against `syn2025` returned "0 hits"
+immediately; editing the query to `[word="je"][word="k"]` and running it
+got real results; editing it back to the exact original text and running
+it again also got real results. Investigated and ruled out as root
+causes: (1) any query-result caching in `manatee-open` or `ManateeKit` -
+`mtc_query()` always does `eval_cqpquery()` → `filter_query()` → `new
+Concordance(...)` fresh, every call; (2) a separate/lazy-loaded code path
+for secondary attributes like `lemma` vs. the primary `word` attribute -
+both compile through the identical `getAttr(name)->regexp2poss(...)`
+call; (3) Unicode normalization drift in `QueryHistoryStore` - the
+persisted query string was confirmed to already be canonical NFC; (4)
+stale index files from a just-finished recompile - the user confirmed
+`syn2025` had been queried successfully many times before this happened.
+The user's working theory was that `syn2025` itself had been compiled by
+an earlier, since-fixed buggy import path (see Phase 4's "duplicate-
+`word`-attribute crash"/stale-directory bugs) - but a follow-up repro of
+the *exact same query* on 2026-09-07 succeeded on the first try, with no
+code changes in between, so that's not confirmed either. Genuinely
+inconclusive: no reproduction recipe, no live console capture from the
+one actual failure. Per the user ("we will chase it if it appears
+again"): not investigated further unless it recurs, at which point
+capture Xcode console output (`GetConsoleOutput`) during the failing run
+itself, since that's the one class of evidence not yet gathered.
 
 ## Key files
 

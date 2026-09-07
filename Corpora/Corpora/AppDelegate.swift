@@ -93,6 +93,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
+        // Target is nil (resolved via the responder chain, same as the
+        // items above) - only `ConcordanceViewController` implements this
+        // selector, so AppKit's standard menu validation automatically
+        // disables the item whenever no concordance window is key.
+        fileMenu.addItem(withTitle: "Export Concordance…", action: #selector(ConcordanceViewController.exportConcordance(_:)), keyEquivalent: "e")
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(withTitle: "Print…", action: #selector(ConcordanceViewController.printConcordance(_:)), keyEquivalent: "p")
 
         let editMenuItem = NSMenuItem()
         main.addItem(editMenuItem)
