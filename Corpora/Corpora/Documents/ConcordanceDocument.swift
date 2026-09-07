@@ -195,6 +195,40 @@ final class ConcordanceDocument: NSDocument {
     /// future rapid double-action) would otherwise fire concurrently.
     private var currentReplayTask: Task<Void, Never>?
 
+    /// Widens/narrows how many tokens of left/right context each KWIC line
+    /// shows, in an already-open window - matches KonText's own live
+    /// expand/narrow-context control. Unlike sort/filter/shuffle/sample,
+    /// this is purely a display setting (mirrors `kwicAttr`): not part of
+    /// the undoable `operations` chain, and doesn't require or invalidate
+    /// line groups, since it can't change which hits exist or their order.
+    /// Reuses the existing `liveConcordance` handle instead of calling
+    /// `replay()` - which would reopen the corpus and re-run the query plus
+    /// every operation in the chain from scratch just to change how much
+    /// text is shown around each hit. `status`'s hit-count/corpus-size text
+    /// is left as-is, since neither changes when only context width does.
+    func setContext(left: Int, right: Int) {
+        leftContext = "-\(max(left, 0))"
+        rightContext = "\(max(right, 0))"
+        guard liveConcordance != nil else { return } // next replay() will use the new values
+        let leftContext = leftContext
+        let rightContext = rightContext
+        let kwicAttr = kwicAttr
+        let descendingSort = Self.descendingSort(in: operations)
+        let previousReplay = currentReplayTask
+        currentReplayTask = Task { @MainActor in
+            await previousReplay?.value
+            guard let live = liveConcordance else { return }
+            do {
+                let lines = try await live.kwicLines(
+                    leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr)
+                rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
+            } catch {
+                status = "\(error)"
+            }
+            onResultsChanged?()
+        }
+    }
+
     private func replay() {
         guard !corpusName.trimmingCharacters(in: .whitespaces).isEmpty,
               !initialQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
@@ -207,13 +241,7 @@ final class ConcordanceDocument: NSDocument {
         let rightContext = rightContext
         let kwicAttr = kwicAttr
         let operations = operations
-        // The most recent .sort operation's flag wins - later operations
-        // (e.g. a filter after a descending sort) don't reset it, matching
-        // how a fresh .sort operation is the only thing that changes it.
-        let descendingSort = operations.reversed().lazy.compactMap { op -> Bool? in
-            if case .sort(_, _, let descending) = op { return descending }
-            return nil
-        }.first ?? false
+        let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
         currentReplayTask = Task { @MainActor in
             await previousReplay?.value
@@ -234,24 +262,7 @@ final class ConcordanceDocument: NSDocument {
                 let corpusSize = await queryCorpus.size
                 let lines = try await live.kwicLines(
                     leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr)
-                var newRows: [ConcordanceRow] = []
-                newRows.reserveCapacity(lines.count)
-                for (offset, line) in lines.enumerated() {
-                    // linegroup(at:) is keyed to Manatee's own view order, so
-                    // look it up before any display-only reversal below.
-                    newRows.append(ConcordanceRow(id: offset, line: line, group: await live.linegroup(at: offset)))
-                }
-                if descendingSort {
-                    // Manatee's own sort is always ascending (see
-                    // ConcordanceOperation.sort's doc comment) - descending is
-                    // purely a display-order flip, so `id` (== row.rows index,
-                    // per ConcordanceViewController.makeCell) must be
-                    // reassigned to match the new positions.
-                    newRows = newRows.reversed().enumerated().map { i, row in
-                        ConcordanceRow(id: i, line: row.line, group: row.group)
-                    }
-                }
-                rows = newRows
+                rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
                 liveConcordance = live
                 let corpusDescription: String
                 if let subcorpusPath {
@@ -269,6 +280,37 @@ final class ConcordanceDocument: NSDocument {
             }
             onResultsChanged?()
         }
+    }
+
+    /// The most recent `.sort` operation's `descending` flag - later
+    /// operations (e.g. a filter after a descending sort) don't reset it,
+    /// matching how only a fresh `.sort` operation itself changes it.
+    private static func descendingSort(in operations: [ConcordanceOperation]) -> Bool {
+        operations.reversed().lazy.compactMap { op -> Bool? in
+            if case .sort(_, _, let descending) = op { return descending }
+            return nil
+        }.first ?? false
+    }
+
+    /// Looks up each line's group (keyed to Manatee's own view order, via
+    /// `live.linegroup(at:)`) before applying `descendingSort`'s
+    /// display-only reversal - Manatee's own sort is always ascending (see
+    /// `ConcordanceOperation.sort`'s doc comment), so descending is purely a
+    /// display-order flip; `id` (== the row's index, per
+    /// `ConcordanceViewController.makeCell`) is reassigned to match the
+    /// flipped positions.
+    private static func buildRows(from lines: [KWICLine], live: LiveConcordance, descendingSort: Bool) async -> [ConcordanceRow] {
+        var newRows: [ConcordanceRow] = []
+        newRows.reserveCapacity(lines.count)
+        for (offset, line) in lines.enumerated() {
+            newRows.append(ConcordanceRow(id: offset, line: line, group: await live.linegroup(at: offset)))
+        }
+        if descendingSort {
+            newRows = newRows.reversed().enumerated().map { i, row in
+                ConcordanceRow(id: i, line: row.line, group: row.group)
+            }
+        }
+        return newRows
     }
 
     // MARK: - Analysis (collocations, frequency distributions)

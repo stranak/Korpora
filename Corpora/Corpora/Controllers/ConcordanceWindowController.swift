@@ -9,6 +9,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let filter = NSToolbarItem.Identifier("filter")
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
+        static let context = NSToolbarItem.Identifier("context")
         static let collocations = NSToolbarItem.Identifier("collocations")
         static let frequencies = NSToolbarItem.Identifier("frequencies")
         static let operations = NSToolbarItem.Identifier("operations")
@@ -42,7 +43,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample,
+        [ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.context,
          ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
     }
 
@@ -74,6 +75,14 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                                      action: #selector(ConcordanceViewController.sampleTapped(_:)))
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
+        case ItemID.context:
+            // Not tracked in a stored property/`updateToolbarState` - unlike
+            // sort/filter/shuffle/sample, widening context is a display
+            // setting (see `ConcordanceDocument.setContext`), not a corpus
+            // operation, so it never needs to disable when line groups exist.
+            let button = makeButton(symbol: "arrow.left.and.right", label: "Context", target: viewController,
+                                     action: #selector(ConcordanceViewController.contextTapped(_:)))
+            return makeItem(identifier, label: "Context", view: button)
         case ItemID.collocations:
             let button = makeButton(symbol: "arrow.left.arrow.right", label: "Collocations", target: viewController,
                                      action: #selector(ConcordanceViewController.collocationsTapped(_:)))

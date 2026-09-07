@@ -136,6 +136,7 @@ Confirmed product decisions (from earlier in this project):
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
+| 5 — concordance UX (context/history/KWIC attrs/doc info/export) | in progress - see Phase 5 writeup | in progress | in progress |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -1344,6 +1345,108 @@ symptom found across this whole Phase 4 effort (the hang, the rendering
 corruption, the window growth ×2, the quit/orphan-process bug, the
 `mkregexattr` gap, the stale-directory corruption, and now the duplicate-
 `word`-attribute crash) has had a real, verified root cause and fix.
+
+## Phase 5 — Concordance UX enhancements, KonText-inspired (in progress)
+
+Prompted by the user asking to compare this app's concordance view against
+KonText's and add what's missing. Five features, agreed with the user in
+this priority order (start → finish):
+
+1. **Adjustable context width** - widen/narrow left/right context live in
+   an existing window, not just at document creation.
+2. **Query history** - recall recent CQL queries typed in a window/session.
+3. **Multi-attribute KWIC display + mouseover** - show e.g. lemma/tag
+   alongside word, inline or on hover.
+4. **Document/structural info** - a row-detail view showing a hit's
+   enclosing `<doc>`/structure attributes (author, year, etc.).
+5. **Export concordance** - save visible/filtered lines to text/CSV.
+
+Investigated up front (see the Explore-agent survey this session) what
+already exists vs. what's genuinely new scope:
+
+- **KWIC display today** is single-attribute only, all the way down:
+  `KWICLine` (`ManateeKit.swift`) is `{ left, kwic, right: String }`, and
+  `mtcbridge.cc`'s `join_text_tokens` explicitly discards every attribute
+  but plain word text before it reaches Swift - even though the underlying
+  manatee-open `KWICLines` class (`concord/concget.hh`) already accepts
+  comma-separated multi-attribute strings (`kwica`/`ctxa`) and a
+  comma-separated structure list (`struca`) for inline structural
+  annotation. So multi-attribute KWIC (#3) and structural info (#4) are
+  both "engine already supports it, bridge/Swift/UI layer doesn't yet" -
+  real but bounded new work, not a manatee-open change.
+- **No tooltip/hover mechanism exists anywhere in this codebase** (grep for
+  `NSToolTip`/`toolTip`/`mouseEntered`/`mouseMoved`/tracking areas across
+  `Corpora/Corpora` turns up exactly one static `.toolTip` string in a
+  Settings checkbox) - #3's mouseover mode is new AppKit groundwork, not an
+  extension of an existing pattern.
+- **Adjustable context width (#1) needed no engine/bridge work at all**:
+  `LiveConcordance.kwicLines(leftContext:rightContext:kwicAttr:)`
+  (`LiveConcordance.swift:315`) already takes context sizes as a per-call
+  parameter, not something baked into the query at open time, and
+  `ConcordanceDocument.leftContext`/`.rightContext` (`ConcordanceDocument.
+  swift:22-23`) are already stored, persisted properties - nothing in the
+  UI had ever changed them after document creation. Pure UI + a new cheap
+  refetch path.
+- **Attribute-picker precedent already exists**: `CollocationSheetController`
+  populates a real `NSPopUpButton` from `CorpusInfo.attributes`
+  (`Corpus.info()`) - the model to extend for a "which attributes to show"
+  picker in #3, rather than `SortPopoverController`'s free-text field
+  (which doesn't discover attributes at all).
+- **No per-window "Display settings" UI pattern exists yet** - only global
+  `AppSettings` (UserDefaults-backed) and per-document plain stored
+  properties (`kwicAttr`, `leftContext`/`rightContext` themselves). A new
+  toolbar popover (mirroring `SortPopoverController`/`SamplePopoverController`'s
+  shape) is the natural third pattern, used for #1 and probably #3.
+
+### 5.1 — Adjustable context width (done)
+
+Widens/narrows how many tokens of left/right context each KWIC line shows,
+live, in an already-open concordance window - matching KonText's own
+expand/narrow-context control rather than only being settable when a query
+is first run.
+
+- **`ConcordanceDocument.swift`**: extracted `replay()`'s row-building
+  logic (line-group lookup per row + the display-only descending-sort
+  reversal) into a shared `static func buildRows(from:live:descendingSort:)`,
+  and its "which sort direction is currently active" scan into
+  `static func descendingSort(in:)` - both now reused by a new
+  `setContext(left:right:)` method. That method updates the stored
+  `leftContext`/`rightContext` and, if a `liveConcordance` handle already
+  exists, re-fetches KWIC lines from that *same* handle
+  (`live.kwicLines(leftContext:rightContext:kwicAttr:)` again) rather than
+  calling `replay()` - which would reopen the corpus and re-run the query
+  plus every operation in the chain from scratch just to change how much
+  context is displayed. `status`'s hit-count/corpus-size text is left
+  untouched on a context-only refetch since neither actually changes when
+  only context width does. Chained onto the existing `currentReplayTask`
+  (the same serialization `replay()` itself uses) so a context change
+  racing with an in-flight replay can't interleave.
+- Deliberately **not** part of the undoable `operations` chain and **not**
+  gated by `hasLineGroups` - mirrors `kwicAttr`'s existing status as a pure
+  display setting, not a corpus query operation; widening context doesn't
+  change hit order/count and has no reason to conflict with an active line
+  group view the way starting a new sort/filter/shuffle/sample would.
+- **New `ContextPopoverController.swift`** (mirrors `SamplePopoverController`'s
+  shape: two labeled `NSTextField`s + Apply button, transient popover) and
+  a new toolbar item (`ConcordanceWindowController`'s `ItemID.context`,
+  SF Symbol `arrow.left.and.right`, placed after Sample) wired via
+  `ConcordanceViewController.contextTapped(_:)`. Not added to
+  `updateToolbarState`'s disable-when-line-groups-exist list, per the point
+  above.
+
+Verified: `cd ManateeKit && swift test` (unaffected - no ManateeKit changes
+this round); `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 8/8 `CorporaTests` passing. Not yet
+manually click-tested (widen/narrow context in a live window, confirm the
+KWIC columns actually grow/shrink and line groups survive) - next step.
+
+### 5.2 — Query history (not started)
+
+### 5.3 — Multi-attribute KWIC display + mouseover (not started)
+
+### 5.4 — Document/structural info (not started)
+
+### 5.5 — Export concordance (not started)
 
 ## Key files
 

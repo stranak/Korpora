@@ -136,6 +136,20 @@ final class ConcordanceViewController: NSViewController {
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
+    @objc func contextTapped(_ sender: NSButton) {
+        let popover = NSPopover()
+        let currentLeft = Int(document.leftContext.replacingOccurrences(of: "-", with: "")) ?? 10
+        let currentRight = Int(document.rightContext) ?? 10
+        let controller = ContextPopoverController(left: currentLeft, right: currentRight)
+        controller.onApply = { [weak self, weak popover] left, right in
+            self?.document.setContext(left: left, right: right)
+            popover?.close()
+        }
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
     @objc func operationsTapped(_ sender: NSButton) {
         let popover = NSPopover()
         let controller = OperationsPopoverController()
