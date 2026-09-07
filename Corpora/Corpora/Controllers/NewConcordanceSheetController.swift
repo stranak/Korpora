@@ -108,10 +108,31 @@ final class NewConcordanceSheetController: NSViewController {
             cancelButton.trailingAnchor.constraint(equalTo: searchButton.leadingAnchor, constant: -8),
         ])
 
+        // Explicit, not relying on AppKit's auto-generated Tab loop:
+        // `queryField` is a custom composite view (NSScrollView + a nested
+        // NSTextView, not a standard control), which that heuristic loop
+        // doesn't reliably reach into - without this, Tabbing from
+        // `subcorpusPopUp` skipped straight past the query field to the
+        // buttons (found via manual testing, 2026-09-07).
+        corpusPopUp.nextKeyView = subcorpusPopUp
+        subcorpusPopUp.nextKeyView = queryField.textView
+        queryField.textView.nextKeyView = searchButton
+        searchButton.nextKeyView = cancelButton
+
         view = root
         preferredContentSize = NSSize(width: 480, height: 300)
 
         refreshForSelectedCorpus()
+    }
+
+    /// Nothing focuses `queryField` just because the sheet is on screen -
+    /// same root cause as the Tab-loop gap above, a custom composite view
+    /// isn't what AppKit's initial-first-responder heuristics expect
+    /// either. `viewDidAppear` (not `loadView`) is the first point the view
+    /// is guaranteed to actually have a window to focus within.
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        queryField.focus()
     }
 
     private func refreshForSelectedCorpus() {

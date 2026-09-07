@@ -16,7 +16,11 @@ final class CQLQueryField: NSView {
     private static let maxHeight: CGFloat = 160
 
     private let scrollView = NSScrollView()
-    private let textView: InternalTextView
+    // Not `private` - callers need it to wire this view into a key-view
+    // loop (`nextKeyView`) and to call `focus()`'s `makeFirstResponder`.
+    // `CQLQueryField` itself never accepts first responder (NSView's
+    // default, unchanged) - only this nested text view actually edits.
+    let textView: InternalTextView
 
     var text: String {
         get { textView.string }
@@ -29,6 +33,18 @@ final class CQLQueryField: NSView {
     var onChange: (() -> Void)?
 
     private var heightConstraint: NSLayoutConstraint!
+
+    /// Focuses the actual editable text view - nothing does this
+    /// automatically just because this view is on screen (a custom
+    /// composite view like this one isn't a standard control, so neither
+    /// AppKit's initial-first-responder heuristics nor its auto-generated
+    /// Tab key-view loop reliably reach into it on their own; see
+    /// `NewConcordanceSheetController.viewDidAppear`/`loadView`, which call
+    /// this and wire `nextKeyView` explicitly rather than relying on that).
+    @discardableResult
+    func focus() -> Bool {
+        window?.makeFirstResponder(textView) ?? false
+    }
 
     override init(frame frameRect: NSRect) {
         textView = InternalTextView()
@@ -103,7 +119,9 @@ final class CQLQueryField: NSView {
 
     /// Text view subclass so Enter/Shift-Enter and completion can be intercepted
     /// without a separate delegate round-trip for every keystroke.
-    private final class InternalTextView: NSTextView {
+    /// Not `private` - `textView`'s own declared type must be at least as
+    /// visible as that (now internal) property itself.
+    final class InternalTextView: NSTextView {
         var onSubmit: (() -> Void)?
 
         override func insertNewline(_ sender: Any?) {
