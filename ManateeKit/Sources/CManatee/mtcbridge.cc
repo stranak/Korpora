@@ -25,6 +25,10 @@ struct MTCConcordance {
 };
 struct MTCKwic {
     KWICLines *kl;
+    // Needed by mtc_kwic_get_{left,kwic,right}_attr to look up an arbitrary
+    // secondary attribute by name on demand - kl itself only knows about
+    // the single kwic_attr it was opened with.
+    Corpus *corp;
 };
 struct MTCCollocItems {
     CollocItems *items;
@@ -56,20 +60,40 @@ void set_error(char **error, const std::exception &e) {
     set_error(error, e.what());
 }
 
-/* Manatee's Tokens vectors alternate [text-run, tag, text-run, tag, ...]
- * (see concord/concget.cc:tcl_output_tokens) - even indices are the actual
- * token text, odd indices are collocation/annotation markup. We only want
- * the text for this API. */
-char *join_text_tokens(const Tokens &toks) {
+/* Joins `attr`'s values across [from, to), one '\x1F' (unit separator -
+ * matches get_corp_text's own attrdelim convention in concord/concget.cc,
+ * chosen because it can't appear in real corpus text) immediately before
+ * *every* token, including the first. This "leading delimiter" shape
+ * (rather than a plain separator strictly *between* tokens) makes the
+ * result unambiguous to split back into exactly one entry per token even
+ * when a token's own attribute value happens to be an empty string - the
+ * caller drops the first character then splits on '\x1F' keeping empty
+ * pieces (see mtcbridge.h's doc comment on mtc_kwic_get_left_attr).
+ * `from >= to` (an undefined/empty line's segment, or zero tokens) yields
+ * "" (not NULL) - the only string with no leading delimiter at all, so it
+ * unambiguously decodes to zero tokens rather than one empty one. */
+char *join_attr_range(PosAttr *attr, Position from, Position to) {
     std::ostringstream out;
-    bool first = true;
-    for (size_t i = 0; i < toks.size(); i += 2) {
-        if (!first)
-            out << ' ';
-        out << toks[i];
-        first = false;
+    if (from < to) {
+        TextIterator *it = attr->textat(from);
+        for (Position p = from; p < to; p++)
+            out << '\x1F' << it->next();
+        delete it;
     }
     return strdup(out.str().c_str());
+}
+
+char *kwic_get_attr_range(MTCKwic *kwic, const char *attr_name, Position from, Position to, char **error) {
+    try {
+        PosAttr *attr = kwic->corp->get_attr(attr_name);
+        return join_attr_range(attr, from, to);
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading attribute");
+        return nullptr;
+    }
 }
 
 /* conf->structs entries are themselves CorpInfo nodes (their own .attrs
@@ -170,6 +194,7 @@ MTCKwic *mtc_kwic_open(MTCCorpus *corp, MTCConcordance *conc,
         MTCKwic *mk = new MTCKwic;
         mk->kl = new KWICLines(corp->corp, view, left_ctx, right_ctx,
                                kwic_attr, kwic_attr, "", "", 100);
+        mk->corp = corp->corp;
         return mk;
     } catch (std::exception &e) {
         set_error(error, e);
@@ -193,16 +218,30 @@ int mtc_kwic_next(MTCKwic *kwic) {
     return kwic->kl->nextline() ? 1 : 0;
 }
 
-char *mtc_kwic_get_left(MTCKwic *kwic) {
-    return join_text_tokens(kwic->kl->get_left());
+char *mtc_kwic_get_left_attr(MTCKwic *kwic, const char *attr_name, char **error) {
+    if (!kwic) {
+        set_error(error, "null kwic handle");
+        return nullptr;
+    }
+    return kwic_get_attr_range(kwic, attr_name, kwic->kl->get_ctxbeg(), kwic->kl->get_pos(), error);
 }
 
-char *mtc_kwic_get_kwic(MTCKwic *kwic) {
-    return join_text_tokens(kwic->kl->get_kwic());
+char *mtc_kwic_get_kwic_attr(MTCKwic *kwic, const char *attr_name, char **error) {
+    if (!kwic) {
+        set_error(error, "null kwic handle");
+        return nullptr;
+    }
+    Position beg = kwic->kl->get_pos();
+    return kwic_get_attr_range(kwic, attr_name, beg, beg + kwic->kl->get_kwiclen(), error);
 }
 
-char *mtc_kwic_get_right(MTCKwic *kwic) {
-    return join_text_tokens(kwic->kl->get_right());
+char *mtc_kwic_get_right_attr(MTCKwic *kwic, const char *attr_name, char **error) {
+    if (!kwic) {
+        set_error(error, "null kwic handle");
+        return nullptr;
+    }
+    Position beg = kwic->kl->get_pos() + kwic->kl->get_kwiclen();
+    return kwic_get_attr_range(kwic, attr_name, beg, kwic->kl->get_ctxend(), error);
 }
 
 int mtc_concordance_sort(MTCConcordance *conc, const char *criteria, int uniq, char **error) {

@@ -312,27 +312,58 @@ public actor LiveConcordance {
         }
     }
 
+    /// `secondaryAttributes` (e.g. `["lemma", "tag"]`) are read alongside
+    /// `kwicAttr` per token, for a caller wanting to show more than one
+    /// attribute per word (KonText-style) - see `KWICToken`. Fetching N
+    /// secondary attributes costs 3N extra bridge calls per line (one per
+    /// left/kwic/right segment per attribute) on top of the 3 already made
+    /// for `kwicAttr` itself - fine for the handful of attributes a picker
+    /// UI realistically requests, but something to keep in mind against an
+    /// already-large, unpaginated result set (`kwicLines` fetches every
+    /// hit's line up front, regardless of how many are ever shown).
     public func kwicLines(leftContext: String = "-10", rightContext: String = "10",
-                           kwicAttr: String = "word") throws -> [KWICLine] {
+                           kwicAttr: String = "word", secondaryAttributes: [String] = []) throws -> [KWICLine] {
         var error: UnsafeMutablePointer<CChar>?
         guard let kwic = mtc_kwic_open(corpusHandle, handle, leftContext, rightContext, kwicAttr, &error) else {
             throw ManateeError.failure(consumeError(error))
         }
         defer { mtc_kwic_close(kwic) }
 
+        // Nested functions (not `Self.`-scoped helpers) so both capture
+        // `error` by reference - `decode` must see whatever `error` a
+        // `fetch` call just set, at the moment it actually failed, not a
+        // value snapshotted before that call ran.
+        func decode(_ cString: UnsafeMutablePointer<CChar>?) throws -> [String] {
+            guard let cString else {
+                throw ManateeError.failure(consumeError(error))
+            }
+            defer { mtc_free_string(cString) }
+            let joined = String(cString: cString)
+            guard !joined.isEmpty else { return [] }
+            // Leading-delimiter encoding - see mtcbridge.h's doc comment on
+            // mtc_kwic_get_left_attr for why this isn't a plain split.
+            return joined.dropFirst().components(separatedBy: "\u{1F}")
+        }
+
+        func segment(_ fetch: (String) -> UnsafeMutablePointer<CChar>?) throws -> [KWICToken] {
+            let words = try decode(fetch(kwicAttr))
+            var secondary = Array(repeating: [String: String](), count: words.count)
+            for attribute in secondaryAttributes {
+                let values = try decode(fetch(attribute))
+                for (index, value) in values.enumerated() where secondary.indices.contains(index) {
+                    secondary[index][attribute] = value
+                }
+            }
+            return zip(words, secondary).map(KWICToken.init)
+        }
+
         var lines: [KWICLine] = []
         while mtc_kwic_next(kwic) != 0 {
-            let left = mtc_kwic_get_left(kwic)
-            let center = mtc_kwic_get_kwic(kwic)
-            let right = mtc_kwic_get_right(kwic)
             lines.append(KWICLine(
-                left: String(cString: left!),
-                kwic: String(cString: center!),
-                right: String(cString: right!)
+                leftTokens: try segment { mtc_kwic_get_left_attr(kwic, $0, &error) },
+                kwicTokens: try segment { mtc_kwic_get_kwic_attr(kwic, $0, &error) },
+                rightTokens: try segment { mtc_kwic_get_right_attr(kwic, $0, &error) }
             ))
-            mtc_free_string(left)
-            mtc_free_string(center)
-            mtc_free_string(right)
         }
         return lines
     }

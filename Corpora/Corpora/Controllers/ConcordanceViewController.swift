@@ -80,7 +80,7 @@ final class ConcordanceViewController: NSViewController {
         queryField.text = document.initialQuery
         queryField.onSubmit = { [weak self] in self?.runQuery() }
 
-        document.onResultsChanged = { [weak self] in self?.refresh() }
+        document.onResultsChanged = { [weak self] animated in self?.refresh(animated: animated) }
         refresh()
 
         NotificationCenter.default.addObserver(
@@ -129,6 +129,22 @@ final class ConcordanceViewController: NSViewController {
         let controller = SamplePopoverController()
         controller.onApply = { [weak self, weak popover] lines in
             self?.document.performSample(lines: lines)
+            popover?.close()
+        }
+        popover.contentViewController = controller
+        popover.behavior = .transient
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
+    @objc func attributesTapped(_ sender: NSButton) {
+        let popover = NSPopover()
+        let controller = AttributeDisplayPopoverController()
+        controller.corpusName = document.corpusName
+        controller.primaryAttribute = document.kwicAttr
+        controller.selectedInlineAttributes = document.inlineAttributes
+        controller.selectedTooltipAttributes = document.tooltipAttributes
+        controller.onApply = { [weak self, weak popover] inlineAttributes, tooltipAttributes in
+            self?.document.setAttributeDisplay(inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
             popover?.close()
         }
         popover.contentViewController = controller
@@ -374,22 +390,29 @@ final class ConcordanceViewController: NSViewController {
         guard document.rows.indices.contains(rowID) else { return NSView() }
         let row = document.rows[rowID]
         let cell = KWICCellView()
+        let inlineAttributes = document.inlineAttributes
+        let tooltipAttributes = document.tooltipAttributes
+        func configure(_ tokens: [KWICToken], alignment: NSTextAlignment, style: KWICCellView.Style) {
+            let displayLine = KWICFormatter.displayLine(
+                for: tokens, inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
+            cell.configure(displayLine: displayLine, alignment: alignment, style: style)
+        }
         switch column.flatMap({ Column(rawValue: $0.identifier.rawValue) }) {
         case .group:
             cell.configureGroup(row.group)
         case .left:
-            cell.configure(text: row.line.left, alignment: .right, style: .plain)
+            configure(row.line.leftTokens, alignment: .right, style: .plain)
         case .kwic:
-            cell.configure(text: row.line.kwic, alignment: .center, style: .highlighted)
+            configure(row.line.kwicTokens, alignment: .center, style: .highlighted)
         case .right:
-            cell.configure(text: row.line.right, alignment: .left, style: .plain)
+            configure(row.line.rightTokens, alignment: .left, style: .plain)
         case nil:
             break
         }
         return cell
     }
 
-    private func refresh() {
+    private func refresh(animated: Bool = true) {
         if queryField.text != document.initialQuery {
             queryField.text = document.initialQuery
         }
@@ -403,7 +426,7 @@ final class ConcordanceViewController: NSViewController {
         // without an explicit reload the diffable data source would decide
         // nothing changed and leave the (now stale) cell alone.
         snapshot.reloadItems(ids)
-        dataSource.apply(snapshot, animatingDifferences: true)
+        dataSource.apply(snapshot, animatingDifferences: animated)
         windowController?.updateToolbarState(hasLineGroups: document.hasLineGroups)
         syncSortIndicators()
         // If the Operations popover is open, its line-group rows are sourced

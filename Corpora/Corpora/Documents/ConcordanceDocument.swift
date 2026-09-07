@@ -22,6 +22,22 @@ final class ConcordanceDocument: NSDocument {
     var leftContext = "-10"
     var rightContext = "10"
     var kwicAttr = "word"
+    /// Additional positional attributes (e.g. "lemma", "tag") shown
+    /// alongside `kwicAttr` per token - see `KWICFormatter`. Independent,
+    /// not an either/or mode: an attribute can be in both lists at once
+    /// (shown inline *and* repeated in the hover tooltip), one only, or
+    /// neither. Both empty by default: no visual change from before this
+    /// feature existed.
+    var inlineAttributes: [String] = []
+    var tooltipAttributes: [String] = []
+
+    /// The deduplicated union of both lists, in first-seen order - what
+    /// actually needs fetching from the engine, since both lists need real
+    /// per-token values regardless of which one(s) an attribute is in.
+    private var attributesToFetch: [String] {
+        var seen = Set<String>()
+        return (inlineAttributes + tooltipAttributes).filter { seen.insert($0).inserted }
+    }
 
     private(set) var operations: [ConcordanceOperation] = []
     private(set) var rows: [ConcordanceRow] = []
@@ -44,7 +60,16 @@ final class ConcordanceDocument: NSDocument {
     var hasLineGroups: Bool { operations.contains { $0.isLineGroupOperation } }
 
     /// The view controller sets this to learn when `rows`/`status` change.
-    var onResultsChanged: (() -> Void)?
+    /// `animated` is false for a display-only refetch (`refetchDisplay()`,
+    /// behind `setContext`/`setAttributeDisplay`) - animating a diffable
+    /// snapshot apply while a toolbar popover is *also* closing (its own
+    /// Core Animation transition) raced with that transition and produced
+    /// "Invalid attempt to open a new transaction during CA commit"
+    /// warnings, found via manual testing 2026-09-07. A display-only
+    /// refetch never adds/removes/reorders rows anyway - only their
+    /// content changes - so there's nothing worth animating here even
+    /// setting the bug aside.
+    var onResultsChanged: ((_ animated: Bool) -> Void)?
 
     private weak var windowController: ConcordanceWindowController?
 
@@ -207,18 +232,40 @@ final class ConcordanceDocument: NSDocument {
     /// this is purely a display setting (mirrors `kwicAttr`): not part of
     /// the undoable `operations` chain, and doesn't require or invalidate
     /// line groups, since it can't change which hits exist or their order.
-    /// Reuses the existing `liveConcordance` handle instead of calling
-    /// `replay()` - which would reopen the corpus and re-run the query plus
-    /// every operation in the chain from scratch just to change how much
-    /// text is shown around each hit. `status`'s hit-count/corpus-size text
-    /// is left as-is, since neither changes when only context width does.
     func setContext(left: Int, right: Int) {
         leftContext = "-\(max(left, 0))"
         rightContext = "\(max(right, 0))"
-        guard liveConcordance != nil else { return } // next replay() will use the new values
+        refetchDisplay()
+    }
+
+    /// Which secondary positional attributes (e.g. "lemma"/"tag") to show
+    /// inline vs. in a hover tooltip - independent per attribute (an
+    /// attribute can be in both, one, or neither list; see
+    /// `inlineAttributes`/`tooltipAttributes`'s own doc comment). Same
+    /// "pure display setting" status as `setContext`, for the same reason:
+    /// it can't change which hits exist, their order, or their line
+    /// groups, only how each already-fetched hit is annotated.
+    func setAttributeDisplay(inlineAttributes: [String], tooltipAttributes: [String]) {
+        self.inlineAttributes = inlineAttributes
+        self.tooltipAttributes = tooltipAttributes
+        refetchDisplay()
+    }
+
+    /// Re-fetches KWIC lines from the existing `liveConcordance` handle
+    /// using the document's *current* leftContext/rightContext/kwicAttr/
+    /// attributesToFetch - cheaper than `replay()`, which would reopen the
+    /// corpus and re-run the whole query/operation chain from scratch just
+    /// to change how already-fetched hits are displayed. No-op if no query
+    /// has run yet (`liveConcordance` is nil) - the next `replay()` will
+    /// pick up whatever's currently stored regardless. `status`'s
+    /// hit-count/corpus-size text is left as-is, since neither changes from
+    /// a display-only refetch.
+    private func refetchDisplay() {
+        guard liveConcordance != nil else { return }
         let leftContext = leftContext
         let rightContext = rightContext
         let kwicAttr = kwicAttr
+        let secondaryAttributes = attributesToFetch
         let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
         currentReplayTask = Task { @MainActor in
@@ -226,12 +273,13 @@ final class ConcordanceDocument: NSDocument {
             guard let live = liveConcordance else { return }
             do {
                 let lines = try await live.kwicLines(
-                    leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr)
+                    leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
+                    secondaryAttributes: secondaryAttributes)
                 rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
             } catch {
                 status = "\(error)"
             }
-            onResultsChanged?()
+            onResultsChanged?(false)
         }
     }
 
@@ -239,13 +287,14 @@ final class ConcordanceDocument: NSDocument {
         guard !corpusName.trimmingCharacters(in: .whitespaces).isEmpty,
               !initialQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         status = "Searching…"
-        onResultsChanged?()
+        onResultsChanged?(true)
         let corpusName = corpusName
         let subcorpusPath = subcorpusPath
         let query = initialQuery
         let leftContext = leftContext
         let rightContext = rightContext
         let kwicAttr = kwicAttr
+        let secondaryAttributes = attributesToFetch
         let operations = operations
         let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
@@ -267,7 +316,8 @@ final class ConcordanceDocument: NSDocument {
                 // makes this correctly reflect the restricted token count.
                 let corpusSize = await queryCorpus.size
                 let lines = try await live.kwicLines(
-                    leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr)
+                    leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
+                    secondaryAttributes: secondaryAttributes)
                 rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
                 liveConcordance = live
                 let corpusDescription: String
@@ -284,7 +334,7 @@ final class ConcordanceDocument: NSDocument {
                 liveConcordance = nil
                 status = "\(error)"
             }
-            onResultsChanged?()
+            onResultsChanged?(true)
         }
     }
 
@@ -356,6 +406,12 @@ final class ConcordanceDocument: NSDocument {
         var leftContext: String
         var rightContext: String
         var kwicAttr: String
+        // Optional (not defaulted-non-optional) so a document autosaved
+        // before these existed still decodes - a missing key becomes nil
+        // for an Optional property under Codable's synthesized decoding,
+        // with no custom init needed.
+        var inlineAttributes: [String]?
+        var tooltipAttributes: [String]?
         var operations: [ConcordanceOperation]
     }
 
@@ -363,6 +419,7 @@ final class ConcordanceDocument: NSDocument {
         let state = DocumentState(
             corpusName: corpusName, subcorpusPath: subcorpusPath, initialQuery: initialQuery,
             leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
+            inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes,
             operations: operations)
         return try JSONEncoder().encode(state)
     }
@@ -375,6 +432,8 @@ final class ConcordanceDocument: NSDocument {
         leftContext = state.leftContext
         rightContext = state.rightContext
         kwicAttr = state.kwicAttr
+        inlineAttributes = state.inlineAttributes ?? []
+        tooltipAttributes = state.tooltipAttributes ?? []
         operations = state.operations
     }
 }

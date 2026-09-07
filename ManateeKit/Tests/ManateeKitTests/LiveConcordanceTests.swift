@@ -39,6 +39,48 @@ final class LiveConcordanceTests: XCTestCase {
         }
     }
 
+    func testKwicLinesWithSecondaryAttributesAlignsWordLemmaTagPerToken() async throws {
+        let live = try await makeLiveConcordance(#"[word="fox"]"#)
+        let lines = try await live.kwicLines(
+            leftContext: "-3", rightContext: "1", secondaryAttributes: ["lemma", "tag"])
+        XCTAssertEqual(lines.count, 1)
+        let line = lines[0]
+
+        XCTAssertEqual(line.leftTokens.map(\.word), ["the", "quick", "brown"])
+        XCTAssertEqual(line.leftTokens.map { $0.secondaryAttributes["tag"] }, ["DT", "JJ", "JJ"])
+        XCTAssertEqual(line.leftTokens.map { $0.secondaryAttributes["lemma"] }, ["the", "quick", "brown"])
+
+        XCTAssertEqual(line.kwicTokens.map(\.word), ["fox"])
+        XCTAssertEqual(line.kwicTokens[0].secondaryAttributes["lemma"], "fox")
+        XCTAssertEqual(line.kwicTokens[0].secondaryAttributes["tag"], "NN")
+
+        XCTAssertEqual(line.rightTokens.map(\.word), ["jumps"])
+        XCTAssertEqual(line.rightTokens[0].secondaryAttributes["lemma"], "jump")
+        XCTAssertEqual(line.rightTokens[0].secondaryAttributes["tag"], "VBZ")
+
+        // The plain joined strings (pre-existing API, still computed from
+        // the same tokens) must still match what they always did.
+        XCTAssertEqual(line.left, "the quick brown")
+        XCTAssertEqual(line.right, "jumps")
+    }
+
+    func testKwicLinesWithoutSecondaryAttributesLeavesThemEmpty() async throws {
+        let live = try await makeLiveConcordance(#"[word="fox"]"#)
+        let lines = try await live.kwicLines(leftContext: "-1", rightContext: "1")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertEqual(lines[0].kwicTokens[0].secondaryAttributes, [:])
+    }
+
+    func testKwicLinesThrowsForUnknownSecondaryAttribute() async throws {
+        let live = try await makeLiveConcordance(#"[word="fox"]"#)
+        do {
+            _ = try await live.kwicLines(secondaryAttributes: ["notarealattribute"])
+            XCTFail("expected an error for an unknown attribute name")
+        } catch {
+            // Expected.
+        }
+    }
+
     func testSortOrdersByKwicAttribute() async throws {
         let live = try await makeLiveConcordance()
         try await live.sort(SortCriteria(SortLevel(attribute: "word", anchor: .kwic)))

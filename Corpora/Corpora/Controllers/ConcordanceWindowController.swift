@@ -11,6 +11,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
         static let context = NSToolbarItem.Identifier("context")
+        static let attributes = NSToolbarItem.Identifier("attributes")
         static let collocations = NSToolbarItem.Identifier("collocations")
         static let frequencies = NSToolbarItem.Identifier("frequencies")
         static let operations = NSToolbarItem.Identifier("operations")
@@ -45,7 +46,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [ItemID.history, ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.context,
-         ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
+         ItemID.attributes, ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -61,27 +62,37 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
             // running a different query is always allowed regardless of
             // line groups (`ConcordanceDocument.runQuery` resets the whole
             // operation chain itself, same as typing into the query bar).
-            let button = makeButton(symbol: "clock.arrow.circlepath", label: "History", target: viewController,
-                                     action: #selector(ConcordanceViewController.historyTapped(_:)))
+            let button = makeButton(
+                symbol: "clock.arrow.circlepath", label: "History",
+                tooltip: "Recall a recently run query", target: viewController,
+                action: #selector(ConcordanceViewController.historyTapped(_:)))
             return makeItem(identifier, label: "History", view: button)
         case ItemID.sort:
-            let button = makeButton(symbol: "arrow.up.arrow.down", label: "Sort", target: viewController,
-                                     action: #selector(ConcordanceViewController.sortTapped(_:)))
+            let button = makeButton(
+                symbol: "arrow.up.arrow.down", label: "Sort",
+                tooltip: "Sort concordance lines", target: viewController,
+                action: #selector(ConcordanceViewController.sortTapped(_:)))
             sortButton = button
             return makeItem(identifier, label: "Sort", view: button)
         case ItemID.filter:
-            let button = makeButton(symbol: "line.3.horizontal.decrease.circle", label: "Filter", target: viewController,
-                                     action: #selector(ConcordanceViewController.filterTapped(_:)))
+            let button = makeButton(
+                symbol: "line.3.horizontal.decrease.circle", label: "Filter",
+                tooltip: "Keep or remove lines matching a sub-query", target: viewController,
+                action: #selector(ConcordanceViewController.filterTapped(_:)))
             filterButton = button
             return makeItem(identifier, label: "Filter", view: button)
         case ItemID.shuffle:
-            let button = makeButton(symbol: "shuffle", label: "Shuffle", target: viewController,
-                                     action: #selector(ConcordanceViewController.shuffleTapped(_:)))
+            let button = makeButton(
+                symbol: "shuffle", label: "Shuffle",
+                tooltip: "Randomize line order", target: viewController,
+                action: #selector(ConcordanceViewController.shuffleTapped(_:)))
             shuffleButton = button
             return makeItem(identifier, label: "Shuffle", view: button)
         case ItemID.sample:
-            let button = makeButton(symbol: "number", label: "Sample", target: viewController,
-                                     action: #selector(ConcordanceViewController.sampleTapped(_:)))
+            let button = makeButton(
+                symbol: "number", label: "Sample",
+                tooltip: "Reduce to a random sample of lines", target: viewController,
+                action: #selector(ConcordanceViewController.sampleTapped(_:)))
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
         case ItemID.context:
@@ -89,35 +100,52 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
             // sort/filter/shuffle/sample, widening context is a display
             // setting (see `ConcordanceDocument.setContext`), not a corpus
             // operation, so it never needs to disable when line groups exist.
-            let button = makeButton(symbol: "arrow.left.and.right", label: "Context", target: viewController,
-                                     action: #selector(ConcordanceViewController.contextTapped(_:)))
+            let button = makeButton(
+                symbol: "arrow.left.and.right", label: "Context",
+                tooltip: "Adjust how much left/right context is shown", target: viewController,
+                action: #selector(ConcordanceViewController.contextTapped(_:)))
             return makeItem(identifier, label: "Context", view: button)
+        case ItemID.attributes:
+            // Not tracked in a stored property/`updateToolbarState` - same
+            // "pure display setting" reasoning as Context above.
+            let button = makeButton(
+                symbol: "textformat", label: "Attributes",
+                tooltip: "Show additional attributes (e.g. lemma, tag) inline or on hover", target: viewController,
+                action: #selector(ConcordanceViewController.attributesTapped(_:)))
+            return makeItem(identifier, label: "Attributes", view: button)
         case ItemID.collocations:
-            let button = makeButton(symbol: "arrow.left.arrow.right", label: "Collocations", target: viewController,
-                                     action: #selector(ConcordanceViewController.collocationsTapped(_:)))
+            let button = makeButton(
+                symbol: "arrow.left.arrow.right", label: "Collocations",
+                tooltip: "Find words that co-occur with the search term", target: viewController,
+                action: #selector(ConcordanceViewController.collocationsTapped(_:)))
             return makeItem(identifier, label: "Collocations", view: button)
         case ItemID.frequencies:
-            let button = makeButton(symbol: "chart.bar", label: "Frequencies", target: viewController,
-                                     action: #selector(ConcordanceViewController.frequenciesTapped(_:)))
+            let button = makeButton(
+                symbol: "chart.bar", label: "Frequencies",
+                tooltip: "Show a frequency distribution for an attribute", target: viewController,
+                action: #selector(ConcordanceViewController.frequenciesTapped(_:)))
             return makeItem(identifier, label: "Frequencies", view: button)
         case ItemID.operations:
             // Icon carried over from the old standalone "Clear Groups"
             // button - merged into this one, since both are fundamentally
             // "review and cancel active operations" (see
             // OperationsPopoverController).
-            let button = makeButton(symbol: "xmark.circle", label: "Operations", target: viewController,
-                                     action: #selector(ConcordanceViewController.operationsTapped(_:)))
+            let button = makeButton(
+                symbol: "xmark.circle", label: "Operations",
+                tooltip: "Review and remove active sort/filter/line-group operations", target: viewController,
+                action: #selector(ConcordanceViewController.operationsTapped(_:)))
             return makeItem(identifier, label: "Operations", view: button)
         default:
             return nil
         }
     }
 
-    private func makeButton(symbol: String, label: String, target: AnyObject, action: Selector) -> NSButton {
+    private func makeButton(symbol: String, label: String, tooltip: String, target: AnyObject, action: Selector) -> NSButton {
         let button = NSButton(
             image: NSImage(systemSymbolName: symbol, accessibilityDescription: label) ?? NSImage(),
             target: target, action: action)
         button.bezelStyle = .texturedRounded
+        button.toolTip = tooltip
         return button
     }
 

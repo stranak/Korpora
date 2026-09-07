@@ -4,6 +4,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
         CorpusResidencyManager.shared.start()
+        // An app launched via Xcode's debugger can appear frontmost and
+        // accept clicks/keyboard input while not being *fully* activated
+        // from the window server's perspective - `.activeInKeyWindow`
+        // NSTrackingAreas (used for the per-token KWIC hover tooltips and
+        // the toolbar button tooltips) silently didn't fire until a real
+        // Cmd-Tab away and back, even after clicking directly inside the
+        // window (confirmed via manual testing, 2026-09-07). Explicitly
+        // activating on launch is the standard fix for this exact class of
+        // debug-launch quirk.
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

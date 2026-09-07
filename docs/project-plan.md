@@ -1499,7 +1499,462 @@ Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
 Not yet manually click-tested (run a few queries, open History, confirm
 recall/Clear both work) - next step, same as 5.1's open item.
 
-### 5.3 — Multi-attribute KWIC display + mouseover (not started)
+### 5.3 — Multi-attribute KWIC display + mouseover (done)
+
+Shows secondary positional attributes (e.g. "lemma"/"tag") alongside the
+primary word text per token, either inline or via a hover tooltip -
+KonText's own "corpus view options" attribute display, in miniature.
+
+**Engine/bridge layer** (the part flagged up front as real, bounded new
+work - manatee-open's `KWICLines` already supported multi-attribute output,
+`mtcbridge.cc` just discarded everything but the primary word text):
+
+- `ManateeKit/Sources/CManatee/{include/mtcbridge.h,mtcbridge.cc}`:
+  replaced `mtc_kwic_get_left/kwic/right` (space-joined, primary attribute
+  only) with `mtc_kwic_get_{left,kwic,right}_attr(MTCKwic*, attr_name,
+  error)`, callable with *any* attribute name (including whichever one is
+  primary) rather than only the one `mtc_kwic_open` was opened with. `MTCKwic`
+  now also stores the owning `Corpus*` (needed to look up an arbitrary
+  attribute by name via `Corpus::get_attr`, cheap after the first call per
+  name - `Corpus::get_attr` itself caches). Implemented directly against
+  `PosAttr::textat(Position)`/`TextIterator::next()` over the position
+  ranges `KWICLines` already computes and exposes (`get_ctxbeg()`/
+  `get_pos()`/`get_kwiclen()`/`get_ctxend()`) - bypasses `KWICLines`'s own
+  combined multi-attribute/collocation-tag `Tokens` rendering entirely
+  (`get_corp_text`'s `\x1F`-joined-secondary-attribute-per-token format,
+  further interleaved with markup tags by `fill_segment`), which would have
+  needed correctly re-deriving token boundaries from a fairly intricate,
+  markup-and-attribute-mixed generic format. Independently walking each
+  attribute's own `PosAttr` over the identical position range sidesteps
+  that: same token count and alignment by construction, no markup-tag
+  parsing needed (this shim never exposed collocation highlighting anyway).
+- **Encoding**: one token per `'\x1F'` (unit separator - can't appear in
+  real corpus text, matches manatee's own `get_corp_text`'s attribute
+  delimiter convention) with the delimiter placed *before every* token
+  including the first (e.g. `"\x1Fthe\x1Ffox\x1Fjumps"`) - not a plain
+  *between*-tokens separator. This "leading delimiter" shape is what makes
+  decoding unambiguous: a caller drops the first character then splits on
+  `'\x1F'` keeping empty pieces, correctly recovering one entry per token
+  even when a token's own attribute value happens to be `""` - a plain
+  separator (or reusing the old space-joined convention) can't distinguish
+  "zero tokens" from "one token with an empty value." An entirely empty
+  (`""`) result unambiguously means zero tokens (an undefined/empty line
+  segment), since it's the only case with no leading delimiter at all.
+- **`ManateeKit.swift`**: `KWICLine` changed from three plain stored
+  strings to `{leftTokens, kwicTokens, rightTokens}: [KWICToken]`
+  (`KWICToken = {word, secondaryAttributes: [String: String]}`), with
+  `left`/`kwic`/`right` now *computed* (`tokens.map(\.word).joined(
+  separator: " ")`) for source compatibility with every existing caller
+  that only ever read the whole-segment string. Confirmed zero other
+  breakage: nothing outside `LiveConcordance.kwicLines` itself ever
+  constructed a `KWICLine`, and every other read site (`ConcordanceDocument`,
+  `KWICCellView` via `ConcordanceViewController`, both test files) only
+  reads `.left`/`.kwic`/`.right`.
+- **`LiveConcordance.kwicLines(...)`** gained `secondaryAttributes: [String]
+  = []`. Switched to call the new `_attr` getters exclusively (passing
+  `kwicAttr` for the primary token text too, not just secondary
+  attributes) - one consistent decode path instead of two, and it removes
+  a latent (if practically unlikely) risk the old space-joined primary
+  getters had: a "word" value containing a literal embedded space would
+  have silently misaligned primary-token-count against secondary-token-
+  count once both were being zipped together per token. Decode/error
+  handling uses nested functions (not `Self.`-scoped helpers) specifically
+  so both capture the shared `var error` *by reference* - an earlier draft
+  passed `error`'s value as a separate function parameter, which could
+  report a stale (usually "unknown error") message instead of the real one
+  if a *later* per-attribute call failed after an *earlier* one had
+  already succeeded; fixed before it shipped anywhere, but worth recording
+  as a real mistake caught during this session, not a hypothetical one.
+  Documented cost: N secondary attributes = 3N extra bridge calls per line
+  (one per left/kwic/right segment per attribute) on top of the 3 already
+  made for `kwicAttr` - fine for the handful of attributes a picker
+  realistically requests, but compounds an existing, unrelated scalability
+  gap (`kwicLines` fetches every hit up front, unpaginated) - flagged, not
+  fixed, in this pass.
+- New tests (`LiveConcordanceTests.swift`): word+lemma+tag alignment across
+  left/kwic/right against the real fixture corpus (confirms the encoding
+  round-trips correctly on the first real attempt - no debugging needed
+  once written); secondary attributes stay empty when none are requested
+  (no behavior change for existing callers); an unknown attribute name
+  throws.
+
+**AppKit UI**:
+
+- **New `KWICFormatter.swift`** (`Corpora/Corpora/Documents/`): pure
+  formatting logic, deliberately dependent on neither `ManateeKit` display
+  opinions nor AppKit - `displaySegments(for:inlineAttributes:)` (returns
+  `[KWICDisplaySegment]`, each tagged `.word` or `.secondaryAttribute` so
+  the caller can style them differently, rather than a single opaque
+  `String` - see "styling" below) and `tooltipText(for:tooltipAttributes:)`
+  (one line per token, `nil` when no tooltip attributes are requested).
+  Unit-testable with no live corpus - `KWICFormatterTests.swift`
+  (`Corpora/CorporaTests/`) covers both directly against hand-built
+  `KWICToken` values.
+- **Inline and hover are independent per attribute, not one mode for the
+  whole document** - `ConcordanceDocument` has two separate lists,
+  `inlineAttributes: [String]` and `tooltipAttributes: [String]` (an
+  attribute can be in both, one, or neither), not a single `[String]` +
+  shared mode enum. This was a deliberate revision after the user pointed
+  out the real use case ("tag inline, lemma on hover, at the same time")
+  an either/or `AttributeDisplayMode` couldn't express - caught before
+  it needed a second redesign, since it came up in the same review pass as
+  the styling/tooltip bugs below. `attributesToFetch` (private, the
+  deduplicated union of both lists) is what's actually passed to
+  `LiveConcordance.kwicLines(secondaryAttributes:)`, since both lists need
+  real per-token values regardless of which one(s) an attribute is
+  configured to display through.
+- **`ConcordanceDocument.setContext`/`setAttributeDisplay(
+  inlineAttributes:tooltipAttributes:)`** both delegate to one shared
+  `refetchDisplay()` - both are "re-fetch KWIC lines from the existing
+  `liveConcordance` handle, don't replay the whole query/operation chain"
+  operations, differing only in *which* stored properties changed first.
+  Both lists persisted in `DocumentState` as *optional* fields (a document
+  autosaved before this feature existed still decodes).
+- **`AttributeDisplayPopoverController.swift`**: one row per corpus
+  attribute (except the current primary `kwicAttr`, sourced from
+  `Corpus(name:).info().attributes` - the same real-attribute-discovery
+  precedent `CollocationSheetController`'s picker already established, not
+  free text, so a typo can't reach `kwicLines` and throw), each with two
+  independent checkboxes ("Inline" / "On Hover") rather than one shared
+  mode control for the whole popover.
+- New toolbar item (`ConcordanceWindowController`'s `ItemID.attributes`,
+  SF Symbol `textformat`, placed after Context) wired via
+  `ConcordanceViewController.attributesTapped(_:)`. Not gated by line
+  groups, same reasoning as Context.
+
+**Found via manual testing, both fixed before commit:**
+
+- **Secondary attributes needed distinct styling, not plain inline text.**
+  User feedback: "should look different, start with grey. Later we'll make
+  a settings panel for that or something." `KWICCellView.configure`
+  switched from a plain `NSTextField.stringValue` to building an
+  `NSMutableAttributedString` from `[KWICDisplaySegment]` -
+  `.secondaryAttribute` segments always render in `.secondaryLabelColor`
+  at the plain (non-bold) base font, regardless of the column's own
+  style (even in the bold/accent-colored KWIC column) so an inline
+  attribute reads as clearly secondary. A single `.word` segment (no
+  inline attributes configured, the common case) renders identically to
+  the old plain-string behavior. Explicitly scoped as a first pass, not a
+  final design - a real display-settings panel (colors, fonts) is future
+  work, not attempted here.
+- **Hover tooltip showed nothing.** Root cause not fully isolated (no
+  interactive AppKit runtime access from this session - see
+  `docs/project-plan.md`'s Division of labor - to reproduce and bisect the
+  exact mechanism), but the fix applied is a well-known robustness pattern
+  for this class of bug: `KWICCellView.configure` now sets `toolTip` on
+  *both* the cell view (`self`) and its `label` subview, not just the
+  cell. The label visually covers nearly the entire cell, and which of the
+  two views AppKit's tooltip tracking actually resolves against isn't
+  guaranteed from the cell-view-only approach - setting it on both costs
+  nothing and is the standard fix for exactly this symptom. **Not yet
+  re-verified interactively** - next manual test should confirm this
+  actually resolved it, not just plausibly addresses it.
+
+Verified: `cd ManateeKit && swift test` → 40/40 passing; `xcodebuild
+-scheme Corpora build`/`test` (via `BuildProject`/`RunAllTests`) →
+**BUILD SUCCEEDED**, 21/21 `CorporaTests` passing (7 `KWICFormatterTests`,
+covering the inline/tooltip-attribute-list independence explicitly). Not
+yet manually click-tested end to end (open the Attributes popover, check
+"tag" Inline and "lemma" On Hover simultaneously, confirm the inline
+suffix renders grey, confirm the tooltip now actually appears on hover) -
+next step, same as 5.1/5.2's open item, now with the added tooltip
+re-verification above.
+
+**Found via manual testing (second round), real row-rendering regression,
+fixed:** screenshot showed the Left column's text progressively
+overlapping/garbling into an illegible smear further down the table -
+worse with each row, not present in the Match/Right columns or in the
+`[]`-query screenshot's first few rows. Root cause: switching
+`KWICCellView.configure` from `label.stringValue = text` to
+`label.attributedStringValue = attributed` (needed for the grey secondary-
+attribute styling above) dropped the field's own `lineBreakMode`/
+`alignment` properties - `NSTextField.attributedStringValue` does **not**
+inherit them from the field the way `.stringValue` does, and silently
+falls back to wrapping when the attributed string carries no explicit
+paragraph style. Each row's actual rendered content was therefore taller
+than what the table view had allocated for it, and the mismatch compounded
+scrolling further down - exactly the "increasingly garbled" pattern in the
+screenshot. Fixed by baking an explicit `NSMutableParagraphStyle`
+(`lineBreakMode`/`alignment` matching what the field property would have
+provided) into the attributed string itself, applied across every segment,
+plus `label.maximumNumberOfLines = 1` in `setUp()` as a standing safeguard
+against this exact class of regression recurring from some future change
+to `configure` - not just a fix for today's specific call site.
+
+Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 21/21 `CorporaTests` passing
+(unaffected - this bug was in rendering, not logic, so no test caught it
+and none is expected to from this fix; confirming it's actually resolved
+needs the same interactive click-through as everything else in this
+phase). Still not manually click-tested - now with three things to check
+in one pass: inline/hover combination, grey inline styling, and this
+row-overlap fix.
+
+**2026-09-07, manual testing (third round) - hover redesigned to be
+per-token, not per-cell; a real, unrelated focus bug found and fixed:**
+
+- User confirmed inline and (whole-cell) hover both rendered, but then
+  clarified hover was wrong-grained: "hover should be per word, not whole
+  line or left/right context part. Hover specific for each token." The
+  whole-cell `self.toolTip`/`label.toolTip` approach from the previous
+  round was never going to satisfy this regardless of whether its earlier
+  "shows nothing" symptom was actually fixed - it fundamentally couldn't
+  distinguish which word was under the cursor. Replaced entirely with
+  per-region tooltips via `NSView.addToolTip(_:owner:userData:)`, AppKit's
+  actual mechanism for multiple independent tooltip areas within one view:
+  - `KWICFormatter.displayLine(for:inlineAttributes:tooltipAttributes:)`
+    (replaces the old `displaySegments`/`tooltipText` pair) returns both
+    `segments: [KWICDisplaySegment]` (unchanged purpose) and
+    `tokenTooltips: [KWICTokenTooltip]`, each tagged with a
+    `segmentRange: Range<Int>` - which of that *same* segment list belongs
+    to that one token (its word segment, plus its inline-attribute suffix
+    segment if it has one). Computed in the same pass as `segments` so the
+    two can never drift apart. Still pure/AppKit-free, still unit-tested
+    (`KWICFormatterTests` - a new
+    `tooltipSegmentRangesPointAtThatTokensOwnSegmentsOnly` test asserts the
+    ranges cover exactly that token's own segments, not neighboring ones
+    or the whole line).
+  - `KWICCellView` converts each token's segment range into an on-screen
+    rect by summing individual segment widths (`NSAttributedString(...)
+    .size().width` per segment) and applying the column's alignment
+    (right/center/left) to find where the text actually starts within the
+    label's bounds - exact for this app's monospaced results font (every
+    character/weight shares one advance width, so per-segment widths sum
+    to the same total the whole string would measure as one unit; a
+    proportional font or truncated overflow text would need more care, not
+    attempted here). One `addToolTip` call per token registers that token's
+    own rect, with `self` as `owner` implementing the informal
+    `stringForToolTip` selector to return that specific token's text via
+    an index encoded in `userData` (offset by 1, since `bitPattern: 0`
+    decodes to a null pointer, indistinguishable from "no userData").
+  - This rect math needs the view's *final* size, which isn't reliably
+    available at `configure()`-call time for a freshly constructed cell
+    (see `ConcordanceViewController.makeCell` - no reuse pool, so every
+    cell starts from zero geometry) - moved into an `override func
+    layout()`, AppKit's own "geometry is now final" callback, rather than
+    computed inline in `configure()`.
+- **Separately, unrelated bug**: Cmd-N (new concordance) didn't focus the
+  query field - not automatically, and not via mouse click or Tab either.
+  Root cause (confirmed by grepping the whole call path for any
+  `nextKeyView`/`makeFirstResponder`/`viewDidAppear` and finding none):
+  nothing ever explicitly focused it, and `CQLQueryField` (a custom
+  `NSScrollView`-wrapping-an-`NSTextView` composite, not a standard
+  control) isn't reliably reached by AppKit's *auto-generated* Tab
+  key-view loop the way a plain `NSTextField`/`NSPopUpButton` is - Tabbing
+  from `subcorpusPopUp` skipped straight to the buttons, over the query
+  field entirely. Fixed with two explicit, standard remedies for exactly
+  this class of gap: `NewConcordanceSheetController.loadView()` now wires
+  `nextKeyView` explicitly (`corpusPopUp` → `subcorpusPopUp` →
+  `queryField.textView` → `searchButton` → `cancelButton`), and a new
+  `override func viewDidAppear()` calls a new `CQLQueryField.focus()`
+  method (`window?.makeFirstResponder(textView)`) once the sheet
+  genuinely has a window to focus within (not `loadView()`, which runs
+  before that's guaranteed). `CQLQueryField.textView` changed from
+  `private` to internal access so both call sites (a different file,
+  same module) can reach it. The "mouse click also didn't focus it" half
+  of the report is less explained by this fix specifically (a click
+  correctly hitting the scroll view/text view should already focus it
+  regardless of the Tab-loop issue) - flagged as possibly resolved as a
+  side effect of the sheet now reliably having a real first responder
+  from the moment it opens, but not separately root-caused; worth
+  re-checking specifically on the next manual pass.
+
+Verified: `cd ManateeKit && swift test` → 40/40 passing (unaffected);
+`xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 22/22 `CorporaTests` passing (8
+`KWICFormatterTests`, including the new segment-range-isolation test).
+Not yet manually click-tested - the per-token hover redesign and the
+Cmd-N focus fix are both new since the last interactive pass.
+
+**2026-09-07, manual testing (fourth round) - the `addToolTip`-based hover
+mechanism above still showed nothing, replaced with a different AppKit
+mechanism entirely:** user specified one attribute inline, a different one
+on hover; inline rendered correctly, hover still showed nothing at all
+(not "wrong-grained" this time - genuinely absent, same as the very first
+report). Rather than keep guessing at what specifically was wrong with
+`addToolTip(_:owner:userData:)`-based per-region registration (plausible
+suspects considered: `layout()` may not fire reliably for a freshly
+constructed, not-yet-windowed `NSTableCellView`; `needsLayout = true` set
+before the view has a window may not be honored once it gets one - neither
+confirmable without interactive AppKit access), switched to a mechanism
+that sidesteps the whole class of "was this view's geometry final when I
+registered a rect against it" problem: `NSTableViewDelegate.tableView(_:
+toolTipFor:rect:tableColumn:row:mouseLocation:)`, called by AppKit
+on-demand at actual hover time with an already-correct, live
+`mouseLocation` - no pre-registered geometry to get stale or wrong.
+
+- `ConcordanceViewController` now sets `tableView.delegate = self` and
+  conforms to `NSTableViewDelegate`, implementing that one method: resolve
+  `row`/`tableColumn` to a `ConcordanceRow` and segment (left/kwic/right),
+  rebuild that segment's `KWICFormatter.displayLine(...)` (the same call
+  `makeCell` already makes - cheap, a handful of tokens, no caching
+  needed), then call a new `KWICCellView.tokenTooltip(for:alignment:
+  style:labelWidth:at:)` with `mouseLocation.x` (adjusted for the label's
+  4pt inset from the cell's edge - `KWICCellView.labelInset`) to find which
+  token, if any, covers that position. Narrows the delegate's `rect`
+  out-parameter to just the matched token's own span, so moving the mouse
+  to an adjacent token triggers a fresh delegate call (and fresh tooltip)
+  instead of the first token's text persisting across the whole cell.
+- `KWICCellView` lost the `addToolTip`/`layout()`/`pendingTooltips` state
+  and the informal `stringForToolTip` method entirely - `configure` is
+  back to being a pure "render this" call with no tooltip side effects,
+  and the token-hit-testing math (`tokenTooltip`, plus the underlying
+  `width(of:style:)` measurement) is now a `static` function with no
+  instance state, callable from `ConcordanceViewController` without a live
+  cell view at all.
+- Documented uncertainty, same as last round: **not independently
+  confirmed working** (no interactive AppKit access this session) - this
+  is the standard, Apple-documented mechanism for exactly this scenario
+  (per-cell tooltip content in a table view), and computing fresh from a
+  live mouse position removes an entire category of theory for why the
+  previous attempt failed, but it hasn't been seen to actually work yet
+  either. If this **still** doesn't show anything on the next test, that
+  would point at something more fundamental (e.g. `tableView.delegate`
+  assignment itself not taking effect, or a possibility not yet
+  considered) rather than a geometry-timing detail - worth explicitly
+  distinguishing "shows the wrong thing" from "shows literally nothing"
+  in that report, since they'd point in very different directions.
+
+Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 22/22 `CorporaTests` passing
+(unaffected - `KWICFormatter`'s logic didn't change, only the AppKit-side
+consumer of it). Not yet manually click-tested.
+
+**2026-09-07, manual testing (fifth round) - hover confirmed working; the
+`NSTableViewDelegate` mechanism confirmed dead via a diagnostic log,
+replaced with manual `NSTrackingArea`-based tracking, which is what
+actually shipped:**
+
+- A diagnostic `NSLog` placed at the very top of `tableView(_:toolTipFor:
+  rect:tableColumn:row:mouseLocation:)` (before any of its own logic)
+  **never printed**, even while deliberately hovering over cells with
+  tooltip content configured - conclusively confirming that delegate
+  method never fires for this view-based table, contrary to what its
+  documentation implies. Removed it entirely (`ConcordanceViewController`'s
+  `NSTableViewDelegate` conformance and `tableView.delegate = self`) rather
+  than leave dead code behind.
+- Replaced with plain `NSView` mouse tracking, which has no NSTableView-
+  specific behavior to second-guess: `KWICCellView` now overrides
+  `updateTrackingAreas()` (registering one `NSTrackingArea` with
+  `.inVisibleRect` so it auto-tracks the view's current bounds through
+  later resizes) and `mouseMoved`/`mouseEntered`/`mouseExited`, calling a
+  new `updateToolTip(for:)` on each that converts the event's window
+  location into label-relative coordinates and calls the same
+  `tokenTooltip(for:alignment:style:labelWidth:at:)` hit-testing function
+  from the (removed) delegate attempt, dynamically setting `self.toolTip`.
+  `configure(displayLine:alignment:style:)` now stashes `displayLine`/
+  `alignment`/`style` as instance state for these callbacks to read.
+- A second diagnostic (`NSLog` inside `updateToolTip(for:)`, logging the
+  computed point/match on every mouse event) confirmed the tracking
+  callbacks fire correctly *and* the hit-testing math was already 100%
+  correct - real log output showed e.g. `match=lemma: move, tag: VBG` and
+  `match=tag: NN` exactly matching the actual hovered token - but the
+  tooltip still didn't visibly appear. At the user's suggestion, added
+  real (non-diagnostic) `.toolTip` strings to the toolbar buttons
+  (History, Sort, Filter, Shuffle, Sample, Context, Attributes,
+  Collocations, Frequencies, Operations) as a control test: if plain
+  static tooltips on ordinary buttons also failed to appear, the issue
+  would be app/window-wide, not KWIC-specific.
+- **Root cause, finally**: not a code bug at all. The tracking area uses
+  `.activeInKeyWindow` (the standard option for tooltip-style tracking,
+  intentionally scoped to only the active window/app). A fresh Cmd+R
+  launch from Xcode's debugger left the app appearing frontmost and
+  accepting clicks/keyboard input normally, but genuinely *not* activated
+  from the window server's own perspective - critically, the user found
+  that clicking directly inside the window (even selecting a KWIC line)
+  did **not** fix it, but a real Cmd-Tab away to Xcode and back did. That
+  distinguishes "window has key status" (which clicking inside already
+  grants) from "app is truly active" (which apparently clicking inside a
+  debug-launched app's own window doesn't reliably grant) - pointing
+  squarely at the app's own launch sequence never calling
+  `NSApp.activate(_:)`, not at anything tracking-area/AppKit-internals
+  related. Confirmed: `AppDelegate.applicationDidFinishLaunching` never
+  called it at all (the only existing call site was `showSettings(_:)`,
+  an unrelated menu action). Added `NSApp.activate(ignoringOtherApps:
+  true)` to `applicationDidFinishLaunching` - the standard fix for exactly
+  this class of debug-launch quirk. Both diagnostic `NSLog` calls removed
+  once the underlying tracking/hit-testing logic was confirmed correct;
+  the toolbar button tooltips were kept (genuinely useful, not just
+  diagnostic) with real explanatory text.
+- **Unresolved, cosmetic, separately tracked**: the "Invalid attempt to
+  open a new transaction during CA commit" warning when clicking Apply in
+  the Attributes popover is still reproducible even after disabling the
+  table's reload animation for that path (`onResultsChanged?(false)`),
+  ruling out that specific theory. Doesn't block or corrupt anything
+  observable (hover, styling, and the popover itself all work correctly
+  despite it) - left as a known, harmless-so-far warning rather than
+  chasing it further without a concrete functional symptom attached to it.
+
+Verified: `cd ManateeKit && swift test` → 40/40 passing (unaffected);
+`xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 22/22 `CorporaTests` passing.
+**Manually confirmed working by the user** (before the `NSApp.activate`
+fix, via a Cmd-Tab workaround): per-token hover tooltips (distinct text
+per token, e.g. lemma+tag), toolbar button tooltips, and (from earlier in
+this same round) inline attribute styling in grey.
+
+**2026-09-07, final round - `NSApp.activate` did not fix it either;
+narrowed further and closed as a known, accepted, non-blocking issue:**
+
+- User confirmed `NSApp.activate(ignoringOtherApps: true)` at launch made
+  no difference - hover/tooltips still required one app-switch away and
+  back, every time, regardless of activation call.
+- Switched the tracking area from `.activeInKeyWindow` to `.activeAlways`
+  (which shouldn't depend on window/app active-state detection *at all*) -
+  still no difference. This was the point where the "it's an activation-
+  state detection problem in my tracking area" theory should have been
+  either confirmed or killed outright; it was killed.
+- Used `GetConsoleOutput` (an xcode-tools MCP capability this session had
+  been underusing - see below) to confirm no crash and nothing unusual in
+  the launch session's console beyond the same benign system-service
+  noise every launch already showed.
+- Launched the actual built `.app` directly via `open` (bypassing Xcode's
+  Run button/debugger-attach path entirely, i.e. the same launch path a
+  real double-click would take) - **still the same behavior**. This ruled
+  out "Xcode debug-launch quirk" as the cause.
+- User confirmed tooltips work normally in *other* apps on the same
+  machine/OS - ruling out a blanket macOS-27-beta tooltip regression.
+- Checked `Info.plist` (no `LSUIElement`/background-only keys) and
+  `main.swift` (`app.setActivationPolicy(.regular)` already explicit,
+  correctly placed before `app.run()`) - both look correct; neither
+  explains the symptom.
+- At the user's request, reverted the tooltip *mechanism* itself back to
+  the very first working approach (`self.toolTip`/`label.toolTip` set
+  once in `configure()`, whole-line text, no `NSTrackingArea` at all) as
+  a final isolation test - **exact same behavior**. This conclusively
+  rules out the tooltip *mechanism* (delegate vs. tracking-area vs. plain
+  static property) as the variable; whatever this is, it's independent of
+  how the tooltip is registered. Reverted back to the per-token
+  `NSTrackingArea` version afterward (strictly better UX once the
+  underlying quirk resolves itself, and the whole-line revert bought
+  nothing).
+- **Conclusion, accepted by the user as non-blocking**: some one-time,
+  per-launch condition - most likely a genuine macOS 27 beta AppKit/window-
+  server quirk specific to this app's window/view configuration in some
+  way not yet identified - prevents the tooltip *display* mechanism from
+  activating until a real, full application deactivate/reactivate cycle
+  happens once (Cmd-Tab away and back, or equivalent). After that single
+  event, tooltips (both KWIC hover and the static toolbar-button ones)
+  work correctly and reliably for the remainder of the session. Every
+  other aspect of the feature - hit-testing accuracy, per-token text
+  correctness, inline styling, row-overlap fix - is independently
+  confirmed correct. Logged here in full rather than fixed, since further
+  diagnosis would need tooling this session doesn't have (Instruments,
+  or a non-beta macOS to test against for comparison) - not chased
+  further given the low severity (one manual workaround, once per launch)
+  relative to the time already invested.
+- **Process note**: this session initially told the user it had no way to
+  read the app's live console output, which was wrong - `GetConsoleOutput`
+  (part of the same xcode-tools MCP surface already used for `BuildProject`/
+  `RunAllTests`) works and should have been used from the start of this
+  investigation instead of asking the user to manually copy-paste console
+  text repeatedly. Corrected once identified; worth remembering for future
+  sessions working in this same environment.
+
+Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
+`RunAllTests`) → **BUILD SUCCEEDED**, 22/22 `CorporaTests` passing (the
+mechanism reverts and re-reverts were pure `KWICCellView` internals with
+no change to `KWICFormatter`'s already-tested logic).
 
 ### 5.4 — Document/structural info (not started)
 

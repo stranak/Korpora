@@ -38,11 +38,27 @@ void mtc_kwic_close(MTCKwic *kwic);
 /* Advances to the next KWIC line. Returns 0 when the concordance is exhausted. */
 int mtc_kwic_next(MTCKwic *kwic);
 
-/* Space-joined token strings for the current line. Caller must free with
- * mtc_free_string. Valid only after mtc_kwic_next() returns nonzero. */
-char *mtc_kwic_get_left(MTCKwic *kwic);
-char *mtc_kwic_get_kwic(MTCKwic *kwic);
-char *mtc_kwic_get_right(MTCKwic *kwic);
+/* Positional-attribute text (e.g. "word", "lemma", "tag") for the current
+ * KWIC line's left/kwic/right segment, independent of whichever attribute
+ * mtc_kwic_open's kwic_attr rendered - lets a caller read more than one
+ * attribute per token (word + lemma + tag, KonText-style) without
+ * reopening the KWIC view per attribute; also the only way to read the
+ * primary token text itself now (there's no separate mtc_kwic_get_left/
+ * kwic/right - call this with attr_name == whatever kwic_attr was).
+ *
+ * Encoding: one token per '\x1F' (unit separator - can't appear in real
+ * corpus text)-delimited piece, with the delimiter placed *before* every
+ * token including the first, e.g. "\x1Fthe\x1Ffox\x1Fjumps" for 3 tokens.
+ * A caller drops the first character then splits on '\x1F' keeping empty
+ * pieces, to correctly recover a token whose own attribute value happens
+ * to be an empty string. An entirely empty ("") result means zero tokens
+ * (an undefined/empty line's segment), not one empty-valued token - the
+ * leading delimiter makes that case unambiguous. NULL and *error set only
+ * for an attr_name that doesn't exist in this corpus. Valid only after
+ * mtc_kwic_next() returns nonzero. */
+char *mtc_kwic_get_left_attr(MTCKwic *kwic, const char *attr_name, char **error);
+char *mtc_kwic_get_kwic_attr(MTCKwic *kwic, const char *attr_name, char **error);
+char *mtc_kwic_get_right_attr(MTCKwic *kwic, const char *attr_name, char **error);
 
 /* -------------------- concordance operations --------------------
  * All mutate *conc in place and report failure the same way as mtc_query
