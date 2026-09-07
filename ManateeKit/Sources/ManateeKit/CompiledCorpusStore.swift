@@ -6,11 +6,15 @@ import Foundation
 /// subdirectories don't count there), so anything imported here shows up in
 /// `CorpusRegistry.availableCorpusNames()` automatically once `baseDirectory`
 /// is added to `MANATEE_REGISTRY` - no separate wiring needed. The compiled
-/// binary indices and our own per-corpus bookkeeping live in a `.indices`
-/// subdirectory instead, since Manatee's registry scan skips directories -
-/// this keeps `baseDirectory` itself Finder-browsable as just "one file per
-/// corpus" rather than being cluttered with the (potentially huge) compiled
-/// data.
+/// binary indices and our own per-corpus bookkeeping live alongside it in a
+/// visible `<name>.data` sibling directory (Manatee's registry scan already
+/// skips directories, so this doesn't need to be hidden to avoid being
+/// mistaken for a corpus) - everything under `baseDirectory` must stay
+/// Finder-browsable, per this project's own convention (see
+/// `Corpora/DevCorpus/`, deliberately not `.devcorpus/`): a user should never
+/// have to know to press Cmd-Shift-. to find their own compiled corpus data,
+/// especially when Settings itself names this exact directory as "where
+/// compiled corpora live."
 public enum CompiledCorpusStore {
     private static let environmentKey = "CORPORA_COMPILED_CORPORA_DIRECTORY"
 
@@ -33,18 +37,21 @@ public enum CompiledCorpusStore {
         baseDirectory.appendingPathComponent(name, isDirectory: false)
     }
 
-    private static func indexDirectory(for name: String) -> URL {
-        baseDirectory.appendingPathComponent(".indices/\(name)", isDirectory: true)
+    /// A visible sibling of `registryPath(for:)` - `<name>.data`, not
+    /// `.data/<name>` or any other leading-dot form, since only a name that
+    /// *starts* with a dot is hidden by macOS/Finder.
+    private static func supportDirectory(for name: String) -> URL {
+        baseDirectory.appendingPathComponent("\(name).data", isDirectory: true)
     }
 
     /// Where `encodevert` writes this corpus's compiled binary indices - the
     /// `PATH` a generated registry file points at.
     public static func dataDirectory(for name: String) -> URL {
-        indexDirectory(for: name).appendingPathComponent("data", isDirectory: true)
+        supportDirectory(for: name).appendingPathComponent("data", isDirectory: true)
     }
 
     private static func metadataURL(for name: String) -> URL {
-        indexDirectory(for: name).appendingPathComponent("corpus-meta.json")
+        supportDirectory(for: name).appendingPathComponent("corpus-meta.json")
     }
 
     public struct Metadata: Codable, Sendable, Equatable {
@@ -89,6 +96,6 @@ public enum CompiledCorpusStore {
     /// Removes a corpus's registry file, compiled indices, and metadata.
     public static func remove(_ name: String) throws {
         try? FileManager.default.removeItem(at: registryPath(for: name))
-        try? FileManager.default.removeItem(at: indexDirectory(for: name))
+        try? FileManager.default.removeItem(at: supportDirectory(for: name))
     }
 }

@@ -48,7 +48,14 @@ final class CorpusImportSheetController: NSViewController {
     private let nameField = NSTextField(string: "")
     private let attributesField = NSTextField(string: "Detecting…")
     private let structuresView = NSTextView()
-    private let errorLabel = NSTextField(wrappingLabelWithString: "")
+    // A fixed-height, scrollable error display, not a plain wrapping label -
+    // found the hard way that an unbounded NSTextField showing a long error
+    // (e.g. several KB of encodevert output) has no height cap of its own,
+    // so Auto Layout has no choice but to grow the *window* to fit it,
+    // reintroducing the exact class of runaway-sheet-size bug the fixed
+    // progress-view size was meant to eliminate - this needed the same fix.
+    private let errorTextView = NSTextView()
+    private let errorScroll = NSScrollView()
     private let compileButton = NSButton(title: "Compile", target: nil, action: nil)
 
     private let formStack = NSView()
@@ -168,10 +175,19 @@ final class CorpusImportSheetController: NSViewController {
                 }.joined(separator: "\n")
             } catch {
                 attributesField.stringValue = ""
-                errorLabel.stringValue = "Couldn’t detect a schema: \(error)"
-                errorLabel.isHidden = false
+                showFormError("Couldn’t detect a schema: \(error)")
             }
         }
+    }
+
+    private func showFormError(_ message: String) {
+        // 20,000 chars is generous headroom for a scrollable view (unlike
+        // the old plain-label cap of 4,000, which existed only to limit how
+        // tall an *unbounded* label could grow) - errorScroll's own height
+        // is fixed regardless, so this is just a sanity bound against
+        // truly pathological output, not load-bearing for layout anymore.
+        errorTextView.string = message.count > 20_000 ? "…" + message.suffix(20_000) : message
+        errorScroll.isHidden = false
     }
 
     private func buildFormStack() {
@@ -195,9 +211,15 @@ final class CorpusImportSheetController: NSViewController {
         structuresScroll.hasVerticalScroller = true
         structuresScroll.borderType = .bezelBorder
 
-        errorLabel.font = .systemFont(ofSize: 11)
-        errorLabel.textColor = .systemRed
-        errorLabel.isHidden = true
+        errorTextView.isEditable = false
+        errorTextView.isRichText = false
+        errorTextView.font = .systemFont(ofSize: 11)
+        errorTextView.textColor = .systemRed
+        Self.configureForScrolling(errorTextView)
+        errorScroll.documentView = errorTextView
+        errorScroll.hasVerticalScroller = true
+        errorScroll.borderType = .bezelBorder
+        errorScroll.isHidden = true
 
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelTapped))
         cancelButton.keyEquivalent = "\u{1b}"
@@ -209,7 +231,7 @@ final class CorpusImportSheetController: NSViewController {
         let views: [NSView] = [
             title, fileLabel, filePathLabel, nameLabel, nameField,
             attributesLabel, attributesField, structuresLabel, structuresScroll,
-            errorLabel, cancelButton, compileButton,
+            errorScroll, cancelButton, compileButton,
         ]
         for v in views {
             v.translatesAutoresizingMaskIntoConstraints = false
@@ -247,11 +269,17 @@ final class CorpusImportSheetController: NSViewController {
             structuresScroll.trailingAnchor.constraint(equalTo: formStack.trailingAnchor, constant: -16),
             structuresScroll.heightAnchor.constraint(equalToConstant: 100),
 
-            errorLabel.topAnchor.constraint(equalTo: structuresScroll.bottomAnchor, constant: 12),
-            errorLabel.leadingAnchor.constraint(equalTo: formStack.leadingAnchor, constant: 16),
-            errorLabel.trailingAnchor.constraint(equalTo: formStack.trailingAnchor, constant: -16),
+            errorScroll.topAnchor.constraint(equalTo: structuresScroll.bottomAnchor, constant: 12),
+            errorScroll.leadingAnchor.constraint(equalTo: formStack.leadingAnchor, constant: 16),
+            errorScroll.trailingAnchor.constraint(equalTo: formStack.trailingAnchor, constant: -16),
+            errorScroll.heightAnchor.constraint(equalToConstant: 80),
 
-            compileButton.topAnchor.constraint(greaterThanOrEqualTo: errorLabel.bottomAnchor, constant: 16),
+            // Fixed offset, not content-dependent (unlike the old
+            // greaterThanOrEqualTo-to-a-label this replaced) - errorScroll's
+            // own height is now always 80pt regardless of message length, so
+            // this can safely be a hard equality without risking the same
+            // window-growth bug.
+            compileButton.topAnchor.constraint(equalTo: errorScroll.bottomAnchor, constant: 16),
             compileButton.trailingAnchor.constraint(equalTo: formStack.trailingAnchor, constant: -16),
             compileButton.bottomAnchor.constraint(equalTo: formStack.bottomAnchor, constant: -16),
             cancelButton.centerYAnchor.constraint(equalTo: compileButton.centerYAnchor),
@@ -402,8 +430,7 @@ final class CorpusImportSheetController: NSViewController {
     @objc private func compileTapped() {
         let name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else {
-            errorLabel.stringValue = "Give the corpus a name."
-            errorLabel.isHidden = false
+            showFormError("Give the corpus a name.")
             return
         }
         let attributes = attributesField.stringValue
@@ -473,10 +500,7 @@ final class CorpusImportSheetController: NSViewController {
                 await MainActor.run {
                     self.finishImport()
                     self.showForm()
-                    let message = "\(error)"
-                    self.errorLabel.stringValue = message.count > 4000
-                        ? "…" + message.suffix(4000) : message
-                    self.errorLabel.isHidden = false
+                    self.showFormError("\(error)")
                 }
             }
         }

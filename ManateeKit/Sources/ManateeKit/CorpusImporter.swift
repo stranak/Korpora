@@ -23,6 +23,13 @@ public enum CorpusImportError: Error, CustomStringConvertible {
     /// deliberate nonzero exit, and worth reporting distinctly since the
     /// two need very different follow-up.
     case encodevertCrashed(signal: Int32, output: String)
+    /// The declared positional attributes (plus the mandatory "word") don't
+    /// match the tab-separated column count of the vertical file's own data
+    /// lines - caught and refused before compiling rather than letting
+    /// encodevert silently misassign columns to the wrong attributes (or,
+    /// if the mismatch happens to duplicate an existing attribute name,
+    /// crash the way a duplicated "word" declaration did).
+    case attributeCountMismatch(declared: Int, actualColumns: Int)
 
     public var description: String {
         switch self {
@@ -35,6 +42,11 @@ public enum CorpusImportError: Error, CustomStringConvertible {
         case .encodevertCrashed(let signal, let output):
             let name = signalName(signal)
             return "encodevert crashed (signal \(signal)\(name.map { " \($0)" } ?? "")): \(output)"
+        case .attributeCountMismatch(let declared, let actualColumns):
+            return "The vertical file has \(actualColumns) tab-separated column(s) per line, " +
+                "but \(declared) positional attribute(s) (including \"word\") are declared. " +
+                "Fix the Positional Attributes list so it has exactly \(actualColumns - 1) entries " +
+                "besides \"word\" before compiling."
         }
     }
 
@@ -104,6 +116,11 @@ public enum CorpusImporter {
     /// Cached per unchanged file (see `LineCountCache`) - repeating this on
     /// the same file (e.g. cancel then retry) is instant after the first
     /// call.
+    ///
+    /// Uses `memchr` to skip straight to each newline rather than a
+    /// byte-by-byte `Data.reduce` closure call - measured (420MB/40M-line
+    /// file, same machine) at ~0.3s vs. `wc -l`'s ~0.4s; the closure-per-byte
+    /// version this replaced measured ~1.8s, over 4x slower than `wc -l`.
     public static func countLines(verticalFile: URL) async throws -> Int {
         if let cached = LineCountCache.shared.cachedCount(for: verticalFile) {
             return cached
@@ -111,11 +128,21 @@ public enum CorpusImporter {
         let handle = try FileHandle(forReadingFrom: verticalFile)
         defer { try? handle.close() }
         var count = 0
-        let newline: UInt8 = 0x0A
         while true {
             try Task.checkCancellation()
             guard let chunk = try handle.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty else { break }
-            count += chunk.reduce(0) { $1 == newline ? $0 + 1 : $0 }
+            count += chunk.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Int in
+                guard var base = raw.baseAddress else { return 0 }
+                var remaining = raw.count
+                var found = 0
+                while remaining > 0, let hit = memchr(base, 0x0A, remaining) {
+                    found += 1
+                    let consumed = UnsafeRawPointer(hit) - base + 1
+                    base = base.advanced(by: consumed)
+                    remaining -= consumed
+                }
+                return found
+            }
         }
         LineCountCache.shared.store(count, for: verticalFile)
         return count
@@ -162,6 +189,19 @@ public enum CorpusImporter {
             (name: name, attributes: (structureAttributes[name] ?? []).sorted())
         }
         return DetectedSchema(attributes: attributes, structures: structures)
+    }
+
+    /// The tab-separated column count of `verticalFile`'s first data line
+    /// (i.e. skipping `<...>` structure tags and blank lines) - the actual
+    /// ground truth `importCorpus` validates a caller's declared attributes
+    /// against, since `sniffSchema`'s own guess is only ever a starting
+    /// point the caller is free to edit (and could edit into a mismatch).
+    private static func firstDataLineColumnCount(verticalFile: URL) async throws -> Int {
+        for try await line in verticalFile.lines {
+            guard !line.isEmpty, !line.hasPrefix("<") else { continue }
+            return line.split(separator: "\t", omittingEmptySubsequences: false).count
+        }
+        throw CorpusImportError.emptyVerticalFile
     }
 
     private static let structureTagPattern = try! Regex(#"<(\w+)((?:\s+[^>]*)?)/?>"#)
@@ -218,8 +258,30 @@ public enum CorpusImporter {
         onProgress: @escaping @Sendable (String) -> Void,
         onStart: (@Sendable (ImportHandle) -> Void)? = nil
     ) async throws {
+        // Catch a declared-attributes/actual-column mismatch before doing
+        // anything else - letting encodevert run against a mismatched
+        // schema either silently misassigns columns to the wrong
+        // attributes, or (if the mismatch happens to duplicate an existing
+        // name, e.g. "word") crashes partway through a multi-hour compile.
+        let declaredAttributeCount = 1 + attributes.filter { $0 != "word" }.count
+        let actualColumnCount = try await firstDataLineColumnCount(verticalFile: verticalFile)
+        guard declaredAttributeCount == actualColumnCount else {
+            throw CorpusImportError.attributeCountMismatch(
+                declared: declaredAttributeCount, actualColumns: actualColumnCount)
+        }
+
         let registryPath = CompiledCorpusStore.registryPath(for: name)
         let dataDirectory = CompiledCorpusStore.dataDirectory(for: name)
+        // Wipe any previous attempt's files first - encodevert writes *into*
+        // whatever's already there rather than starting clean, so retrying
+        // the same corpus name after editing the schema (e.g. adding a
+        // structure that changes which attributes exist) previously left
+        // stale index files from the earlier, incompatible attempt mixed in
+        // with the new ones. Confirmed as real, not hypothetical: a retried
+        // real corpus queried back garbled, non-matching text for a literal
+        // word search - exactly what mismatched/stale lexicon files would
+        // produce, not what an actual encodevert bug would.
+        try? FileManager.default.removeItem(at: dataDirectory)
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
 
         let registryText = makeRegistryText(
@@ -321,7 +383,10 @@ public enum CorpusImporter {
         }
     }
 
-    private static func makeRegistryText(
+    /// Not `private` so `CorpusImporterTests` (`@testable import`) can verify
+    /// the generated text directly, without needing a full `encodevert` run
+    /// to catch a registry-format regression.
+    static func makeRegistryText(
         name: String, dataDirectory: URL, verticalFile: URL,
         attributes: [String], structures: [(name: String, attributes: [String])]
     ) -> String {
@@ -335,7 +400,16 @@ public enum CorpusImporter {
             "",
             "ATTRIBUTE word",
         ]
-        for attribute in attributes {
+        // "word" is always declared above - if the caller-supplied list also
+        // contains it (e.g. a user describing their vertical file's own
+        // first column by its real name), skip it here rather than
+        // declaring ATTRIBUTE word twice: encodevert builds one write_attr
+        // per registry ATTRIBUTE line, and two writers targeting the same
+        // output file crash with an uncaught std::runtime_error when the
+        // second tries to rename an already-consumed temp file out from
+        // under the first. Root cause of a real crash against a 162M-line
+        // corpus - see docs/project-plan.md.
+        for attribute in attributes where attribute != "word" {
             lines.append("ATTRIBUTE \(attribute) {")
             lines.append("}")
         }

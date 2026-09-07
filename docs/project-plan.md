@@ -1165,10 +1165,185 @@ passing; `xcodegen generate` + `xcodebuild -scheme Corpora clean build` →
 **BUILD SUCCEEDED**, warning count 41 → 6; `xcodebuild -scheme Corpora
 test` → 8/8 `CorporaTests` passing.
 
+**2026-09-06, third real-corpus attempt (SYN2025), the two most important
+findings of the whole Phase 4 effort so far (user):**
+
+- **The "final errors and window growth" problem was the exact same root
+  cause as the earlier one, just in a different view.** Screenshot showed
+  the *form* (schema review) visible again with `Cancel`/`Compile` buttons -
+  meaning the error-catch path had run - with log content bleeding in below
+  it, in a very tall window. Root cause: `errorLabel` was a plain
+  `NSTextField(wrappingLabelWithString:)` with **no height cap of its own**,
+  showing up to 4,000 characters of raw error text; `compileButton` was
+  pinned to it with `greaterThanOrEqualTo`, so a long error message forced
+  Auto Layout to grow the actual window to fit it - the exact class of bug
+  the earlier `fixedContentSize` change addressed for the *progress* log,
+  but this was a completely separate view that needed the identical
+  treatment. Fixed by replacing `errorLabel` with a fixed-height (80pt),
+  scrollable `NSTextView` (`errorScroll`/`errorTextView`, same
+  `configureForScrolling` helper as the other two text views) and changing
+  `compileButton`'s constraint to a fixed `equalTo` offset from it - no
+  longer content-dependent, so no message length can force window growth
+  again.
+- **Real data corruption bug, found by actually querying the result**:
+  the compiled corpus looked plausible (7.4GB, 1,848 index files in
+  `.indices/syn2025/data/` - the "2KB `syn2025` file" the user found was
+  just the small registry text file; the real compiled data lives in that
+  hidden, dot-prefixed directory Finder doesn't show by default) but
+  querying `[word="the"]` via `manateekit-cli` returned nonsense text that
+  wasn't "the" at all. Root cause: `CorpusImporter.importCorpus` never
+  wiped the target data directory before compiling - `encodevert` writes
+  *into* whatever's already there. The user had retried the same corpus
+  name after editing the schema (adding `text`/`p`, missed by the initial
+  scan), so the second, different-schema compile's files ended up mixed
+  with the first attempt's incompatible leftovers, producing exactly the
+  kind of mismatched-lexicon corruption observed. Fixed by wiping the data
+  directory (`try? FileManager.default.removeItem`) immediately before
+  recreating it in `importCorpus` - every compile now starts from a
+  genuinely clean slate, and (usefully) this self-heals the already-corrupt
+  `syn2025` on disk automatically the next time it's compiled, no manual
+  cleanup needed. New regression test
+  (`testImportCorpusWipesStaleFilesFromAPreviousAttempt`) plants a fake
+  leftover file and asserts it's gone after a fresh import.
+- Confirmed non-fatal, again, on direct re-ask: the `mkregexattr` warning
+  in the pasted log is the same already-diagnosed optional-optimization
+  failure from earlier this session (fixed via the `PATH` change) - the
+  pasted log's timestamp predates that fix reaching a rebuilt app.
+
+Verified: `cd ManateeKit && swift test` → 35/35 passing (new stale-file
+test included); `xcodebuild -scheme Corpora clean build` → **BUILD
+SUCCEEDED**, still 6 warnings (unchanged, expected); `xcodebuild -scheme
+Corpora test` → 8/8 `CorporaTests` passing.
+
+**2026-09-06/07, fourth real-corpus attempt (SYN2025) — the original SIGABRT
+crash finally explained, plus the hidden-directory design reversed (user):**
+the user hand-deleted the old `syn2025` + `.indices/syn2025` and re-ran the
+compile from scratch. It still crashed, but the errorScroll fix above meant
+the **complete** crash text was visible for the first time:
+`libc++abi: terminating due to uncaught exception of type std::runtime_error:
+renaming '.../data/word.lex.tmp' to '.../data/word.lex': No such file or
+directory` — immediately preceded in the log by *two* separate "Closing
+attribute .../word ..." lines.
+
+- **Root cause found: a duplicate `ATTRIBUTE word` registry declaration.**
+  `CorpusImporter.makeRegistryText` always emits `ATTRIBUTE word` as its
+  first attribute line (mandatory - every Manatee corpus has a `word`
+  positional attribute), then appended one `ATTRIBUTE <x>` line per entry in
+  the caller-supplied `attributes` array with no de-duplication. The user's
+  own "Positional attributes" field content (visible in an earlier
+  screenshot) was `word, sword, lemma, sublemma, tag, pos, case, verbtag,
+  ord, afun, parer...` — reasonably including "word" as the literal name of
+  their vertical file's own first column. The generated registry therefore
+  declared `ATTRIBUTE word` **twice**. `encodevert` builds one `write_attr`
+  object per registry `ATTRIBUTE` line (`encodevert.cc` lines ~979-1013),
+  so this produced two independent writers both targeting the identical
+  output path (`data/word.lex`): the first finishes cleanly and renames its
+  `.tmp` file into place (matching the 18MB `word.lex` the user found
+  intact on disk); the second, redundant writer then tries to rename the
+  *same already-consumed* temp path and throws an uncaught
+  `std::runtime_error`, aborting the whole process. This also explains the
+  `[word="..."]` query mismatches reported against SYN2025 (screenshot:
+  querying `moci` matched `Vytřepala` with garbled surrounding context) —
+  the abort happened before later corpus-finalization steps could run,
+  leaving `word`'s index out of sync with the rest. Fixed by skipping
+  `"word"` when appending the caller-supplied `attributes` list in
+  `makeRegistryText` (`ManateeKit/CorpusImporter.swift`) - a user who types
+  "word" into the Positional Attributes field is now safely ignored there
+  rather than producing a broken registry. `makeRegistryText` is no longer
+  `private` (just internal) so a new regression test
+  (`testMakeRegistryTextDoesNotDuplicateAttributeWordWhenCallerIncludesIt`)
+  can assert the generated text contains exactly one `ATTRIBUTE word`
+  occurrence when the input list also contains `"word"`.
+- **Explicit, repeated user instruction acted on: no hidden directories for
+  anything user-facing.** *"do NOT put files into hidden directories I
+  cannot find. It is especially confusing when in the GUI of Settings/
+  Corpora you clearly say that ... CompiledCorpora is the directory for the
+  actual compiled corpora."* `CompiledCorpusStore` previously hid each
+  corpus's compiled binary indices inside a dot-prefixed `.indices/<name>/`
+  subdirectory of the compiled-corpora base directory - exactly the kind of
+  Finder-invisible location this project's own established convention
+  (`Corpora/DevCorpus/`, deliberately not `.devcorpus/`) says to avoid.
+  Changed to a **visible** sibling directory, `<base>/<name>.data/` (a
+  trailing `.data` *suffix* on the name, not a leading dot - only a name
+  that *starts* with a dot is hidden by macOS). `dataDirectory(for:)`,
+  the metadata sidecar, and `remove(_:)` all updated accordingly; Manatee's
+  own registry scan already skips directories regardless of name, so this
+  needed no change on that side. `CorpusImporterTests`'s stale-file
+  regression test now calls `CompiledCorpusStore.dataDirectory(for:)`
+  directly instead of hardcoding the old `.indices/...` path.
+- **Not yet addressed (user feedback, lower priority):** "it is not
+  intuitive that after the failure it gets to the window state allowing it
+  to just re-run again" - i.e. a failed compile reverts to the editable
+  schema form rather than something more clearly signaling failure. Current
+  behavior is deliberate (so a retry doesn't require re-filling the whole
+  form) but the presentation could be clearer; not changed this round.
+
+Practical guidance for the next re-import: the existing on-disk `syn2025`
+remnants (under the old `.indices/` location, already partially hand-cleaned
+by the user) are superseded by this change and can be deleted -
+`CompiledCorpusStore` now writes to `<base>/syn2025.data/` instead. A fresh
+compile should no longer crash even with "word" left in the Positional
+Attributes field, since it's now filtered out rather than causing a
+duplicate declaration.
+
+- **Follow-up hardening (user asked directly): validate declared attribute
+  count against the vertical file's real column count, and refuse to
+  compile on a mismatch** rather than relying solely on the "word"-specific
+  filter above. The "word" fix only catches that one specific name
+  collision; a user could still miscount in other ways (too few/too many
+  entries in the Positional Attributes list) and previously nothing caught
+  it before `encodevert` ran - either silently misassigning columns to the
+  wrong attributes, or crashing if the miscount happened to duplicate an
+  existing name. Added `CorpusImporter.firstDataLineColumnCount(verticalFile:)`
+  (reads just the first non-structure, non-blank line) and a check at the
+  very top of `importCorpus`, before any disk state is touched: `1 +
+  attributes.filter { $0 != "word" }.count` (the actual declared-attribute
+  total once the "word" fix's de-dup is applied) must equal the file's real
+  tab-separated column count, or `importCorpus` throws
+  `CorpusImportError.attributeCountMismatch(declared:actualColumns:)` with a
+  message telling the user exactly how many entries their Positional
+  Attributes list needs. Surfaces through the existing generic
+  `showFormError("\(error)")` catch site in
+  `CorpusImportSheetController` with no UI changes needed, since
+  `CorpusImportError` is `CustomStringConvertible`. New regression test
+  `testImportCorpusRefusesToCompileWhenDeclaredAttributesDontMatchFileColumns`
+  (declares one attribute for a 3-column file, asserts the specific error
+  and that no registry file gets written).
+
+Verified: `cd ManateeKit && swift test` → 37/37 passing (new
+`testMakeRegistryTextDoesNotDuplicateAttributeWordWhenCallerIncludesIt` and
+`testImportCorpusRefusesToCompileWhenDeclaredAttributesDontMatchFileColumns`
+included); `xcodebuild -scheme Corpora build` (via `BuildProject`) →
+**BUILD SUCCEEDED**; `xcodebuild -scheme Corpora test` (via `RunAllTests`)
+→ 8/8 `CorporaTests` passing.
+
+- **`countLines` benchmarked against `wc -l` on the user's suspicion it
+  might be faster, and rewritten once the numbers said otherwise (user).**
+  Measured on a synthetic 420MB/40M-line vertical-shaped file (`/tmp`, same
+  machine, warm page cache, 3 runs each): `wc -l` ≈0.38-0.40s;
+  `countLines`'s then-current `chunk.reduce(0) { ... }` byte-by-byte closure
+  ≈1.74-1.97s — over **4x slower** than `wc -l`, not faster. Root cause:
+  `Data.reduce` invokes its closure once per byte, which dominates over any
+  I/O cost at this scale. Rewrote to scan each 4MB chunk with `memchr`
+  (`withUnsafeBytes` + a pointer-advancing loop, jumping straight to the
+  next newline instead of testing every byte) — re-measured at ≈0.27-0.32s,
+  a hair faster than `wc -l` itself. Same chunked-read structure and
+  cancellation/caching behavior, only the inner byte-scan changed.
+
+Verified (that round): `cd ManateeKit && swift test` → 37/37 passing
+(existing `countLines` tests, unchanged expectations, confirm the rewrite
+still counts correctly); `xcodebuild -scheme Corpora build` (via
+`BuildProject`) → **BUILD SUCCEEDED**; `xcodebuild -scheme Corpora test`
+(via `RunAllTests`) → 8/8 `CorporaTests` passing.
+
 **Still not manually click-tested end-to-end** — re-running the SYN2025
-import with all of this session's fixes (including the actual crash still
-being unexplained) is the next step, along with the original Keep in
-Memory toggle/guard verification.
+import (a fresh compile, now self-cleaning, with the duplicate-`word` and
+hidden-directory bugs both fixed) is the next step, along with the original
+Keep in Memory toggle/guard verification. Every concrete, diagnosable
+symptom found across this whole Phase 4 effort (the hang, the rendering
+corruption, the window growth ×2, the quit/orphan-process bug, the
+`mkregexattr` gap, the stale-directory corruption, and now the duplicate-
+`word`-attribute crash) has had a real, verified root cause and fix.
 
 ## Key files
 
