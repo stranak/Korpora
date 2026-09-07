@@ -37,6 +37,13 @@ public struct KWICLine: Sendable {
     public let leftTokens: [KWICToken]
     public let kwicTokens: [KWICToken]
     public let rightTokens: [KWICToken]
+    /// The match's corpus-wide token start position - stable and meaningful
+    /// independent of the `LiveConcordance`/iterator that produced this
+    /// line, so a caller can look up this specific hit's enclosing
+    /// structural attributes (e.g. "doc.author") later, on demand, via
+    /// `Corpus.structuralAttributeValue(at:attribute:)`, without keeping
+    /// anything else alive.
+    public let position: Int
 
     /// Plain space-joined display text, for callers that don't need
     /// per-token/secondary-attribute detail - the whole `KWICLine` API
@@ -44,6 +51,13 @@ public struct KWICLine: Sendable {
     public var left: String { Self.joined(leftTokens) }
     public var kwic: String { Self.joined(kwicTokens) }
     public var right: String { Self.joined(rightTokens) }
+
+    public init(leftTokens: [KWICToken], kwicTokens: [KWICToken], rightTokens: [KWICToken], position: Int) {
+        self.leftTokens = leftTokens
+        self.kwicTokens = kwicTokens
+        self.rightTokens = rightTokens
+        self.position = position
+    }
 
     private static func joined(_ tokens: [KWICToken]) -> String {
         tokens.map(\.word).joined(separator: " ")
@@ -147,6 +161,23 @@ public actor Corpus {
             throw ManateeError.failure(consumeError(error))
         }
         return path
+    }
+
+    /// The value of structural attribute `attribute` (e.g. "doc.author") for
+    /// whichever structure instance encloses `position` - a real per-match
+    /// lookup (see `mtc_corpus_get_struct_attr`'s doc comment), not the
+    /// registry-only names `info()` returns. `position` normally comes from
+    /// a `KWICLine.position` obtained earlier from this same corpus (or an
+    /// equivalent one - a subcorpus/its parent share the same underlying
+    /// token positions). Empty string if `position` isn't enclosed by any
+    /// instance of that structure.
+    public func structuralAttributeValue(at position: Int, attribute: String) throws -> String {
+        var error: UnsafeMutablePointer<CChar>?
+        guard let cstr = mtc_corpus_get_struct_attr(handle, Int64(position), attribute, &error) else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        defer { mtc_free_string(cstr) }
+        return String(cString: cstr)
     }
 
     /// Opens a previously created subcorpus (see `createSubcorpus`) as its

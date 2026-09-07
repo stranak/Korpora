@@ -52,6 +52,14 @@ final class ConcordanceDocument: NSDocument {
     /// and after a failed replay (see `replay()`'s catch branch).
     private var liveConcordance: LiveConcordance?
 
+    /// The `Corpus` (or opened subcorpus) behind the most recent successful
+    /// replay - kept around, same reasoning as `liveConcordance`, so
+    /// `structuralInfo(at:)` can look up a specific hit's enclosing
+    /// structural attributes (e.g. "doc.author") on demand later, without
+    /// needing a live `LiveConcordance`/iterator (structural lookups are
+    /// pure `Corpus`-level position queries - see `KWICLine.position`).
+    private var queryCorpus: Corpus?
+
     /// Once any line-group operation exists, sort/filter/shuffle/sample are
     /// disabled - mirrors KonText's own mutual-exclusion rule, since a fresh
     /// sort/sample would silently invalidate the view line-group
@@ -320,6 +328,7 @@ final class ConcordanceDocument: NSDocument {
                     secondaryAttributes: secondaryAttributes)
                 rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
                 liveConcordance = live
+                self.queryCorpus = queryCorpus
                 let corpusDescription: String
                 if let subcorpusPath {
                     let subcorpusName = (subcorpusPath as NSString).lastPathComponent
@@ -332,6 +341,7 @@ final class ConcordanceDocument: NSDocument {
             } catch {
                 rows = []
                 liveConcordance = nil
+                queryCorpus = nil
                 status = "\(error)"
             }
             onResultsChanged?(true)
@@ -395,6 +405,31 @@ final class ConcordanceDocument: NSDocument {
     func frequencyDistribution(_ criteria: [FrequencyCriterion], minFrequency: Int = 1) async throws -> [FrequencyItem] {
         guard let liveConcordance else { throw AnalysisError.noResultsYet }
         return try await liveConcordance.frequencyDistribution(criteria, minFrequency: minFrequency)
+    }
+
+    /// One structural attribute value (e.g. "doc.author" → "Twain") enclosing
+    /// `rowID`'s hit - every attribute of every structure the corpus
+    /// declares, skipping any that come back empty (not enclosed by that
+    /// structure at this position, or genuinely blank). Unlike
+    /// `collocations`/`frequencyDistribution`, this only needs `queryCorpus`
+    /// (a plain position lookup - see `KWICLine.position`), not
+    /// `liveConcordance`, so it keeps working even if a later sort/filter
+    /// replaced the live handle, as long as the row itself is still there.
+    func structuralInfo(at rowID: Int) async throws -> [(structure: String, attribute: String, value: String)] {
+        guard let queryCorpus else { throw AnalysisError.noResultsYet }
+        guard rows.indices.contains(rowID) else { return [] }
+        let position = rows[rowID].line.position
+        let info = await queryCorpus.info()
+        var results: [(structure: String, attribute: String, value: String)] = []
+        for structure in info.structures {
+            for attribute in structure.attributes {
+                let value = try await queryCorpus.structuralAttributeValue(
+                    at: position, attribute: "\(structure.name).\(attribute)")
+                guard !value.isEmpty else { continue }
+                results.append((structure.name, attribute, value))
+            }
+        }
+        return results
     }
 
     // MARK: - Persistence (query + operation chain only, never the materialized rows)

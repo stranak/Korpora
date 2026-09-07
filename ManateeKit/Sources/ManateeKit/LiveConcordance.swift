@@ -362,7 +362,8 @@ public actor LiveConcordance {
             lines.append(KWICLine(
                 leftTokens: try segment { mtc_kwic_get_left_attr(kwic, $0, &error) },
                 kwicTokens: try segment { mtc_kwic_get_kwic_attr(kwic, $0, &error) },
-                rightTokens: try segment { mtc_kwic_get_right_attr(kwic, $0, &error) }
+                rightTokens: try segment { mtc_kwic_get_right_attr(kwic, $0, &error) },
+                position: Int(mtc_kwic_get_pos(kwic))
             ))
         }
         return lines

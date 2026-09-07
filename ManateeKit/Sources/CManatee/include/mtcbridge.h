@@ -60,6 +60,15 @@ char *mtc_kwic_get_left_attr(MTCKwic *kwic, const char *attr_name, char **error)
 char *mtc_kwic_get_kwic_attr(MTCKwic *kwic, const char *attr_name, char **error);
 char *mtc_kwic_get_right_attr(MTCKwic *kwic, const char *attr_name, char **error);
 
+/* The current KWIC line's match start position - a corpus-wide token
+ * index, stable and meaningful independent of this iterator's lifetime
+ * (unlike everything else on MTCKwic). Callers keep this alongside a
+ * fetched line so they can look up that line's enclosing structural
+ * attributes later, on demand, via mtc_corpus_get_struct_attr - without
+ * needing to keep a KWIC iterator (or even the concordance) open. Valid
+ * only after mtc_kwic_next() returns nonzero. */
+long long mtc_kwic_get_pos(MTCKwic *kwic);
+
 /* -------------------- concordance operations --------------------
  * All mutate *conc in place and report failure the same way as mtc_query
  * (return 0 and set *error). `criteria` strings use Manatee's own sort-key
@@ -183,6 +192,17 @@ char *mtc_corpus_struct_name(MTCCorpus *corp, int index);
 
 int mtc_corpus_struct_attr_count(MTCCorpus *corp, const char *struct_name);
 char *mtc_corpus_struct_attr_name(MTCCorpus *corp, const char *struct_name, int index);
+
+/* The value of structural attribute "struct.attr" (e.g. "doc.author") for
+ * whichever <struct> instance encloses corpus-wide token position `position`
+ * (see mtc_kwic_get_pos) - a real per-match lookup, unlike the registry-only
+ * introspection above. Wraps manatee-open's own StructPosAttr::pos2str,
+ * which already resolves "which structure instance contains this position"
+ * internally - no separate range lookup needed on our side. Empty string
+ * (not NULL) if `position` isn't enclosed by any instance of that structure;
+ * NULL and *error set only for a struct_attr_name that doesn't exist in
+ * this corpus. */
+char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char *struct_attr_name, char **error);
 
 /* -------------------- subcorpora --------------------
  * A subcorpus is a Manatee-native concept: a saved range file restricting a

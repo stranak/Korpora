@@ -1956,7 +1956,67 @@ Verified: `xcodebuild -scheme Corpora build`/`test` (via `BuildProject`/
 mechanism reverts and re-reverts were pure `KWICCellView` internals with
 no change to `KWICFormatter`'s already-tested logic).
 
-### 5.4 — Document/structural info (not started)
+### 5.4 — Document/structural info (engine + AppKit UI done)
+
+Shows a hit's enclosing structural attributes (e.g. `doc.author`,
+`doc.year`) via a "Document Info…" row context-menu item - the piece
+explicitly flagged as missing during Phase 5.3's scoping: `Corpus.info()`
+only ever exposed registry-level structure/attribute *names*, never a
+per-match lookup.
+
+**Engine/bridge**: found the exact API needed by reading manatee-open's own
+sort/frequency-criteria code (`conccrit.cc`'s `crit_struct_nr`), which
+led to `corp/struct.cc`'s `StructPosAttr::pos2str(Position pos)` - it
+*already* resolves "which `<doc>` instance contains this token position"
+internally (via `ranges::num_at_pos`) and returns that instance's
+attribute value directly. No manual range-search needed on our side at
+all - just call `Corpus::get_attr("doc.author")` (the plain, default
+`struct_attr=false` overload, which is what routes through the
+position-indexed `StructPosAttr` wrapper rather than the structure's own
+instance-indexed raw attribute) and `.pos2str(position)`.
+
+- `mtcbridge.h`/`.cc`: two new functions. `mtc_kwic_get_pos(MTCKwic*)`
+  exposes the current KWIC line's corpus-wide match position (previously
+  computed internally by `KWICLines` but never exposed - the position
+  itself, not any text at it). `mtc_corpus_get_struct_attr(MTCCorpus*,
+  position, "struct.attr", error)` wraps the `pos2str` call above,
+  operating directly on the corpus handle - no open `MTCKwic`/
+  `MTCConcordance` needed, so a lookup can happen long after the query
+  that produced the position ran.
+- `ManateeKit.swift`: `KWICLine` gained `position: Int` (every line
+  already flows through one construction site in `LiveConcordance.
+  kwicLines`, so this was a single-call-site change); `Corpus` gained
+  `structuralAttributeValue(at:attribute:) throws -> String`.
+- New tests (`CorpusInfoTests.swift`, alongside the existing registry-only
+  `info()` test for contrast): queries for "fox" (only in `<doc id="1">`)
+  and "cat" (only in `<doc id="2">`) in the fixture corpus, confirms
+  `structuralAttributeValue` returns the correct enclosing doc's `id` for
+  each - a real per-match assertion, not just registry metadata. Both
+  passed on the first attempt once written, confirming the `pos2str`
+  understanding was correct. Also confirms an unknown structural attribute
+  name throws.
+
+**AppKit UI**: `ConcordanceDocument` gained `queryCorpus` (kept alongside
+the existing `liveConcordance`, same "survive past a single replay" reasoning) and
+`structuralInfo(at rowID:) async throws -> [(structure:attribute:value:)]`
+- loops every attribute of every structure `queryCorpus.info()` declares,
+skipping any that come back empty for this particular hit (not every hit
+is enclosed by every structure - e.g. a `<p>` that only wraps some
+documents). `ConcordanceViewController` adds "Document Info…" to the
+existing row right-click menu (alongside "Filter to Selection"/"Copy"),
+showing the results as a plain `NSAlert` - proportionate to showing a
+handful of key/value pairs for one row, not a sortable/scrollable result
+set like Collocations/Frequencies get their own dedicated windows for.
+
+Verified: `cd ManateeKit && swift test` → 42/42 passing (2 new
+`CorpusInfoTests`); `xcodebuild -scheme Corpora build`/`test` (via
+`BuildProject`/`RunAllTests`) → **BUILD SUCCEEDED**, 22/22 `CorporaTests`
+passing (unaffected - no AppKit-layer tests exist for this feature, since
+it's a one-shot alert, not logic worth isolating the way `KWICFormatter`
+was). Not yet manually click-tested - next step: right-click a KWIC line
+in a real corpus with structural attributes (e.g. the dev corpus's
+`doc.author`/`doc.genre`/`doc.year`) and confirm "Document Info…" shows
+correct, real values.
 
 ### 5.5 — Export concordance (not started)
 

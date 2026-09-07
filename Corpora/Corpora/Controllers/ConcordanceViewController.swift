@@ -478,6 +478,24 @@ final class ConcordanceViewController: NSViewController {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("\(line.left)\t\(line.kwic)\t\(line.right)", forType: .string)
     }
+
+    @objc private func showDocumentInfo(_ sender: Any) {
+        let row = tableView.clickedRow
+        guard document.rows.indices.contains(row) else { return }
+        Task { @MainActor in
+            do {
+                let info = try await document.structuralInfo(at: row)
+                let alert = NSAlert()
+                alert.messageText = "Document Info"
+                alert.informativeText = info.isEmpty
+                    ? "No structural attribute values for this line."
+                    : info.map { "\($0.structure).\($0.attribute): \($0.value)" }.joined(separator: "\n")
+                alert.runModal()
+            } catch {
+                self.showErrorAlert(error)
+            }
+        }
+    }
 }
 
 extension ConcordanceViewController: NSMenuDelegate {
@@ -509,5 +527,10 @@ extension ConcordanceViewController: NSMenuDelegate {
         let copyItem = NSMenuItem(title: "Copy", action: #selector(copySelection(_:)), keyEquivalent: "")
         copyItem.target = self
         menu.addItem(copyItem)
+
+        menu.addItem(.separator())
+        let infoItem = NSMenuItem(title: "Document Info…", action: #selector(showDocumentInfo(_:)), keyEquivalent: "")
+        infoItem.target = self
+        menu.addItem(infoItem)
     }
 }

@@ -244,6 +244,12 @@ char *mtc_kwic_get_right_attr(MTCKwic *kwic, const char *attr_name, char **error
     return kwic_get_attr_range(kwic, attr_name, beg, kwic->kl->get_ctxend(), error);
 }
 
+long long mtc_kwic_get_pos(MTCKwic *kwic) {
+    if (!kwic)
+        return -1;
+    return static_cast<long long>(kwic->kl->get_pos());
+}
+
 int mtc_concordance_sort(MTCConcordance *conc, const char *criteria, int uniq, char **error) {
     if (!conc) {
         set_error(error, "null concordance handle");
@@ -533,6 +539,28 @@ char *mtc_corpus_struct_attr_name(MTCCorpus *corp, const char *struct_name, int 
     if (!s || index < 0 || static_cast<size_t>(index) >= s->attrs.size())
         return nullptr;
     return strdup(s->attrs[index].first.c_str());
+}
+
+char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char *struct_attr_name, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        // get_attr's default struct_attr=false is what returns the
+        // position-indexed StructPosAttr wrapper (via get_struct_pos_attr)
+        // rather than the structure's own instance-indexed raw attribute -
+        // pos2str below needs the former, since `position` is a corpus-wide
+        // token position, not a structure instance number.
+        PosAttr *attr = corp->corp->get_attr(struct_attr_name);
+        return strdup(attr->pos2str(static_cast<Position>(position)));
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading structural attribute");
+        return nullptr;
+    }
 }
 
 int mtc_create_subcorpus(MTCCorpus *corp, const char *subc_path, const char *struct_name,
