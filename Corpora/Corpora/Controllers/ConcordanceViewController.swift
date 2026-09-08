@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 final class ConcordanceViewController: NSViewController {
     private enum Section { case main }
-    private enum Column: String { case group, left, kwic, right }
+    private enum Column: String { case group, doc, left, kwic, right }
 
     private let document: ConcordanceDocument
     private let queryField = CQLQueryField()
@@ -144,13 +144,28 @@ final class ConcordanceViewController: NSViewController {
         controller.primaryAttribute = document.kwicAttr
         controller.selectedInlineAttributes = document.inlineAttributes
         controller.selectedTooltipAttributes = document.tooltipAttributes
-        controller.onApply = { [weak self, weak popover] inlineAttributes, tooltipAttributes in
-            self?.document.setAttributeDisplay(inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
+        controller.selectedStructuralAttribute = document.structuralAttributeToShow
+        controller.onApply = { [weak self, weak popover] inlineAttributes, tooltipAttributes, structuralAttribute in
+            guard let self else { return }
+            document.setAttributeDisplay(inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
+            document.setStructuralAttributeDisplay(structuralAttribute)
+            updateStructuralColumnVisibility()
             popover?.close()
         }
         popover.contentViewController = controller
         popover.behavior = .transient
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+
+    /// The "Doc" column is hidden entirely (rather than always shown but
+    /// empty) whenever no structural attribute is configured. The initial
+    /// state (including for a reopened saved document already carrying a
+    /// non-nil `structuralAttributeToShow`) is set directly in
+    /// `setUpTableView`; this is the update path for `attributesTapped`'s
+    /// Apply changing it afterward.
+    private func updateStructuralColumnVisibility() {
+        tableView.tableColumn(withIdentifier: .init(Column.doc.rawValue))?.isHidden =
+            document.structuralAttributeToShow == nil
     }
 
     @objc func historyTapped(_ sender: NSButton) {
@@ -347,6 +362,19 @@ final class ConcordanceViewController: NSViewController {
         group.maxWidth = 32
         group.resizingMask = []
 
+        // Fixed-width (manual drag only, no auto-grow) like `group` - a
+        // structural attribute value (e.g. "doc.title") is constant for
+        // the whole line, so it doesn't participate in the Left/Right
+        // symmetric-growth centering below. Hidden (zero width) unless
+        // `document.structuralAttributeToShow` is set - see
+        // `updateStructuralColumnVisibility`.
+        let doc = NSTableColumn(identifier: .init(Column.doc.rawValue))
+        doc.title = "Doc"
+        doc.resizingMask = .userResizingMask
+        doc.width = 120
+        doc.minWidth = 0
+        doc.isHidden = document.structuralAttributeToShow == nil
+
         // Left/Right both auto-resize (and start at equal widths) while
         // Match only resizes by manual drag - combined with
         // `.uniformColumnAutoresizingStyle` below, this keeps Left and
@@ -373,6 +401,7 @@ final class ConcordanceViewController: NSViewController {
         right.sortDescriptorPrototype = NSSortDescriptor(key: Column.right.rawValue, ascending: true)
 
         tableView.addTableColumn(group)
+        tableView.addTableColumn(doc)
         tableView.addTableColumn(left)
         tableView.addTableColumn(kwic)
         tableView.addTableColumn(right)
@@ -402,7 +431,7 @@ final class ConcordanceViewController: NSViewController {
         case .left: anchor = .left
         case .kwic: anchor = .kwic
         case .right: anchor = .right
-        case .group: return
+        case .group, .doc: return
         }
         let level = SortLevel(attribute: "word", anchor: anchor, span: 1)
         document.performSort(SortCriteria(level), descending: !descriptor.ascending)
@@ -430,7 +459,8 @@ final class ConcordanceViewController: NSViewController {
         }
 
         for column in tableView.tableColumns {
-            guard let identifier = Column(rawValue: column.identifier.rawValue), identifier != .group else { continue }
+            guard let identifier = Column(rawValue: column.identifier.rawValue),
+                  identifier != .group, identifier != .doc else { continue }
             if identifier == matchedColumn {
                 tableView.setIndicatorImage(
                     NSImage(named: matchedAscending ? "NSAscendingSortIndicator" : "NSDescendingSortIndicator"),
@@ -458,6 +488,8 @@ final class ConcordanceViewController: NSViewController {
         switch column.flatMap({ Column(rawValue: $0.identifier.rawValue) }) {
         case .group:
             cell.configureGroup(row.group)
+        case .doc:
+            cell.configureStructuralInfo(row.structuralAttributeValue ?? "")
         case .left:
             configure(row.line.leftTokens, alignment: .right, style: .plain)
         case .kwic:

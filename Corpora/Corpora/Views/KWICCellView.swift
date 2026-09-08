@@ -240,4 +240,18 @@ final class KWICCellView: NSTableCellView {
         ]
         return palette[(group - 1) % palette.count]
     }
+
+    /// The "Doc" column - one structural attribute value (e.g.
+    /// "doc.title"), constant for the whole line, so styled as a small
+    /// secondary label (like `configureGroup`'s badge) rather than routed
+    /// through `KWICFormatter`'s per-token segment machinery.
+    func configureStructuralInfo(_ value: String) {
+        wantsLayer = false
+        layer?.backgroundColor = nil
+        label.alignment = .left
+        label.lineBreakMode = .byTruncatingTail
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+        label.stringValue = value
+    }
 }

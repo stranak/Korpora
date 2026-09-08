@@ -20,7 +20,13 @@ final class AttributeDisplayPopoverController: NSViewController {
     var primaryAttribute: String = "word"
     var selectedInlineAttributes: [String] = []
     var selectedTooltipAttributes: [String] = []
-    var onApply: (([String], [String]) -> Void)?
+    /// Fully-qualified name (e.g. "doc.title") or nil for "None" - see
+    /// `ConcordanceDocument.structuralAttributeToShow`. Only one can ever
+    /// be shown (there's a single "Doc" column, not one per attribute),
+    /// so this is a radio-button choice, not a checklist - see
+    /// `populateStructuralRows`.
+    var selectedStructuralAttribute: String?
+    var onApply: (([String], [String], String?) -> Void)?
 
     private struct Row {
         let attribute: String
@@ -29,8 +35,12 @@ final class AttributeDisplayPopoverController: NSViewController {
     }
 
     private let rowsStack = NSStackView()
+    private let structuralSectionTitle = NSTextField(labelWithString: "Structural:")
+    private let structuralRowsStack = NSStackView()
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private var rows: [Row] = []
+    /// `attribute` is nil for the "None" radio button.
+    private var structuralRadioButtons: [(attribute: String?, button: NSButton)] = []
     private static let width: CGFloat = 300
 
     override func loadView() {
@@ -49,6 +59,12 @@ final class AttributeDisplayPopoverController: NSViewController {
         rowsStack.alignment = .leading
         rowsStack.spacing = 4
 
+        structuralSectionTitle.font = .boldSystemFont(ofSize: 12)
+
+        structuralRowsStack.orientation = .vertical
+        structuralRowsStack.alignment = .leading
+        structuralRowsStack.spacing = 4
+
         errorLabel.font = .systemFont(ofSize: 11)
         errorLabel.textColor = .systemRed
         errorLabel.isHidden = true
@@ -57,7 +73,9 @@ final class AttributeDisplayPopoverController: NSViewController {
         applyButton.keyEquivalent = "\r"
         applyButton.bezelStyle = .rounded
 
-        let views: [NSView] = [title, headerRow, rowsStack, errorLabel, applyButton]
+        let views: [NSView] = [
+            title, headerRow, rowsStack, structuralSectionTitle, structuralRowsStack, errorLabel, applyButton,
+        ]
         for v in views {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
@@ -74,7 +92,14 @@ final class AttributeDisplayPopoverController: NSViewController {
             rowsStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
             rowsStack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -16),
 
-            errorLabel.topAnchor.constraint(equalTo: rowsStack.bottomAnchor, constant: 12),
+            structuralSectionTitle.topAnchor.constraint(equalTo: rowsStack.bottomAnchor, constant: 16),
+            structuralSectionTitle.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+
+            structuralRowsStack.topAnchor.constraint(equalTo: structuralSectionTitle.bottomAnchor, constant: 6),
+            structuralRowsStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            structuralRowsStack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -16),
+
+            errorLabel.topAnchor.constraint(equalTo: structuralRowsStack.bottomAnchor, constant: 12),
             errorLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
             errorLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
 
@@ -95,6 +120,7 @@ final class AttributeDisplayPopoverController: NSViewController {
                 let corpus = try Corpus(name: corpusName)
                 let info = await corpus.info()
                 populateRows(attributes: info.attributes.filter { $0 != primaryAttribute })
+                populateStructuralRows(structures: info.structures)
             } catch {
                 errorLabel.stringValue = "\(error)"
                 errorLabel.isHidden = false
@@ -144,13 +170,63 @@ final class AttributeDisplayPopoverController: NSViewController {
             rowsStack.addArrangedSubview(row)
             rows.append(Row(attribute: attribute, inlineCheckbox: inlineCheckbox, tooltipCheckbox: tooltipCheckbox))
         }
+    }
+
+    /// One radio button per structural attribute (e.g. "doc.title",
+    /// "doc.author"), plus "None" - unlike positional attributes (a
+    /// checklist, since any number can be shown inline/on hover at once),
+    /// only one structural attribute can ever be shown (there's a single
+    /// "Doc" column), so this is mutually exclusive by nature. Radio
+    /// buttons, not a pop-up, per HIG's guidance on presenting a small set
+    /// of mutually exclusive options where showing every choice at once
+    /// (rather than hiding them behind a menu) helps people scan them.
+    /// Exclusivity is managed explicitly in `structuralRadioTapped(_:)`
+    /// rather than relying on AppKit's automatic same-superview radio
+    /// grouping - that turned out not to kick in here (found via manual
+    /// testing 2026-09-08: every button toggled independently, so more
+    /// than one could end up checked), most likely because grouping is
+    /// tied to a shared, non-nil target/action, and this passed `nil` for
+    /// both.
+    private func populateStructuralRows(structures: [StructureInfo]) {
+        structuralRowsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        structuralRadioButtons = []
+        let qualifiedNames = structures.flatMap { structure in
+            structure.attributes.map { "\(structure.name).\($0)" }
+        }
+        if qualifiedNames.isEmpty {
+            structuralSectionTitle.isHidden = true
+            structuralRowsStack.isHidden = true
+        } else {
+            structuralSectionTitle.isHidden = false
+            structuralRowsStack.isHidden = false
+            func addRadioButton(title: String, attribute: String?) {
+                let button = NSButton(
+                    radioButtonWithTitle: title, target: self, action: #selector(structuralRadioTapped(_:)))
+                button.state = selectedStructuralAttribute == attribute ? .on : .off
+                structuralRowsStack.addArrangedSubview(button)
+                structuralRadioButtons.append((attribute: attribute, button: button))
+            }
+            addRadioButton(title: "None", attribute: nil)
+            for name in qualifiedNames {
+                addRadioButton(title: name, attribute: name)
+            }
+        }
         view.layoutSubtreeIfNeeded()
         preferredContentSize = NSSize(width: Self.width, height: view.fittingSize.height)
+    }
+
+    /// Manual radio-group exclusivity - see `populateStructuralRows`'s doc
+    /// comment on why this isn't left to AppKit's automatic grouping.
+    @objc private func structuralRadioTapped(_ sender: NSButton) {
+        for (_, button) in structuralRadioButtons {
+            button.state = (button === sender) ? .on : .off
+        }
     }
 
     @objc private func applyTapped() {
         let inline = rows.filter { $0.inlineCheckbox.state == .on }.map(\.attribute)
         let tooltip = rows.filter { $0.tooltipCheckbox.state == .on }.map(\.attribute)
-        onApply?(inline, tooltip)
+        let structural = structuralRadioButtons.first { $0.button.state == .on }?.attribute
+        onApply?(inline, tooltip, structural)
     }
 }

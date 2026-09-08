@@ -2231,44 +2231,84 @@ symmetrically together while Match stays visually centered.
 **Verify**: `BuildProject` + manual resize test in Xcode (widen/narrow the
 window, confirm Left/Right grow symmetrically and Match stays centered).
 
-### 6.2 — `doc.title`-style structural attribute on every KWIC line (not started)
+### 6.2 — `doc.title`-style structural attribute on every KWIC line (AppKit UI done)
 
 KonText (per `korpus.cz`) always shows a structural attribute (typically
 `doc.title`) on every concordance line — document identity at a glance,
 not just on click like the existing "Document Info…" popup.
 
-**Design**:
-- `ConcordanceDocument` gains `structuralAttributesToShow: [String] = []`
-  (mirrors `inlineAttributes`/`tooltipAttributes`'s shape) and a
-  `setStructuralAttributeDisplay(_:)` method calling `refetchDisplay()`,
-  same pattern as `setAttributeDisplay`.
-- `ConcordanceRow` gains `structuralAttributeValues: [String: String]`,
-  populated in `buildRows` by calling the *existing*
+**Implemented**:
+- `ConcordanceDocument` gained `structuralAttributeToShow: String?`
+  (persisted the same nil-for-back-compat way as `inlineAttributes`/
+  `tooltipAttributes`) and `setStructuralAttributeDisplay(_:)` calling
+  `refetchDisplay()`, same pattern as `setAttributeDisplay`. **Revised
+  after first manual test**: initially built as a checklist
+  (`structuralAttributesToShow: [String]`), but since there's only ever
+  one "Doc" column, checking a second box silently did nothing - the
+  user caught this and asked for the model itself to be single-valued,
+  not just the UI, citing HIG's guidance on mutually-exclusive choices
+  (and specifically radio buttons, `NSButton.ButtonType.radio`, over a
+  pop-up, per the older HIG's fuller treatment of when to prefer each).
+  Simplified end-to-end to `String?` rather than leaving a `[String]`
+  that only ever honored its first element.
+- `ConcordanceRow` gained `structuralAttributeValue: String?` (via an
+  explicit init with a `nil` default, not a plain stored-property default
+  - the synthesized memberwise init didn't pick the default up for an
+  explicit-argument call the way expected, so a real `init` was simpler
+  than chasing why), populated in `buildRows` by calling the *existing*
   `Corpus.structuralAttributeValue(at:attribute:)` (built in Phase 5.4 for
-  "Document Info…") once per configured attribute per row - no new engine
-  API needed, just a new eager call site for an existing one.
-  - **Performance note**: this is one `pos2str` engine call per row per
-    attribute. Cheap per-call, but serial-per-row could add up for large
-    result sets - use a `TaskGroup` to fan the per-row calls out
-    concurrently within `buildRows` rather than a plain sequential
-    `for`/`await` loop. Revisit if still slow once 6.11 (pagination) caps
-    how many rows are ever materialized at once.
-- New fixed-width table column (e.g. "Doc", between `group` and `left`)
-  showing `structuralAttributeValues[the configured attribute]` — a
-  separate column, not mixed into `KWICFormatter`'s per-token segments,
-  since this value is constant for the whole line, not per-token. Text
-  color: the new `structuralAttributeColor` setting from 6.5.
-- `AttributeDisplayPopoverController` gains a second section, "Structural"
-  (checkboxes, no Inline/Hover split needed - just "shown as a column" on
-  or off), sourced from `Corpus.info().structures`' attributes rather than
-  `Corpus.info().attributes`.
+  "Document Info…") - no new engine API needed, just a new eager call
+  site for an existing one.
+  - **Performance**: `buildRows` now fans *every* row's `linegroup(at:)`
+    lookup and structural-attribute lookup out concurrently via a
+    `withTaskGroup`, rather than one `await` per row in sequence (which is
+    what it did before this change, for `linegroup` alone) - a real,
+    incidental improvement to existing behavior, not just new-feature
+    scaffolding. Revisit if still slow once 6.11 (pagination) caps how
+    many rows are ever materialized at once.
+- New fixed-width "Doc" table column, between `group` and `left`
+  (`resizingMask = .userResizingMask`, no `.autoresizingMask` - stays out
+  of 6.1's Left/Right symmetric-growth centering), hidden entirely
+  (`NSTableColumn.isHidden`) whenever `structuralAttributeToShow` is nil
+  rather than shown-but-blank. New `KWICCellView.configureStructuralInfo(_:)`
+  - a small secondary-style label, same spirit as the existing
+  `configureGroup` badge, not routed through `KWICFormatter`'s per-token
+  segment machinery since the value is constant for the whole line.
+  Color is `.secondaryLabelColor` for now; 6.5 will make it a real
+  setting.
+- `AttributeDisplayPopoverController` gained a second section,
+  "Structural" - a radio-button group (`NSButton(radioButtonWithTitle:)`),
+  one per fully-qualified name (e.g. "doc.title") plus "None", sourced
+  from `Corpus.info().structures` rather than `Corpus.info().attributes`.
+  `onApply`'s signature grew a third `String?` parameter for the
+  selected structural attribute. **Revised after a second manual test**
+  (screenshot showed more than one button stayable-checked at once):
+  AppKit's automatic same-superview radio grouping didn't actually kick
+  in with `target: nil, action: nil` (grouping most likely requires a
+  shared, non-nil target/action to recognize siblings as one group) - so
+  exclusivity is now managed explicitly, in a new
+  `structuralRadioTapped(_:)` action shared by every button in the
+  group, which turns every other button in `structuralRadioButtons` off
+  whenever one is tapped.
 
 **Key files**: `ConcordanceDocument.swift`, `ConcordanceViewController.swift`
-(new column in `setUpTableView`/`makeCell`), `AttributeDisplayPopoverController.swift`.
+(new "Doc" column in `setUpTableView`/`makeCell`, `updateStructuralColumnVisibility`),
+`AttributeDisplayPopoverController.swift`, `KWICCellView.swift`.
 
-**Verify**: unit test on the row-building logic (mock corpus, assert the
-column value matches the enclosing doc's attribute); manual test with the
-dev/syn2025 corpus's `doc.title` or `doc.author`.
+**Not added**: an automated test for the row-building wiring itself - the
+underlying engine call (`structuralAttributeValue`) already has real
+coverage from Phase 5.4's `CorpusInfoTests`, and this target
+(`CorporaTests`) has no existing precedent for spinning up a real
+compiled fixture corpus of its own (unlike `ManateeKitTests`'
+`TestCorpusFixture`) - same "one-shot, not logic worth isolating"
+reasoning Phase 5.4 used for `structuralInfo(at:)`'s own AppKit wiring.
+
+Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
+`RunAllTests` → 32/32 `CorporaTests` passing (unaffected). Not yet
+manually click-tested - next step: enable "doc.title" (or `.author`) in
+the Attributes popover's new Structural section on a corpus that has one,
+confirm the "Doc" column appears with the right value per row and stays
+hidden when nothing's checked.
 
 ### 6.3 — KWIC / Sentence view switch (not started)
 

@@ -5,6 +5,17 @@ struct ConcordanceRow {
     let id: Int
     let line: KWICLine
     let group: Int
+    /// The value of `ConcordanceDocument.structuralAttributeToShow` for
+    /// this line's enclosing structure - nil if that setting is itself
+    /// nil, or if this line's structure has no value for it.
+    let structuralAttributeValue: String?
+
+    init(id: Int, line: KWICLine, group: Int, structuralAttributeValue: String? = nil) {
+        self.id = id
+        self.line = line
+        self.group = group
+        self.structuralAttributeValue = structuralAttributeValue
+    }
 }
 
 /// The persisted content is the query, not the materialized rows - stable
@@ -30,6 +41,14 @@ final class ConcordanceDocument: NSDocument {
     /// feature existed.
     var inlineAttributes: [String] = []
     var tooltipAttributes: [String] = []
+    /// A structural attribute (e.g. "doc.title") shown as its own column
+    /// on every row - constant for the whole line (one enclosing document
+    /// per hit), unlike `inlineAttributes`/`tooltipAttributes` which vary
+    /// per token, so this doesn't feed `attributesToFetch`/`KWICFormatter`
+    /// at all - it's fetched separately per row in `buildRows`. There's
+    /// only ever one "Doc" column, so this is a single value, not a list
+    /// - see `AttributeDisplayPopoverController`'s radio-button choice.
+    var structuralAttributeToShow: String?
 
     /// The deduplicated union of both lists, in first-seen order - what
     /// actually needs fetching from the engine, since both lists need real
@@ -259,6 +278,14 @@ final class ConcordanceDocument: NSDocument {
         refetchDisplay()
     }
 
+    /// Which structural attribute (e.g. "doc.title"), if any, to show as
+    /// its own column on every row - same "pure display setting" status
+    /// as `setContext`/`setAttributeDisplay`.
+    func setStructuralAttributeDisplay(_ attribute: String?) {
+        structuralAttributeToShow = attribute
+        refetchDisplay()
+    }
+
     /// Re-fetches KWIC lines from the existing `liveConcordance` handle
     /// using the document's *current* leftContext/rightContext/kwicAttr/
     /// attributesToFetch - cheaper than `replay()`, which would reopen the
@@ -274,16 +301,19 @@ final class ConcordanceDocument: NSDocument {
         let rightContext = rightContext
         let kwicAttr = kwicAttr
         let secondaryAttributes = attributesToFetch
+        let structuralAttributeToShow = structuralAttributeToShow
         let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
         currentReplayTask = Task { @MainActor in
             await previousReplay?.value
-            guard let live = liveConcordance else { return }
+            guard let live = liveConcordance, let queryCorpus else { return }
             do {
                 let lines = try await live.kwicLines(
                     leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
                     secondaryAttributes: secondaryAttributes)
-                rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
+                rows = await Self.buildRows(
+                    from: lines, live: live, descendingSort: descendingSort,
+                    queryCorpus: queryCorpus, structuralAttributeToShow: structuralAttributeToShow)
             } catch {
                 status = "\(error)"
             }
@@ -303,6 +333,7 @@ final class ConcordanceDocument: NSDocument {
         let rightContext = rightContext
         let kwicAttr = kwicAttr
         let secondaryAttributes = attributesToFetch
+        let structuralAttributeToShow = structuralAttributeToShow
         let operations = operations
         let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
@@ -326,7 +357,9 @@ final class ConcordanceDocument: NSDocument {
                 let lines = try await live.kwicLines(
                     leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
                     secondaryAttributes: secondaryAttributes)
-                rows = await Self.buildRows(from: lines, live: live, descendingSort: descendingSort)
+                rows = await Self.buildRows(
+                    from: lines, live: live, descendingSort: descendingSort,
+                    queryCorpus: queryCorpus, structuralAttributeToShow: structuralAttributeToShow)
                 liveConcordance = live
                 self.queryCorpus = queryCorpus
                 let corpusDescription: String
@@ -364,19 +397,42 @@ final class ConcordanceDocument: NSDocument {
     /// `ConcordanceOperation.sort`'s doc comment), so descending is purely a
     /// display-order flip; `id` (== the row's index, per
     /// `ConcordanceViewController.makeCell`) is reassigned to match the
-    /// flipped positions.
-    private static func buildRows(from lines: [KWICLine], live: LiveConcordance, descendingSort: Bool) async -> [ConcordanceRow] {
-        var newRows: [ConcordanceRow] = []
-        newRows.reserveCapacity(lines.count)
-        for (offset, line) in lines.enumerated() {
-            newRows.append(ConcordanceRow(id: offset, line: line, group: await live.linegroup(at: offset)))
-        }
-        if descendingSort {
-            newRows = newRows.reversed().enumerated().map { i, row in
-                ConcordanceRow(id: i, line: row.line, group: row.group)
+    /// flipped positions. Fans every row's `linegroup(at:)` lookup (and,
+    /// if `structuralAttributeToShow` isn't nil, its structural attribute
+    /// lookup - see `ConcordanceRow.structuralAttributeValue`) out
+    /// concurrently via a `TaskGroup`, rather than one `await` per row in
+    /// sequence - both are per-row engine round trips, so this matters
+    /// more the more rows there are.
+    private static func buildRows(
+        from lines: [KWICLine], live: LiveConcordance, descendingSort: Bool,
+        queryCorpus: Corpus, structuralAttributeToShow: String?
+    ) async -> [ConcordanceRow] {
+        var newRows = [ConcordanceRow?](repeating: nil, count: lines.count)
+        await withTaskGroup(of: (Int, ConcordanceRow).self) { group in
+            for (offset, line) in lines.enumerated() {
+                group.addTask {
+                    let lineGroup = await live.linegroup(at: offset)
+                    var structuralValue: String?
+                    if let attribute = structuralAttributeToShow,
+                       let value = try? await queryCorpus.structuralAttributeValue(at: line.position, attribute: attribute),
+                       !value.isEmpty {
+                        structuralValue = value
+                    }
+                    return (offset, ConcordanceRow(
+                        id: offset, line: line, group: lineGroup, structuralAttributeValue: structuralValue))
+                }
+            }
+            for await (offset, row) in group {
+                newRows[offset] = row
             }
         }
-        return newRows
+        var result = newRows.compactMap { $0 }
+        if descendingSort {
+            result = result.reversed().enumerated().map { i, row in
+                ConcordanceRow(id: i, line: row.line, group: row.group, structuralAttributeValue: row.structuralAttributeValue)
+            }
+        }
+        return result
     }
 
     // MARK: - Analysis (collocations, frequency distributions)
@@ -447,6 +503,11 @@ final class ConcordanceDocument: NSDocument {
         // with no custom init needed.
         var inlineAttributes: [String]?
         var tooltipAttributes: [String]?
+        // Already optional at the live-property level too (nil == "None"
+        // is a real, meaningful value here, not just "unset") - Codable's
+        // synthesized decoding already treats a missing key as nil for an
+        // Optional property, so no `?? []`-style fallback is needed.
+        var structuralAttributeToShow: String?
         var operations: [ConcordanceOperation]
     }
 
@@ -455,6 +516,7 @@ final class ConcordanceDocument: NSDocument {
             corpusName: corpusName, subcorpusPath: subcorpusPath, initialQuery: initialQuery,
             leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
             inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes,
+            structuralAttributeToShow: structuralAttributeToShow,
             operations: operations)
         return try JSONEncoder().encode(state)
     }
@@ -469,6 +531,7 @@ final class ConcordanceDocument: NSDocument {
         kwicAttr = state.kwicAttr
         inlineAttributes = state.inlineAttributes ?? []
         tooltipAttributes = state.tooltipAttributes ?? []
+        structuralAttributeToShow = state.structuralAttributeToShow
         operations = state.operations
     }
 }
