@@ -30,6 +30,7 @@
 		62F2B2241409CF37E39DCD16 /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DAABABBF8E66299CCC4CE24 /* GeneralSettingsViewController.swift */; };
 		67DFE992A86BA395057F5CB6 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25829CE0B1184479409C9C1F /* SettingsWindowController.swift */; };
 		6E56D19B4B2D73E51D47847A /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196F3E82C872642B3C56905B /* SortableTableView.swift */; };
+		7024DF7B3613BE44930F30A8 /* ConcordanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942CAFC23DA548B292E0CC3E /* ConcordanceSettingsViewController.swift */; };
 		78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777B79F44224A872C8862850 /* ConcordanceOperation.swift */; };
 		80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636CBF6D7F4F39CC37EB546 /* ConcordanceDocument.swift */; };
 		817C5C05F371B7CE725642FE /* QueryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */; };
@@ -84,6 +85,7 @@
 		88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStoreTests.swift; sourceTree = "<group>"; };
 		91009E795461A30103DE13D6 /* CorpusImportSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusImportSheetController.swift; sourceTree = "<group>"; };
 		91FB24BF00ABBF28FB9302F5 /* CollocationSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationSheetController.swift; sourceTree = "<group>"; };
+		942CAFC23DA548B292E0CC3E /* ConcordanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceSettingsViewController.swift; sourceTree = "<group>"; };
 		951961934552F0583BFE9387 /* HistoryPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverController.swift; sourceTree = "<group>"; };
 		9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
 		9F74D8DE2F0CA6B253A45B4C /* FrequencySheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencySheetController.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			children = (
 				9E2520C7B71B427C2E99AEEB /* AppearanceSettingsViewController.swift */,
 				2BEC6F15BA4380A2D97DEDD5 /* AppSettings.swift */,
+				942CAFC23DA548B292E0CC3E /* ConcordanceSettingsViewController.swift */,
 				EA2743F9CD0004FB8FE8CDBE /* CorporaSettingsViewController.swift */,
 				3370C232287251C1FA430377 /* CorpusResidencyManager.swift */,
 				1DAABABBF8E66299CCC4CE24 /* GeneralSettingsViewController.swift */,
@@ -333,6 +336,7 @@
 				80B2251EC1467BB5DB716934 /* ConcordanceDocument.swift in Sources */,
 				8496EE9D90A3E6469FD4AAC0 /* ConcordanceExporter.swift in Sources */,
 				78F4CDCF71610EABE9486B5C /* ConcordanceOperation.swift in Sources */,
+				7024DF7B3613BE44930F30A8 /* ConcordanceSettingsViewController.swift in Sources */,
 				E2A2F41A47453E237F323A14 /* ConcordanceViewController.swift in Sources */,
 				39910E9FAD2844CEB020E76C /* ConcordanceWindowController.swift in Sources */,
 				2A23AA5973C8ABB13E8F6A44 /* ContextPopoverController.swift in Sources */,

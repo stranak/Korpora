@@ -98,12 +98,25 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
         case ItemID.viewMode:
-            let segmented = NSSegmentedControl(
-                labels: ["KWIC", "Sentence"], trackingMode: .selectOne,
+            // "text.aligncenter" (centered lines) reads as "the match
+            // centered in a fixed window" for KWIC; "text.alignleft"
+            // (left-aligned lines, i.e. a normal paragraph) reads as "flow
+            // like ordinary sentence text" for Sentence - also matches
+            // the Concordance settings pane's own icon for this same
+            // choice (`SettingsWindowController.Pane.concordance`).
+            let segmented = PerSegmentToolTipSegmentedControl(
+                images: [
+                    NSImage(systemSymbolName: "text.aligncenter", accessibilityDescription: "KWIC")!,
+                    NSImage(systemSymbolName: "text.alignleft", accessibilityDescription: "Sentence")!,
+                ],
+                trackingMode: .selectOne,
                 target: viewController, action: #selector(ConcordanceViewController.viewModeChanged(_:)))
             segmented.segmentStyle = .texturedRounded
             segmented.selectedSegment = viewController.viewMode == .sentence ? 1 : 0
-            segmented.toolTip = "KWIC: fixed-width context. Sentence: expand to the enclosing sentence."
+            segmented.segmentToolTips = [
+                "KWIC: fixed-width context, same number of tokens left/right on every line.",
+                "Sentence: expand context to the enclosing sentence.",
+            ]
             return makeItem(identifier, label: "View", view: segmented)
         case ItemID.context:
             // Disabled in Sentence view - see `updateToolbarState` - since
@@ -187,5 +200,56 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         shuffleButton?.isEnabled = !hasLineGroups
         sampleButton?.isEnabled = !hasLineGroups
         contextButton?.isEnabled = viewMode != .sentence
+    }
+}
+
+/// `NSSegmentedCell.setToolTip(_:forSegment:)` exists but Apple's own docs
+/// say plainly "Tooltips are currently not displayed" - confirmed true
+/// here too (a single whole-control `.toolTip` showed the same combined
+/// text regardless of which segment was hovered, which read as confusing
+/// once there were two segments with distinct meanings). Tracks the mouse
+/// instead and swaps the control's own `toolTip` for whichever segment
+/// it's over - same technique already used for per-token KWIC tooltips
+/// (see `KWICCellView`), just applied to a control that's created once
+/// and kept for the toolbar's lifetime rather than a table cell that's
+/// constantly recreated/reused, which was the likely cause of that
+/// mechanism's own flakiness there.
+private final class PerSegmentToolTipSegmentedControl: NSSegmentedControl {
+    var segmentToolTips: [String] = []
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        updateToolTip(for: event)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        updateToolTip(for: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        toolTip = nil
+    }
+
+    private func updateToolTip(for event: NSEvent) {
+        guard segmentCount > 0 else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let segmentWidth = bounds.width / CGFloat(segmentCount)
+        let index = min(max(Int(point.x / segmentWidth), 0), segmentCount - 1)
+        toolTip = segmentToolTips.indices.contains(index) ? segmentToolTips[index] : nil
     }
 }

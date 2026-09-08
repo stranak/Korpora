@@ -2383,38 +2383,85 @@ corpus with real multi-token sentences and confirm each line's context
 stops at sentence boundaries, and that the Context button visibly
 disables/re-enables with the switch.
 
-### 6.4 — Concordance settings tab (behavioral defaults) (not started)
+### 6.4 — Concordance settings tab (behavioral defaults) (done)
 
-New `Settings/ConcordanceSettingsViewController.swift`, registered in
-`SettingsWindowController`'s `Pane` enum (`General`/`Appearance`/`Corpora`
-today - adding a case is the entire registration step, confirmed via
-Explore agent). Holds **global defaults for brand-new concordance
-documents** (not per-document overrides, which stay on the toolbar
-popovers) - `AppSettings.minimumFreeMemoryAfterResidency`'s getter/setter
-shape is the precedent for each new property.
+New `Settings/ConcordanceSettingsViewController.swift`, registered as a
+4th case in `SettingsWindowController`'s `Pane` enum (`General`/
+`Appearance`/`Corpora` before - adding a case was the entire registration
+step, exactly as expected). Holds **global defaults for brand-new
+concordance documents** (not per-document overrides, which stay on the
+toolbar popovers) - `AppSettings.minimumFreeMemoryAfterResidency`'s
+getter/setter shape was the precedent followed for each new property.
 
 **New `AppSettings` properties** (all plain `UserDefaults`-backed,
 following the existing `Key` enum + computed-property pattern):
 - `defaultLeftContext: Int` / `defaultRightContext: Int` (default 10 each)
-- `defaultViewMode: String` ("kwic" / "sentence", default "kwic")
-- `defaultExtendedContextTokens: Int` (default e.g. 50 - feeds 6.6)
+- `defaultViewMode: ConcordanceViewMode` (default `.kwic` - stored as the
+  enum's own `rawValue` string, not a separate hand-rolled "kwic"/
+  "sentence" string as originally sketched, since the real enum from 6.3
+  already exists and round-trips through `RawRepresentable` for free)
+- `defaultExtendedContextTokens: Int` (default 50 - feeds 6.6)
 
 `ConcordanceDocument`'s hardcoded property-declaration defaults
-(`leftContext = "-10"` etc., `ConcordanceDocument.swift:22-24`) change to
-read `AppSettings.shared` at declaration time (e.g.
+(`leftContext = "-10"`, `rightContext = "10"`, `viewMode: ConcordanceViewMode = .kwic`)
+now read `AppSettings.shared` at declaration time instead (e.g.
 `var leftContext = "-\(AppSettings.shared.defaultLeftContext)"`) - this
-runs once per `ConcordanceDocument` instance at creation, which is
-correct for both the brand-new-document path (nothing currently sets
-these, per Explore agent's finding) and the reopen-a-saved-document path
-(`read(from:ofType:)` immediately overwrites them anyway).
+runs once per `ConcordanceDocument` instance at creation, correct for
+both the brand-new-document path (nothing else was setting these) and
+the reopen-a-saved-document path (`read(from:)` immediately overwrites
+them anyway).
+
+New pane's UI: default context width (two small integer fields, same
+plain-`NSTextField` style as the existing Context popover), the default
+KWIC/Sentence view (an `NSSegmentedControl`, same control as the
+concordance window's own toolbar switch), and the default extended-
+context token count (feeds 6.6, not yet built, but grouped here since
+it's the same category of setting) - saved on end-of-editing
+(`NSTextFieldDelegate.controlTextDidEndEditing`) for the text fields,
+immediately on click for the segmented control.
 
 **Key files**: new `ConcordanceSettingsViewController.swift`,
 `SettingsWindowController.swift`, `AppSettings.swift`,
 `ConcordanceDocument.swift`.
 
-**Verify**: no engine involvement; `BuildProject`/`RunAllTests`, manual
-test that changing a default in Settings affects the *next* new
-concordance window, not already-open ones.
+Verified: `xcodegen generate` (picked up the new file) then
+`BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**; `RunAllTests`
+→ 32/32 `CorporaTests` passing (unaffected - no test exercises Settings
+UI). Not yet manually click-tested - next step: change each default in
+the new Concordance settings pane, confirm the *next* new concordance
+window picks them up while an already-open one is unaffected.
+
+**Follow-up after manual testing**: the user liked the Concordance pane's
+own toolbar icon and asked for the concordance window's "KWIC | Sentence"
+toolbar switch (6.3) to use icons matching it, rather than text labels -
+`ConcordanceWindowController`'s segmented control now uses
+`"text.aligncenter"` (centered lines - reads as "the match centered in a
+fixed window") for KWIC and `"text.alignleft"` (left-aligned lines, i.e.
+a normal paragraph) for Sentence, the latter matching
+`SettingsWindowController.Pane.concordance`'s own icon. The Settings
+pane's own segmented control was deliberately left as text labels - the
+ask was specifically about the toolbar, and text reads more clearly in a
+persistent settings panel than an icon-only one would.
+
+**Second follow-up**: the icon-only segmented control's single whole-control
+`.toolTip` showed the same combined "KWIC: ... Sentence: ..." text
+regardless of which icon was actually hovered - confusing with two
+distinct meanings now hidden behind icons rather than self-explanatory
+text labels. `NSSegmentedCell.setToolTip(_:forSegment:)` exists but
+Apple's own docs say plainly "Tooltips are currently not displayed," so
+that's not usable. New private `PerSegmentToolTipSegmentedControl`
+(`ConcordanceWindowController.swift`) tracks the mouse
+(`NSTrackingArea`+`mouseMoved`) and swaps the control's own `toolTip` for
+whichever segment it's over - the same technique already used for
+per-token KWIC tooltips (`KWICCellView`, Phase 5.3), which had an
+unresolved, never-root-caused "needs one app-switch after launch before
+tooltips appear" quirk logged as non-blocking. Applying the same
+mechanism here carries some risk of the same quirk recurring, but the
+suspected contributing factor there (a table *cell* view being
+constantly recreated/reused by the diffable data source) doesn't apply
+to a toolbar item's view, which is created once and kept for the
+toolbar's lifetime - worth watching for during manual testing, not
+assumed safe.
 
 ### 6.5 — Appearance settings: concordance styling (fonts + colors) (not started)
 

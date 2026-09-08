@@ -12,6 +12,10 @@ final class AppSettings {
         static let resultsFontSize = "resultsFontSize"
         static let compiledCorporaDirectory = "compiledCorporaDirectory"
         static let minimumFreeMemoryAfterResidency = "minimumFreeMemoryAfterResidency"
+        static let defaultLeftContext = "defaultLeftContext"
+        static let defaultRightContext = "defaultRightContext"
+        static let defaultViewMode = "defaultViewMode"
+        static let defaultExtendedContextTokens = "defaultExtendedContextTokens"
     }
 
     private let defaults: UserDefaults
@@ -82,6 +86,56 @@ final class AppSettings {
         }
         set {
             defaults.set(Int(newValue), forKey: Key.minimumFreeMemoryAfterResidency)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    /// Seeds `ConcordanceDocument.leftContext`/`rightContext` for a
+    /// brand-new document - see `ConcordanceDocument`'s property
+    /// declarations, which read these at instance-creation time.
+    var defaultLeftContext: Int {
+        get {
+            let value = defaults.integer(forKey: Key.defaultLeftContext)
+            return value > 0 ? value : 10
+        }
+        set {
+            defaults.set(newValue, forKey: Key.defaultLeftContext)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    var defaultRightContext: Int {
+        get {
+            let value = defaults.integer(forKey: Key.defaultRightContext)
+            return value > 0 ? value : 10
+        }
+        set {
+            defaults.set(newValue, forKey: Key.defaultRightContext)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    /// Seeds `ConcordanceDocument.viewMode` for a brand-new document -
+    /// see `ConcordanceViewMode`.
+    var defaultViewMode: ConcordanceViewMode {
+        get { defaults.string(forKey: Key.defaultViewMode).flatMap(ConcordanceViewMode.init(rawValue:)) ?? .kwic }
+        set {
+            defaults.set(newValue.rawValue, forKey: Key.defaultViewMode)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    /// How many tokens of context each side to fetch for the "Extended
+    /// Context…" row action (Phase 6.6) by default. Defaults to 50 -
+    /// generous enough to see well past a truncated Left/Right cell
+    /// without being a heavy fetch.
+    var defaultExtendedContextTokens: Int {
+        get {
+            let value = defaults.integer(forKey: Key.defaultExtendedContextTokens)
+            return value > 0 ? value : 50
+        }
+        set {
+            defaults.set(newValue, forKey: Key.defaultExtendedContextTokens)
             NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
         }
     }

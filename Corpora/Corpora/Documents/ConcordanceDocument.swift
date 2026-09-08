@@ -41,8 +41,12 @@ final class ConcordanceDocument: NSDocument {
     /// whole corpus, or nil to query `corpusName` directly.
     var subcorpusPath: String?
     var initialQuery: String = ""
-    var leftContext = "-10"
-    var rightContext = "10"
+    // Defaults come from AppSettings (Phase 6.4's Concordance settings
+    // tab) at instance-creation time - correct for both a brand-new
+    // document (nothing else sets these beforehand) and a reopened saved
+    // one (`read(from:)` immediately overwrites them anyway).
+    var leftContext = "-\(AppSettings.shared.defaultLeftContext)"
+    var rightContext = "\(AppSettings.shared.defaultRightContext)"
     /// See `ConcordanceViewMode`. `leftContext`/`rightContext` themselves
     /// are left untouched by this - `effectiveLeftContext`/
     /// `.effectiveRightContext` (what's actually sent to the engine)
@@ -50,7 +54,7 @@ final class ConcordanceDocument: NSDocument {
     /// switching back to `.kwic` trivially restores whatever numeric
     /// width was last set via `setContext`, with no separate "remembered
     /// width" state needed.
-    private(set) var viewMode: ConcordanceViewMode = .kwic
+    private(set) var viewMode: ConcordanceViewMode = AppSettings.shared.defaultViewMode
     var kwicAttr = "word"
     /// Additional positional attributes (e.g. "lemma", "tag") shown
     /// alongside `kwicAttr` per token - see `KWICFormatter`. Independent,
