@@ -24,7 +24,7 @@ final class ManateeKitTests: XCTestCase {
 
     func testCorpusSizeMatchesTokenCount() async throws {
         let corpus = try await Corpus(name: corpusName)
-        let size = await corpus.size
+        let size = try await corpus.size
         XCTAssertEqual(size, 17)  // 5 + 4 + 4 + 4 tokens across the 4 sentences
     }
 

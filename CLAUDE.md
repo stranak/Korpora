@@ -1,13 +1,19 @@
 # mac-corpora
 
 `ManateeKit` wraps `manatee-open` (the corpus-query engine behind KonText).
-`Corpora` is the native AppKit macOS app built on top of it.
+`Korpora` is the native AppKit macOS app built on top of it. It was renamed
+from Corpora to Korpora, directories included, so the project lives at
+`Korpora/Korpora.xcodeproj` with sources in `Korpora/Korpora/` and tests in
+`Korpora/KorporaTests/`. Every "Corpora" that meant *the app* is gone;
+"Corpora" as the plural of *corpus* — the Settings tab,
+`CorporaSettingsViewController`, `compiledCorporaDirectory` — is correct
+and should stay.
 
 ## Project plan
 
 `docs/project-plan.md` is the living status/handoff document for this
 project — read it before starting non-trivial work, and update it as part
-of the work rather than after. It covers `ManateeKit`, `Corpora`, and the
+of the work rather than after. It covers `ManateeKit`, `Korpora`, and the
 `manatee-open` fork.
 
 Project plans and design notes belong in `docs/` inside this repo. Never
@@ -20,14 +26,14 @@ them by repo-relative path.
 - **Terminal Claude Code sessions**: engine-layer work (`ManateeKit`/
   `CManatee`/`manatee-open`), tests, AppKit *code* changes, git/PR work,
   planning.
-- **Xcode's built-in Claude agent**: building/running `Corpora.app`,
+- **Xcode's built-in Claude agent**: building/running `Korpora.app`,
   visual inspection, interactive click-through testing, iterating on
   layout/visual polish — via its `BuildProject`/`RunAllTests`/
   `DeviceInteraction*` tools.
 
 ## Repos
 
-- `ManateeKit/`, `Corpora/`, `scripts/` — this repo
+- `ManateeKit/`, `Korpora/`, `scripts/` — this repo
   (`github.com/stranak/mac-corpora`).
 - `manatee-open/` — a separate git checkout, sibling to this repo, not
   nested/submoduled. Must be `stranak/manatee-open`'s

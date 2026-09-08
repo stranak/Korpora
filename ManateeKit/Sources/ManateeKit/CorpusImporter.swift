@@ -64,7 +64,7 @@ public enum CorpusImportError: Error, CustomStringConvertible {
 
 /// Compiles a vertical-format corpus file into a real, queryable Manatee
 /// corpus under `CompiledCorpusStore`, driving the same `encodevert` tool
-/// `TestCorpusFixture`/`Corpora/scripts/build-dev-corpus.sh` already shell
+/// `TestCorpusFixture`/`Korpora/scripts/build-dev-corpus.sh` already shell
 /// out to by hand - the point of this type is to make that a real app
 /// feature (pick a file, edit a pre-filled schema, compile) instead of a
 /// script someone has to run themselves.

@@ -105,8 +105,22 @@ public actor Corpus {
 
     /// Token count - for a subcorpus (see `openSubcorpus`), this is the
     /// subcorpus's own restricted size, not the parent corpus's full size.
+    ///
+    /// Throwing despite reading like a plain accessor: this is the first call
+    /// that touches the corpus's *compiled data* rather than its registry
+    /// file, so it's where a corpus that opened perfectly well turns out to
+    /// be unreadable - a registry `PATH` is an absolute path, and it may no
+    /// longer resolve (a moved directory, an unmounted volume, a deleted
+    /// `.data` sibling). See `mtc_corpus_size`'s own doc comment.
     public var size: Int {
-        Int(mtc_corpus_size(handle))
+        get throws {
+            var error: UnsafeMutablePointer<CChar>?
+            let size = mtc_corpus_size(handle, &error)
+            guard size >= 0 else {
+                throw ManateeError.failure(consumeError(error))
+            }
+            return Int(size)
+        }
     }
 
     /// One-shot convenience over `LiveConcordance` for callers that just want
@@ -120,9 +134,16 @@ public actor Corpus {
 
     /// The registry metadata parsed when this corpus was opened - positional
     /// attributes and structures/structural-attributes, for building a
-    /// corpus browser or a CQL-writing aid. Cheap: no engine work, just
-    /// walking the already-parsed `CorpInfo` tree (see `mtcbridge.cc`).
-    public func info() -> CorpusInfo {
+    /// corpus browser or a CQL-writing aid.
+    ///
+    /// The attribute/structure walk itself is cheap (no engine work, just the
+    /// already-parsed `CorpInfo` tree - see `mtcbridge.cc`), but `sizeTokens`
+    /// comes from `size`, which does open compiled data off disk and can
+    /// therefore fail. That mismatch used to be masked: `info()` was
+    /// non-throwing and this comment claimed the whole call did no engine
+    /// work, so a corpus with an unresolvable registry `PATH` aborted the
+    /// process from inside a getter instead of surfacing an error.
+    public func info() throws -> CorpusInfo {
         var attributes: [String] = []
         for i in 0..<mtc_corpus_attr_count(handle) {
             guard let cstr = mtc_corpus_attr_name(handle, i) else { continue }
@@ -145,7 +166,7 @@ public actor Corpus {
             structures.append(StructureInfo(name: structName, attributes: structAttributes))
         }
 
-        return CorpusInfo(name: name, sizeTokens: size, attributes: attributes, structures: structures)
+        return CorpusInfo(name: name, sizeTokens: try size, attributes: attributes, structures: structures)
     }
 
     /// Creates a subcorpus restricted to `query`'s hits within `structure`
@@ -174,6 +195,25 @@ public actor Corpus {
     public func structuralAttributeValue(at position: Int, attribute: String) throws -> String {
         var error: UnsafeMutablePointer<CChar>?
         guard let cstr = mtc_corpus_get_struct_attr(handle, Int64(position), attribute, &error) else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        defer { mtc_free_string(cstr) }
+        return String(cString: cstr)
+    }
+
+    /// Space-joined values of positional attribute `attribute` (e.g.
+    /// "word") over corpus-wide token positions `[fromPosition,
+    /// toPosition)` - "Extended Context"'s primitive (Phase 6.6): given a
+    /// hit's own position (`KWICLine.position`) and match length, the
+    /// caller asks for a much wider window around it directly, with no
+    /// live query/concordance needed at all - see
+    /// `mtc_corpus_positional_attr_range`'s own doc comment. Silently
+    /// clamped to the corpus's own bounds by the bridge - a hit near the
+    /// very start/end of the corpus is expected to ask for a range that
+    /// runs off one side.
+    public func positionalAttributeRange(from fromPosition: Int, to toPosition: Int, attribute: String) throws -> String {
+        var error: UnsafeMutablePointer<CChar>?
+        guard let cstr = mtc_corpus_positional_attr_range(handle, Int64(fromPosition), Int64(toPosition), attribute, &error) else {
             throw ManateeError.failure(consumeError(error))
         }
         defer { mtc_free_string(cstr) }

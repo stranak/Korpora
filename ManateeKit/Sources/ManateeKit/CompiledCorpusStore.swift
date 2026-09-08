@@ -11,14 +11,14 @@ import Foundation
 /// skips directories, so this doesn't need to be hidden to avoid being
 /// mistaken for a corpus) - everything under `baseDirectory` must stay
 /// Finder-browsable, per this project's own convention (see
-/// `Corpora/DevCorpus/`, deliberately not `.devcorpus/`): a user should never
+/// `Korpora/DevCorpus/`, deliberately not `.devcorpus/`): a user should never
 /// have to know to press Cmd-Shift-. to find their own compiled corpus data,
 /// especially when Settings itself names this exact directory as "where
 /// compiled corpora live."
 public enum CompiledCorpusStore {
-    private static let environmentKey = "CORPORA_COMPILED_CORPORA_DIRECTORY"
+    private static let environmentKey = "KORPORA_COMPILED_CORPORA_DIRECTORY"
 
-    /// Reads a `Corpora`-app-set environment variable (mirrors how
+    /// Reads a `Korpora`-app-set environment variable (mirrors how
     /// `CorpusRegistry` reads `MANATEE_REGISTRY` fresh on every call, rather
     /// than this package owning persisted state itself - it has no
     /// UserDefaults dependency) with a sensible default so
@@ -28,7 +28,7 @@ public enum CompiledCorpusStore {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return appSupport.appendingPathComponent("Corpora/CompiledCorpora", isDirectory: true)
+        return appSupport.appendingPathComponent("Korpora/CompiledCorpora", isDirectory: true)
     }
 
     /// The registry file itself - must sit directly under `baseDirectory`

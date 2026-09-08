@@ -1,10 +1,83 @@
-# Corpora: native AppKit corpus concordancer — status & handoff
+# Korpora: native AppKit corpus concordancer — status & handoff
 
 This is the living status/handoff document for this project. It lives at
 `docs/project-plan.md` in the repo (not `~/.claude/plans/` or anywhere
 outside the checkout) so any session — Terminal or Xcode — can read and
 update it, and so code comments can cite it by a stable path. See the root
 `CLAUDE.md` for the convention.
+
+**Naming (2026-09-08)**: the Xcode project/app was renamed from Corpora to
+Korpora on GitHub — product name, scheme, target names, `NSDocumentClass`/
+UTI, and the `CorporaDocumentController` class (→
+`KorporaDocumentController`) all follow. In a second pass the same day the
+app directory followed too (`Corpora/` → `Korpora/`), as did the
+Application Support directory and the compiled-corpora environment
+variable:
+
+| Was | Is |
+| --- | --- |
+| `Corpora/Korpora.xcodeproj` | `Korpora/Korpora.xcodeproj` |
+| `Corpora/Corpora/` (app sources) | `Korpora/Korpora/` |
+| `Corpora/CorporaTests/` | `Korpora/KorporaTests/` |
+| `CORPORA_COMPILED_CORPORA_DIRECTORY` | `KORPORA_COMPILED_CORPORA_DIRECTORY` |
+| `~/Library/Application Support/Corpora/` | `~/Library/Application Support/Korpora/` |
+
+So every "Corpora" that meant *the app* is now "Korpora". "Corpora" as the
+plural of *corpus* is correct and stays — the Settings tab,
+`CorporaSettingsViewController`, `AppSettings.compiledCorporaDirectory`,
+`reloadCorpora()`. `project.yml` points `sources:`/`INFOPLIST_FILE`/
+`CODE_SIGN_ENTITLEMENTS` at the renamed directories; re-run `xcodegen
+generate` in `Korpora/` after any further move.
+
+Two things broke on the directory rename, and both are *baked-in absolute
+paths* — the one category no source-level rename can catch:
+
+- `Korpora/DevCorpus/registry/testcorp` holds an absolute `PATH` written at
+  generation time. After the move it pointed at the old directory and
+  Manatee threw while opening the lexicon. Fix: re-run
+  `Korpora/scripts/build-dev-corpus.sh` (it derives paths from its own
+  location, and is safe to re-run).
+- Registry files under Application Support have the same baked-in `PATH`,
+  so moving that directory is not just a `mv` — each registry file's `PATH`
+  has to be rewritten too. (Their `VERTICAL` lines are provenance only;
+  a stale one doesn't stop the corpus from opening.)
+
+That throw should have been a corpus-picker error message, but it
+**`abort()`ed the whole app** instead — and took the test host with it, so
+all 35 `KorporaTests` reported "not run" rather than failing. Root cause:
+`mtc_corpus_size` had no `try`/`catch`, so a C++ exception unwound across
+`mtcbridge.cc`'s `extern "C"` boundary, which is UB and in practice
+`std::terminate()`. Fixed 2026-09-08:
+
+- **`mtcbridge.cc` now states the boundary rule as an invariant**: no
+  exception may cross it. Entry points either take a `char **error` and
+  report via `set_error`, or wrap their body in the new `guard`/
+  `guard_void` helpers and return their existing null-handle sentinel. 23
+  previously unguarded entry points were wrapped. A sentinel means
+  "failed", never a real value.
+- **`mtc_corpus_size` gained a `char **error` out-param**, so Manatee's
+  actual diagnostic survives instead of being flattened to `-1`. It reads
+  like a cheap accessor but is the call that first opens compiled data off
+  disk (`search_size()` → `size()` → `get_default_attr()`), which is why a
+  corpus that opened fine can still fail here — opening only parses the
+  registry *file*.
+- **`Corpus.size` and `Corpus.info()` now `throw`.** `info()`'s doc comment
+  had claimed the whole call did no engine work, which is what hid this:
+  it reads `sizeTokens` from `size`. The picker's existing `catch` already
+  renders the message, so a bad corpus now shows
+  `FileAccessError (…) in failed to open FSA lexicon [No such file or
+  directory]` in the info label.
+- Regression test: `CorpusInfoTests.testSizeThrowsWhenRegistryPathDoesNotResolve`
+  builds a registry whose `PATH` doesn't resolve and asserts both `size`
+  and `info()` throw. Verified end-to-end by re-breaking
+  `DevCorpus/registry/testcorp` and confirming the app stays running with
+  no crash report, where it previously aborted on launch.
+
+Also fixed while there: `mtc_colloc_get_item`/`_freq`/`_cnt` dereferenced
+`items` with no null check, unlike their `get_bgr` sibling.
+
+Everything **below** this note was written before the rename and still
+says "Corpora" throughout — read those mentions as "Korpora."
 
 ## Division of labor
 
@@ -137,16 +210,16 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | not started | not started | not started - see Phase 6 writeup for the full roadmap |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6 done, 46/46 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6 done, builds cleanly, 35/35 CorporaTests passing; 6.7-6.11 not started | partial — 6.1-6.5 confirmed by user; 6.6 (incl. inline display mode) not yet manually click-tested, see Phase 6 writeup |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
 
 ## Phase 0 — AppKit shell, NSDocument model, query parity (done)
 
-- `Corpora/Corpora.xcodeproj`, generated via `xcodegen` from
-  `Corpora/project.yml`, sibling to `ManateeKit/`. Depends on `ManateeKit`
-  as a local Swift package. Regenerate with `cd Corpora && xcodegen
+- `Korpora/Korpora.xcodeproj`, generated via `xcodegen` from
+  `Korpora/project.yml`, sibling to `ManateeKit/`. Depends on `ManateeKit`
+  as a local Swift package. Regenerate with `cd Korpora && xcodegen
   generate` after adding/removing source files (Xcode won't pick them up on
   its own).
 - `main.swift`: manual bootstrap (no storyboard). Calls
@@ -203,7 +276,7 @@ test` → 17/17).
   `SettingsWindowController` (classic multi-pane `.preference`-style
   toolbar), `GeneralSettingsViewController` (directory list),
   `AppearanceSettingsViewController` (Font Panel picker).
-- `Corpora/Corpora.entitlements`: sandboxing explicitly disabled
+- `Korpora/Korpora/Korpora.entitlements`: sandboxing explicitly disabled
   (`com.apple.security.app-sandbox` = false) — needed for arbitrary
   registry/corpus-directory access during dev; revisit before any real
   distribution.
@@ -454,8 +527,10 @@ returns exactly the original 10 matches, same order, same content.
   rejected the macOS target outright, and no other available tool can
   synthesize clicks/typing into an AppKit window. These remain open:
 
-1. Open `Corpora/Corpora.xcodeproj`. If `DevCorpus/` doesn't exist, run
-   `Corpora/scripts/build-dev-corpus.sh` once (idempotent). The Xcode
+1. Open `Korpora/Korpora.xcodeproj`. If `DevCorpus/` doesn't exist — or the
+   app aborts on launch because its registry's baked-in absolute `PATH` no
+   longer resolves — run `Korpora/scripts/build-dev-corpus.sh` (idempotent).
+   The Xcode
    scheme's `MANATEE_REGISTRY` already points at it (see `project.yml`).
 2. Build + run. The New Concordance sheet should show corpus `testcorp`,
    with an info label listing its attributes (word/lemma/tag) and
@@ -2575,43 +2650,133 @@ popover on the same large corpus and confirm it now scrolls within a
 fixed height instead of growing off-screen, and that the structural
 section shows two columns.
 
-### 6.6 — Extended context on the selected line (not started)
+### 6.6 — Extended context on the selected line (done)
 
 KonText's "concordance detail" view - see much wider context than the
 table row shows, for one specific hit.
 
-**Design** (uses the position-indexed lookup pattern from Phase 5.4, not
-a full requery): new bridge primitive
+**Implemented** (uses the position-indexed lookup pattern from Phase 5.4,
+not a full requery): new bridge primitive
 `mtc_corpus_positional_attr_range(corpus, fromPosition, toPosition,
-attrName, error) -> char*` (space-joined tokens) - a straightforward
-extension of the *already proven* "call `PosAttr::pos2str` directly off a
-position, no live concordance needed" approach `mtc_corpus_get_struct_attr`
-established. Given a row's `position` (already on `KWICLine`) and its
-match length (`kwicTokens.count`), fetch
-`[position - N, position + matchLen + N)` for a generous `N` (default
-from 6.4's `defaultExtendedContextTokens`).
+attrName, error) -> char*` (space-joined tokens, clamped to
+`[0, search_size())` inside the bridge rather than trusting the caller's
+range) - a straightforward extension of the *already proven* "call
+`PosAttr::pos2str` directly off a position, no live concordance needed"
+approach `mtc_corpus_get_struct_attr` established. Wrapped in
+`Corpus.positionalAttributeRange(from:to:attribute:)`.
 
+- `ConcordanceDocument.extendedContext(at rowID:) async throws ->
+  (before: String, match: String, after: String)`: given a row's
+  `position` (already on `KWICLine`) and its match length
+  (`kwicTokens.count`), fetches `[position - N, position + matchLen + N)`
+  for `N` = 6.4's `defaultExtendedContextTokens`, then splits the
+  returned space-joined string back into before/match/after by
+  computing `actualTokensBefore = min(N, position)` client-side - the
+  same clamp the bridge itself applies at its lower bound, needed here
+  so the split point stays correct for a hit near the very start of the
+  corpus without a second round-trip to ask "how much did you actually
+  clamp".
 - Trigger: a new "Extended Context…" row context-menu item, right next to
   the existing "Document Info…" (`ConcordanceViewController.swift`'s
-  `menuNeedsUpdate`/`showDocumentInfo` is the exact precedent to copy -
-  same `tableView.clickedRow` pattern, single-row only, matches the
+  `menuNeedsUpdate`/`showDocumentInfo` is the exact precedent copied -
+  same `tableView.clickedRow` pattern, single-row only, matching the
   user's "if only one selected" framing since the context menu already
   only makes sense for a single clicked row).
-- Display: a small sheet (not `NSAlert`, since context can be long and
-  needs scrolling) with a read-only, wrapped `NSTextView` showing the
-  wider context, the original match bolded/highlighted (we know its exact
-  token range within the fetched text).
+- Display: new `ExtendedContextSheetController.swift` - a sheet (not
+  `NSAlert`, since context can be long and needs scrolling) built on
+  `NSTextView.scrollableTextView()` (not a hand-assembled
+  `NSScrollView`+`NSTextView` pair - already wires up wrapping/resizing
+  correctly), read-only, with the match bolded and accent-colored between
+  the plain-styled before/after text.
 
-**Key files**: `mtcbridge.h`/`.cc` (new function), `ManateeKit.swift`
-(`Corpus.extendedContext(at:attribute:tokensBefore:tokensAfter:)` or
-similar), `ConcordanceDocument.swift` (thin wrapper, same shape as
-`structuralInfo(at:)`), new `ExtendedContextSheetController.swift`,
-`ConcordanceViewController.swift` (menu item).
+**Follow-up - inline display mode**: the user asked for a second way to
+see this - expanding the clicked row itself in place into a
+word-wrapped paragraph, rather than always popping a sheet - switchable
+via a new setting (6.4's Concordance pane), not a replacement.
+- `ExtendedContextDisplayMode: String, Codable { case sheet; case
+  inline }` (`ConcordanceDocument.swift`) + `AppSettings
+  .extendedContextDisplayMode` (default `.sheet`, the original
+  behavior) - a global preference, not per-document, since it's purely
+  presentational. New "Extended context display: Sheet | Inline"
+  segmented control in `ConcordanceSettingsViewController`.
+- `showExtendedContext(_:)` now branches on the setting: `.sheet` is
+  the unchanged popup above; `.inline` calls a new
+  `toggleInlineExtendedContext(for:)`.
+- Transient UI state on `ConcordanceViewController` (not
+  `ConcordanceDocument` - doesn't survive a real replay): `expandedRowID:
+  Int?`/`expandedContext: (before:match:after:)?`. Re-triggering on the
+  already-expanded row collapses it; expanding a different row collapses
+  whichever was open first (one expansion at a time, matching the sheet
+  mode's own "if only one selected" framing). `refresh(animated: true)`
+  (a real replay - sort/filter/requery, as opposed to a display-only
+  `settingsDidChange`-style reload) clears the expansion, since row ids
+  can be renumbered underneath it.
+- **One continuous paragraph, not three columns**: the first version of
+  this rendered the expanded row's before/match/after text into the
+  existing Left/Match/Right cells, which still visually chopped it into
+  three separate pieces - rejected by the user ("it must be an
+  uninterrupted paragraph, not split into left/match/right"). Fixed by
+  rendering nothing in any column cell for the expanded row
+  (`makeCell` returns a blank `NSView()` for every column when
+  `rowID == expandedRowID`) and instead overlaying one full-row-width
+  `NSTextField(wrappingLabelWithString:)` (`ExtendedContextOverlayField`,
+  a marker subclass used only to find/remove it later) directly on that
+  row's `NSTableRowView`, pinned via Auto Layout to the row view's own
+  leading/trailing/top/bottom anchors - so it spans the whole row
+  (ignoring column boundaries entirely) and tracks the row's width
+  automatically as Left/Right auto-grow on resize, no manual
+  repositioning needed. `KWICCellView.extendedContextParagraph(before:
+  match:after:)` builds the single `NSAttributedString` (match
+  bold/accent, joined with plain spaces, one left-aligned word-wrapping
+  paragraph style throughout).
+- `tableView.delegate = self` is now set (previously unset -
+  `SortableTableView` never used a delegate for anything) so
+  `ConcordanceViewController` can implement `NSTableViewDelegate
+  .tableView(_:heightOfRow:)` (sizes the expanded row to
+  `KWICCellView.extendedContextHeight(for:width:)` at the table's own
+  current width - shared with the overlay's own text so the row is
+  always exactly as tall as what's drawn) and `.tableView(_:didAdd
+  rowView:forRow:)` (the passive counterpart to the eager
+  `applyExpansionChange` - reapplies the correct overlay state whenever
+  AppKit hands back a row view, including a freshly-scrolled-into-view
+  one or a recycled one that used to belong to a different, possibly
+  still-expanded row). A `NSTableView.columnDidResizeNotification`
+  observer renotes the expanded row's height after 6.1's symmetric
+  Left/Right resize changes the table's overall width.
+- `applyOverlay(to:row:)` is the single idempotent choke point for
+  add/update/remove, called from both `applyExpansionChange` (eagerly,
+  right after toggling) and `didAdd` (passively) - looked up via
+  `rowView.subviews.compactMap { $0 as? ExtendedContextOverlayField
+  }.first` rather than separate tagging/bookkeeping.
 
-**Verify**: `ManateeKitTests` - new test against `TestCorpusFixture`
-asserting the fetched range matches expected surrounding words including
-across the target token itself; `RunAllTests` for the UI wiring; manual
-click-test.
+**Key files**: `mtcbridge.h`/`.cc`, `ManateeKit.swift`,
+`ConcordanceDocument.swift`, `ExtendedContextSheetController.swift`,
+`ConcordanceViewController.swift`, `KWICCellView.swift`, `AppSettings.swift`,
+`ConcordanceSettingsViewController.swift`.
+
+New tests, `CorpusInfoTests.swift` (3): a plain in-bounds range returns
+the expected space-joined words for both "word" and "lemma"; a range
+request running off either end of the fixture corpus (position ± N
+naturally does this for a hit near the start/end) clamps rather than
+throwing or reading garbage; an unknown attribute name throws.
+
+Verified: `cd ManateeKit && swift test` → **46/46 passing** (3 new);
+`xcodegen generate` (picked up the new sheet controller) then
+`BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**; `RunAllTests`
+→ 35/35 `CorporaTests` passing (unaffected - no AppKit-layer test exists
+for this feature, same "one-shot sheet, not logic worth isolating"
+reasoning as 5.4's "Document Info…"). Not yet manually click-tested -
+next steps: (1) right-click a line, choose "Extended Context…", confirm
+the sheet shows much wider context with the match visibly bolded, and
+try a hit near the very start/end of a corpus to exercise the clamping;
+(2) switch the new setting to "Inline", right-click a line and choose
+"Extended Context…" again, confirm the row itself expands in place into
+one uninterrupted word-wrapped paragraph spanning the full row width
+(not split across Left/Match/Right) with the match bolded, confirm
+re-triggering the same row collapses it, expanding a different row
+collapses the old one, resizing the window keeps the expanded row's
+height correct, and scrolling the expanded row off-screen and back
+still shows it correctly (exercises the `didAdd` passive path).
 
 ### 6.7 — New engine primitive: attribute value enumeration (not started)
 

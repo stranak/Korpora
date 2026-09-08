@@ -6,9 +6,9 @@ import Foundation
 /// one or two lines of non-trivial, repeated-tag data to operate on.
 struct TestCorpusFixture {
     // Deliberately not "testcorp" (2026-09-06): that's also the real dev
-    // corpus's name in the Corpora app, and SubcorpusStore keys subcorpus
+    // corpus's name in the Korpora app, and SubcorpusStore keys subcorpus
     // storage by corpus name alone in a permanent, shared
-    // ~/Library/Application Support/Corpora/Subcorpora/<name>/ directory -
+    // ~/Library/Application Support/Korpora/Subcorpora/<name>/ directory -
     // SubcorpusTests' teardown deleting that directory for "testcorp" once
     // deleted a real subcorpus created via manual UI testing. A name unique
     // to this fixture can never collide with a real corpus again.
