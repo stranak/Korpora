@@ -87,7 +87,7 @@ final class FrequencySheetController: NSViewController {
             guard let self else { return }
             do {
                 let corpus = try Corpus(name: corpusName)
-                let info = await corpus.info()
+                let info = try await corpus.info()
                 var attributes = info.attributes
                 for structure in info.structures {
                     attributes += structure.attributes.map { "\(structure.name).\($0)" }

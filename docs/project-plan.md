@@ -45,10 +45,36 @@ paths* — the one category no source-level rename can catch:
 That throw should have been a corpus-picker error message, but it
 **`abort()`ed the whole app** instead — and took the test host with it, so
 all 35 `KorporaTests` reported "not run" rather than failing. Root cause:
-`mtc_corpus_size` has no `try`/`catch`, unlike its neighbours in
-`mtcbridge.cc`, so a C++ exception unwinds across the `extern "C"`
-boundary, which is UB and in practice `std::terminate()`. **Not yet
-fixed** — see the open item below.
+`mtc_corpus_size` had no `try`/`catch`, so a C++ exception unwound across
+`mtcbridge.cc`'s `extern "C"` boundary, which is UB and in practice
+`std::terminate()`. Fixed 2026-09-08:
+
+- **`mtcbridge.cc` now states the boundary rule as an invariant**: no
+  exception may cross it. Entry points either take a `char **error` and
+  report via `set_error`, or wrap their body in the new `guard`/
+  `guard_void` helpers and return their existing null-handle sentinel. 23
+  previously unguarded entry points were wrapped. A sentinel means
+  "failed", never a real value.
+- **`mtc_corpus_size` gained a `char **error` out-param**, so Manatee's
+  actual diagnostic survives instead of being flattened to `-1`. It reads
+  like a cheap accessor but is the call that first opens compiled data off
+  disk (`search_size()` → `size()` → `get_default_attr()`), which is why a
+  corpus that opened fine can still fail here — opening only parses the
+  registry *file*.
+- **`Corpus.size` and `Corpus.info()` now `throw`.** `info()`'s doc comment
+  had claimed the whole call did no engine work, which is what hid this:
+  it reads `sizeTokens` from `size`. The picker's existing `catch` already
+  renders the message, so a bad corpus now shows
+  `FileAccessError (…) in failed to open FSA lexicon [No such file or
+  directory]` in the info label.
+- Regression test: `CorpusInfoTests.testSizeThrowsWhenRegistryPathDoesNotResolve`
+  builds a registry whose `PATH` doesn't resolve and asserts both `size`
+  and `info()` throw. Verified end-to-end by re-breaking
+  `DevCorpus/registry/testcorp` and confirming the app stays running with
+  no crash report, where it previously aborted on launch.
+
+Also fixed while there: `mtc_colloc_get_item`/`_freq`/`_cnt` dereferenced
+`items` with no null check, unlike their `get_bgr` sibling.
 
 Everything **below** this note was written before the rename and still
 says "Corpora" throughout — read those mentions as "Korpora."

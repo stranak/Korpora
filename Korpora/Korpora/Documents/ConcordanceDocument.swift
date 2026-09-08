@@ -415,7 +415,7 @@ final class ConcordanceDocument: NSDocument {
                 }
                 // search size, not the parent corpus's - openSubcorpus already
                 // makes this correctly reflect the restricted token count.
-                let corpusSize = await queryCorpus.size
+                let corpusSize = try await queryCorpus.size
                 let lines = try await live.kwicLines(
                     leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
                     secondaryAttributes: secondaryAttributes)
@@ -537,7 +537,7 @@ final class ConcordanceDocument: NSDocument {
         guard let queryCorpus else { throw AnalysisError.noResultsYet }
         guard rows.indices.contains(rowID) else { return [] }
         let position = rows[rowID].line.position
-        let info = await queryCorpus.info()
+        let info = try await queryCorpus.info()
         var results: [(structure: String, attribute: String, value: String)] = []
         for structure in info.structures {
             for attribute in structure.attributes {

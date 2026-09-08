@@ -132,7 +132,7 @@ final class CollocationSheetController: NSViewController {
             guard let self else { return }
             do {
                 let corpus = try Corpus(name: corpusName)
-                let info = await corpus.info()
+                let info = try await corpus.info()
                 attributePopUp.addItems(withTitles: info.attributes)
             } catch {
                 errorLabel.stringValue = "\(error)"

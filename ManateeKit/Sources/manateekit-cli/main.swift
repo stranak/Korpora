@@ -10,7 +10,7 @@ struct CLI {
         }
         do {
             let corpus = try await Corpus(name: args[1])
-            print("opened corpus, size=\(await corpus.size) tokens")
+            print("opened corpus, size=\(try await corpus.size) tokens")
             let lines = try await corpus.query(args[2])
             print("query matched \(lines.count) hits")
             for line in lines {

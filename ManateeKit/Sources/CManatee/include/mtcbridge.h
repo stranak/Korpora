@@ -14,7 +14,15 @@ typedef struct MTCKwic MTCKwic;
  * *error (caller must free with mtc_free_string) on failure. */
 MTCCorpus *mtc_corpus_open(const char *name, char **error);
 void mtc_corpus_close(MTCCorpus *corp);
-long long mtc_corpus_size(MTCCorpus *corp);
+
+/* Token count - the subcorpus's own restricted size for a subcorpus. Returns
+ * -1 and sets *error (caller must free with mtc_free_string) on failure.
+ * Unlike most getters here this is *not* a cheap accessor: it's the call that
+ * first opens the corpus's compiled data off disk, so it can fail even though
+ * mtc_corpus_open succeeded - opening only parses the registry file, whose
+ * PATH is an absolute path that may no longer resolve. Treat -1 as "failed",
+ * never as a real size. */
+long long mtc_corpus_size(MTCCorpus *corp, char **error);
 
 /* Runs a CQL query against the corpus. The concordance handle stays open and
  * mutable - the mutators below (sort/shuffle/reduce/pnfilter/linegroup) all

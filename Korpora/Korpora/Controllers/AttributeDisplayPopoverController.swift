@@ -143,7 +143,7 @@ final class AttributeDisplayPopoverController: NSViewController {
             guard let self else { return }
             do {
                 let corpus = try Corpus(name: corpusName)
-                let info = await corpus.info()
+                let info = try await corpus.info()
                 populateRows(attributes: info.attributes.filter { $0 != primaryAttribute })
                 populateStructuralRows(structures: info.structures)
             } catch {

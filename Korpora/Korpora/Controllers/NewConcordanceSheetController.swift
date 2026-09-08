@@ -147,7 +147,7 @@ final class NewConcordanceSheetController: NSViewController {
             guard let self else { return }
             do {
                 let corpus = try Corpus(name: name)
-                let info = await corpus.info()
+                let info = try await corpus.info()
                 currentCorpusInfo = info
                 var parts: [String] = []
                 if !info.attributes.isEmpty {

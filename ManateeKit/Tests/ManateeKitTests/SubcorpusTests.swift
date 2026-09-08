@@ -34,7 +34,7 @@ final class SubcorpusTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
 
         let subcorpus = try await corpus.openSubcorpus(atPath: path)
-        let size = await subcorpus.size
+        let size = try await subcorpus.size
         XCTAssertEqual(size, 9)  // doc 1 only: "the quick brown fox jumps" + "the lazy dog sleeps"
 
         let lines = try await subcorpus.query(#"[tag="JJ"][tag="NN"]"#, leftContext: "-1", rightContext: "1")

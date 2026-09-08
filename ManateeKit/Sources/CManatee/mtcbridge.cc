@@ -60,6 +60,42 @@ void set_error(char **error, const std::exception &e) {
     set_error(error, e.what());
 }
 
+/* No C++ exception may cross this file's extern "C" boundary: unwinding
+ * into a C/Swift caller is undefined behavior, and in practice libc++
+ * calls std::terminate() -> abort(), taking the whole app down with no
+ * catchable Swift error. This bit the project once already (2026-09-08):
+ * an unguarded mtc_corpus_size, called via Corpus.info() from the New
+ * Concordance picker, hit a registry file whose baked-in absolute PATH no
+ * longer resolved after a directory rename, and Manatee's throw while
+ * opening the lexicon killed the app - and the test host with it, so the
+ * whole suite reported "not run" rather than failing.
+ *
+ * Every entry point below therefore either takes a `char **error`
+ * out-param and reports through set_error, or - when its signature has no
+ * way to say anything - wraps its body in one of these guards and returns
+ * the same sentinel it already uses for a null handle. A sentinel means
+ * "failed", not a real value; callers must treat it as such (see
+ * Corpus.size in ManateeKit.swift, which throws on -1). */
+template <typename T, typename F>
+T guard(T sentinel, F &&body) noexcept {
+    try {
+        return body();
+    } catch (...) {
+        return sentinel;
+    }
+}
+
+/* Same, for the void entry points - the closes/frees, whose `delete` runs
+ * Manatee destructors that unmap files. Nothing to report and nothing a
+ * caller could do about it, so a throw here is simply swallowed. */
+template <typename F>
+void guard_void(F &&body) noexcept {
+    try {
+        body();
+    } catch (...) {
+    }
+}
+
 /* Joins `attr`'s values across [from, to), one '\x1F' (unit separator -
  * matches get_corp_text's own attrdelim convention in concord/concget.cc,
  * chosen because it can't appear in real corpus text) immediately before
@@ -129,19 +165,38 @@ MTCCorpus *mtc_corpus_open(const char *name, char **error) {
 void mtc_corpus_close(MTCCorpus *corp) {
     if (!corp)
         return;
-    delete corp->corp;
-    delete corp;
+    guard_void([&] {
+        delete corp->corp;
+        delete corp;
+    });
 }
 
-long long mtc_corpus_size(MTCCorpus *corp) {
-    if (!corp)
+long long mtc_corpus_size(MTCCorpus *corp, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
         return -1;
-    // search_size(), not size(): for a plain Corpus these are the same
-    // (Corpus::search_size()'s default body is just `return size();`), but
-    // SubCorpus overrides search_size() to the actual restricted token
-    // count - size() alone would always report the *parent* corpus's full
-    // size, even for a subcorpus (see corp/subcorp.hh).
-    return static_cast<long long>(corp->corp->search_size());
+    }
+    try {
+        // search_size(), not size(): for a plain Corpus these are the same
+        // (Corpus::search_size()'s default body is just `return size();`), but
+        // SubCorpus overrides search_size() to the actual restricted token
+        // count - size() alone would always report the *parent* corpus's full
+        // size, even for a subcorpus (see corp/subcorp.hh).
+        //
+        // Despite reading like a cheap accessor, this is the call that first
+        // touches the corpus's compiled data: search_size() -> size() ->
+        // get_default_attr() lazily opens the default attribute's lexicon
+        // off disk. A corpus that opened fine (mtc_corpus_open only parses
+        // the registry *file*) can still throw here, because a registry's
+        // PATH is an absolute path that may no longer resolve.
+        return static_cast<long long>(corp->corp->search_size());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return -1;
+    } catch (...) {
+        set_error(error, "unknown error reading corpus size");
+        return -1;
+    }
 }
 
 MTCConcordance *mtc_query(MTCCorpus *corp, const char *cql, char **error) {
@@ -169,14 +224,16 @@ MTCConcordance *mtc_query(MTCCorpus *corp, const char *cql, char **error) {
 void mtc_concordance_close(MTCConcordance *conc) {
     if (!conc)
         return;
-    delete conc->conc;
-    delete conc;
+    guard_void([&] {
+        delete conc->conc;
+        delete conc;
+    });
 }
 
 long long mtc_concordance_size(MTCConcordance *conc) {
     if (!conc)
         return -1;
-    return static_cast<long long>(conc->conc->size());
+    return guard<long long>(-1, [&] { return static_cast<long long>(conc->conc->size()); });
 }
 
 MTCKwic *mtc_kwic_open(MTCCorpus *corp, MTCConcordance *conc,
@@ -215,14 +272,18 @@ MTCKwic *mtc_kwic_open(MTCCorpus *corp, MTCConcordance *conc,
 void mtc_kwic_close(MTCKwic *kwic) {
     if (!kwic)
         return;
-    delete kwic->kl;
-    delete kwic;
+    guard_void([&] {
+        delete kwic->kl;
+        delete kwic;
+    });
 }
 
 int mtc_kwic_next(MTCKwic *kwic) {
     if (!kwic)
         return 0;
-    return kwic->kl->nextline() ? 1 : 0;
+    // Real engine work, not an accessor: nextline() reads the next hit's
+    // data off disk, so this can throw on a corpus whose files went away.
+    return guard<int>(0, [&] { return kwic->kl->nextline() ? 1 : 0; });
 }
 
 char *mtc_kwic_get_left_attr(MTCKwic *kwic, const char *attr_name, char **error) {
@@ -254,7 +315,7 @@ char *mtc_kwic_get_right_attr(MTCKwic *kwic, const char *attr_name, char **error
 long long mtc_kwic_get_pos(MTCKwic *kwic) {
     if (!kwic)
         return -1;
-    return static_cast<long long>(kwic->kl->get_pos());
+    return guard<long long>(-1, [&] { return static_cast<long long>(kwic->kl->get_pos()); });
 }
 
 int mtc_concordance_sort(MTCConcordance *conc, const char *criteria, int uniq, char **error) {
@@ -369,7 +430,7 @@ int mtc_concordance_set_linegroup(MTCConcordance *conc, long long range_start,
 long long mtc_concordance_get_linegroup(MTCConcordance *conc, long long line_idx) {
     if (!conc)
         return 0;
-    return conc->conc->get_linegroup(static_cast<ConcIndex>(line_idx));
+    return guard<long long>(0, [&] { return conc->conc->get_linegroup(static_cast<ConcIndex>(line_idx)); });
 }
 
 int mtc_concordance_delete_linegroups(MTCConcordance *conc, const char *groups_spec,
@@ -422,38 +483,48 @@ MTCCollocItems *mtc_colloc_open(MTCConcordance *conc, const char *attr_name,
 void mtc_colloc_close(MTCCollocItems *items) {
     if (!items)
         return;
-    delete items->items;
-    delete items;
+    guard_void([&] {
+        delete items->items;
+        delete items;
+    });
 }
 
 int mtc_colloc_next(MTCCollocItems *items) {
     if (!items)
         return 0;
-    if (items->started) {
-        if (items->items->eos())
-            return 0;
-        items->items->next();
-    }
-    items->started = true;
-    return items->items->eos() ? 0 : 1;
+    return guard<int>(0, [&] {
+        if (items->started) {
+            if (items->items->eos())
+                return 0;
+            items->items->next();
+        }
+        items->started = true;
+        return items->items->eos() ? 0 : 1;
+    });
 }
 
 char *mtc_colloc_get_item(MTCCollocItems *items) {
-    return strdup(items->items->get_item());
+    if (!items)
+        return nullptr;
+    return guard<char *>(nullptr, [&] { return strdup(items->items->get_item()); });
 }
 
 long long mtc_colloc_get_freq(MTCCollocItems *items) {
-    return static_cast<long long>(items->items->get_freq());
+    if (!items)
+        return 0;
+    return guard<long long>(0, [&] { return static_cast<long long>(items->items->get_freq()); });
 }
 
 long long mtc_colloc_get_cnt(MTCCollocItems *items) {
-    return static_cast<long long>(items->items->get_cnt());
+    if (!items)
+        return 0;
+    return guard<long long>(0, [&] { return static_cast<long long>(items->items->get_cnt()); });
 }
 
 double mtc_colloc_get_bgr(MTCCollocItems *items, char bgr_code) {
     if (!items)
         return 0.0;
-    return items->items->get_bgr(bgr_code);
+    return guard<double>(0.0, [&] { return items->items->get_bgr(bgr_code); });
 }
 
 MTCFreqDist *mtc_freq_dist_open(MTCConcordance *conc, const char *crit,
@@ -485,7 +556,7 @@ MTCFreqDist *mtc_freq_dist_open(MTCConcordance *conc, const char *crit,
 }
 
 void mtc_freq_dist_close(MTCFreqDist *dist) {
-    delete dist;
+    guard_void([&] { delete dist; });
 }
 
 int mtc_freq_dist_count(MTCFreqDist *dist) {
@@ -497,55 +568,55 @@ int mtc_freq_dist_count(MTCFreqDist *dist) {
 char *mtc_freq_dist_get_word(MTCFreqDist *dist, int index) {
     if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
         return nullptr;
-    return strdup(dist->words[dist->order[index]].c_str());
+    return guard<char *>(nullptr, [&] { return strdup(dist->words[dist->order[index]].c_str()); });
 }
 
 long long mtc_freq_dist_get_freq(MTCFreqDist *dist, int index) {
     if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
         return 0;
-    return static_cast<long long>(dist->freqs[dist->order[index]]);
+    return guard<long long>(0, [&] { return static_cast<long long>(dist->freqs[dist->order[index]]); });
 }
 
 long long mtc_freq_dist_get_norm(MTCFreqDist *dist, int index) {
     if (!dist || index < 0 || static_cast<size_t>(index) >= dist->order.size())
         return 0;
-    return static_cast<long long>(dist->norms[dist->order[index]]);
+    return guard<long long>(0, [&] { return static_cast<long long>(dist->norms[dist->order[index]]); });
 }
 
 int mtc_corpus_attr_count(MTCCorpus *corp) {
     if (!corp)
         return 0;
-    return static_cast<int>(corp->corp->conf->attrs.size());
+    return guard<int>(0, [&] { return static_cast<int>(corp->corp->conf->attrs.size()); });
 }
 
 char *mtc_corpus_attr_name(MTCCorpus *corp, int index) {
     if (!corp || index < 0 || static_cast<size_t>(index) >= corp->corp->conf->attrs.size())
         return nullptr;
-    return strdup(corp->corp->conf->attrs[index].first.c_str());
+    return guard<char *>(nullptr, [&] { return strdup(corp->corp->conf->attrs[index].first.c_str()); });
 }
 
 int mtc_corpus_struct_count(MTCCorpus *corp) {
     if (!corp)
         return 0;
-    return static_cast<int>(corp->corp->conf->structs.size());
+    return guard<int>(0, [&] { return static_cast<int>(corp->corp->conf->structs.size()); });
 }
 
 char *mtc_corpus_struct_name(MTCCorpus *corp, int index) {
     if (!corp || index < 0 || static_cast<size_t>(index) >= corp->corp->conf->structs.size())
         return nullptr;
-    return strdup(corp->corp->conf->structs[index].first.c_str());
+    return guard<char *>(nullptr, [&] { return strdup(corp->corp->conf->structs[index].first.c_str()); });
 }
 
 int mtc_corpus_struct_attr_count(MTCCorpus *corp, const char *struct_name) {
     CorpInfo *s = find_struct_info(corp, struct_name);
-    return s ? static_cast<int>(s->attrs.size()) : 0;
+    return guard<int>(0, [&] { return s ? static_cast<int>(s->attrs.size()) : 0; });
 }
 
 char *mtc_corpus_struct_attr_name(MTCCorpus *corp, const char *struct_name, int index) {
     CorpInfo *s = find_struct_info(corp, struct_name);
     if (!s || index < 0 || static_cast<size_t>(index) >= s->attrs.size())
         return nullptr;
-    return strdup(s->attrs[index].first.c_str());
+    return guard<char *>(nullptr, [&] { return strdup(s->attrs[index].first.c_str()); });
 }
 
 char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char *struct_attr_name, char **error) {
