@@ -27,6 +27,7 @@
 		5147B2175F0C34D38FFC1569 /* SamplePopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76275DF734870EDBA0975A28 /* SamplePopoverController.swift */; };
 		5ECA53D14CF01740C22D2F3A /* ConcordanceOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */; };
 		61237E8A161CE660673F237A /* FilterSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8707E5EE04A324077AEEBD4 /* FilterSheetController.swift */; };
+		6176B5BE81BE9B3D12C16A4C /* UnicodeScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58FCDB5A5CC3FDBB4424F25 /* UnicodeScriptTests.swift */; };
 		62F2B2241409CF37E39DCD16 /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DAABABBF8E66299CCC4CE24 /* GeneralSettingsViewController.swift */; };
 		67DFE992A86BA395057F5CB6 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25829CE0B1184479409C9C1F /* SettingsWindowController.swift */; };
 		6E56D19B4B2D73E51D47847A /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196F3E82C872642B3C56905B /* SortableTableView.swift */; };
@@ -43,6 +44,7 @@
 		97945D900550F11D6B3BB5FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E5FBE061C9D0960D0F0BD6 /* AppDelegate.swift */; };
 		9A8A001D30BB0535DD4B24ED /* QueryHistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */; };
 		B525122C9FD4CF23BD36396D /* CorporaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2743F9CD0004FB8FE8CDBE /* CorporaSettingsViewController.swift */; };
+		D780403A6A414D569BE5B711 /* UnicodeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6581346AFAB668B038C61FB7 /* UnicodeScript.swift */; };
 		D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F56CC63630EA28304391DEA /* SortPopoverController.swift */; };
 		DC819B1BEE7789EC6AEFDE12 /* CQLQueryField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DE5D6AB25194929C0CBD73 /* CQLQueryField.swift */; };
 		E2A2F41A47453E237F323A14 /* ConcordanceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1666A994CF31918D279B02E /* ConcordanceViewController.swift */; };
@@ -78,6 +80,7 @@
 		556B88C8063C6E5835FFD178 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
 		58307DCD0FC034F29569C0D2 /* QueryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStore.swift; sourceTree = "<group>"; };
 		5D93A3EB8B3576BB025AFE83 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
+		6581346AFAB668B038C61FB7 /* UnicodeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScript.swift; sourceTree = "<group>"; };
 		6F56CC63630EA28304391DEA /* SortPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortPopoverController.swift; sourceTree = "<group>"; };
 		76275DF734870EDBA0975A28 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
 		76D8CB27F099A49990068107 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
@@ -94,6 +97,7 @@
 		B1666A994CF31918D279B02E /* ConcordanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceViewController.swift; sourceTree = "<group>"; };
 		B8707E5EE04A324077AEEBD4 /* FilterSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSheetController.swift; sourceTree = "<group>"; };
 		C3F9456E4A2C14053C721F2B /* ManateeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ManateeKit; path = ../ManateeKit; sourceTree = SOURCE_ROOT; };
+		C58FCDB5A5CC3FDBB4424F25 /* UnicodeScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScriptTests.swift; sourceTree = "<group>"; };
 		D0D17C2701F753914E2C6F2A /* Corpora.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Corpora.entitlements; sourceTree = "<group>"; };
 		D0DE5D6AB25194929C0CBD73 /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
 		D3437EA61ACD87355C830BF6 /* ActiveImportTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveImportTracker.swift; sourceTree = "<group>"; };
@@ -125,6 +129,7 @@
 				03AEA8290524BE7142C58EB0 /* ConcordanceExporter.swift */,
 				777B79F44224A872C8862850 /* ConcordanceOperation.swift */,
 				0AC8A96F3C7AE68B2C65FBA4 /* KWICFormatter.swift */,
+				6581346AFAB668B038C61FB7 /* UnicodeScript.swift */,
 			);
 			path = Documents;
 			sourceTree = "<group>";
@@ -203,6 +208,7 @@
 				0C6EF02FFC7860A1730005FA /* ConcordanceOperationTests.swift */,
 				E708C82DA0152C0688169FE7 /* KWICFormatterTests.swift */,
 				88D413EB03D4160980E6D4FE /* QueryHistoryStoreTests.swift */,
+				C58FCDB5A5CC3FDBB4424F25 /* UnicodeScriptTests.swift */,
 			);
 			path = CorporaTests;
 			sourceTree = "<group>";
@@ -318,6 +324,7 @@
 				5ECA53D14CF01740C22D2F3A /* ConcordanceOperationTests.swift in Sources */,
 				86AB9809D12EF591C3ADF77C /* KWICFormatterTests.swift in Sources */,
 				9A8A001D30BB0535DD4B24ED /* QueryHistoryStoreTests.swift in Sources */,
+				6176B5BE81BE9B3D12C16A4C /* UnicodeScriptTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -359,6 +366,7 @@
 				67DFE992A86BA395057F5CB6 /* SettingsWindowController.swift in Sources */,
 				D82C2AF6EB05336727829E26 /* SortPopoverController.swift in Sources */,
 				6E56D19B4B2D73E51D47847A /* SortableTableView.swift in Sources */,
+				D780403A6A414D569BE5B711 /* UnicodeScript.swift in Sources */,
 				972A82C87A877EE9C96F5D83 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

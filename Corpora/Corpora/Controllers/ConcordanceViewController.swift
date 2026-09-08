@@ -95,10 +95,14 @@ final class ConcordanceViewController: NSViewController {
             self, selector: #selector(settingsDidChange), name: AppSettings.didChangeNotification, object: nil)
     }
 
-    /// A font-setting change doesn't touch `document.rows`, so the diffable
-    /// data source (keyed on row `id`, not content) wouldn't otherwise know
-    /// to redraw anything - force every visible cell to rebuild.
+    /// A font/color-setting change doesn't touch `document.rows`, so the
+    /// diffable data source (keyed on row `id`, not content) wouldn't
+    /// otherwise know to redraw anything - force every visible cell to
+    /// rebuild. Also re-applies `usesAlternatingRowBackground`, the one
+    /// setting that lives on the table view itself rather than being read
+    /// fresh per-cell.
     @objc private func settingsDidChange() {
+        tableView.usesAlternatingRowBackgroundColors = AppSettings.shared.usesAlternatingRowBackground
         tableView.reloadData()
     }
 
@@ -362,7 +366,7 @@ final class ConcordanceViewController: NSViewController {
     // MARK: - Table view
 
     private func setUpTableView() {
-        tableView.usesAlternatingRowBackgroundColors = true
+        tableView.usesAlternatingRowBackgroundColors = AppSettings.shared.usesAlternatingRowBackground
         tableView.style = .plain
         tableView.headerView = NSTableHeaderView()
         // NSTableView.allowsMultipleSelection defaults to false - only

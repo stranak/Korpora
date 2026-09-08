@@ -52,10 +52,12 @@ final class KWICCellView: NSTableCellView {
 
     /// `displayLine.segments` (see `KWICFormatter.displayLine`) are combined
     /// into one attributed string - `.word` segments get the column's own
-    /// `style`, `.secondaryAttribute` segments always render in
-    /// `.secondaryLabelColor` at the plain (non-bold) base font regardless
-    /// of `style`, so an inline attribute reads as clearly secondary even
-    /// in the bold/accent-colored KWIC column.
+    /// `style` (plus a per-script font override, if configured - see
+    /// `wordFont`), `.secondaryAttribute` segments always render in
+    /// `AppSettings.shared.positionalAttributeColor` at the plain
+    /// (non-bold) base font regardless of `style`, so an inline attribute
+    /// reads as clearly secondary even in the bold/accent-colored KWIC
+    /// column.
     func configure(displayLine: KWICDisplayLine, alignment: NSTextAlignment, style: Style) {
         wantsLayer = false
         layer?.backgroundColor = nil
@@ -172,10 +174,22 @@ final class KWICCellView: NSTableCellView {
 
     private static func width(of segment: KWICDisplaySegment, style: Style) -> CGFloat {
         let baseFont = AppSettings.shared.resultsFont
-        let font: NSFont = segment.kind == .secondaryAttribute
-            ? baseFont
-            : (style == .highlighted ? NSFontManager.shared.convert(baseFont, toHaveTrait: .boldFontMask) : baseFont)
+        let font: NSFont = segment.kind == .secondaryAttribute ? baseFont : wordFont(for: segment, baseFont: baseFont, style: style)
         return NSAttributedString(string: segment.text, attributes: [.font: font]).size().width
+    }
+
+    /// `.word`-kind segments (actual token text, not a secondary-attribute
+    /// suffix) get a per-script font override if `AppSettings.shared
+    /// .scriptFontOverrides` has one for that segment's dominant script
+    /// (see `UnicodeScript`) - e.g. a corpus mixing Latin and Cyrillic text
+    /// where one font's glyph coverage isn't ideal for both. Falls back to
+    /// `baseFont` (`resultsFont`) with no override configured, same as
+    /// before this setting existed.
+    private static func wordFont(for segment: KWICDisplaySegment, baseFont: NSFont, style: Style) -> NSFont {
+        let script = UnicodeScript.dominant(in: segment.text)
+        let overrideName = AppSettings.shared.scriptFontOverrides[script.rawValue]
+        let resolvedBase = overrideName.flatMap { NSFont(name: $0, size: baseFont.pointSize) } ?? baseFont
+        return style == .highlighted ? NSFontManager.shared.convert(resolvedBase, toHaveTrait: .boldFontMask) : resolvedBase
     }
 
     /// NSTextField.attributedStringValue does NOT pick up the field's own
@@ -190,15 +204,7 @@ final class KWICCellView: NSTableCellView {
         for segments: [KWICDisplaySegment], alignment: NSTextAlignment, style: Style
     ) -> NSAttributedString {
         let baseFont = AppSettings.shared.resultsFont
-        let (wordFont, wordColor): (NSFont, NSColor)
-        switch style {
-        case .plain:
-            wordFont = baseFont
-            wordColor = .labelColor
-        case .highlighted:
-            wordFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .boldFontMask)
-            wordColor = .controlAccentColor
-        }
+        let wordColor: NSColor = style == .highlighted ? .controlAccentColor : .labelColor
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineBreakMode = alignment == .right ? .byTruncatingHead : .byTruncatingTail
         paragraphStyle.alignment = alignment
@@ -206,8 +212,8 @@ final class KWICCellView: NSTableCellView {
         let attributed = NSMutableAttributedString()
         for segment in segments {
             let (font, color): (NSFont, NSColor) = segment.kind == .secondaryAttribute
-                ? (baseFont, .secondaryLabelColor)
-                : (wordFont, wordColor)
+                ? (baseFont, AppSettings.shared.positionalAttributeColor)
+                : (wordFont(for: segment, baseFont: baseFont, style: style), wordColor)
             attributed.append(NSAttributedString(
                 string: segment.text,
                 attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraphStyle]))
@@ -251,7 +257,7 @@ final class KWICCellView: NSTableCellView {
         label.alignment = .left
         label.lineBreakMode = .byTruncatingTail
         label.font = .systemFont(ofSize: 11)
-        label.textColor = .secondaryLabelColor
+        label.textColor = AppSettings.shared.structuralAttributeColor
         label.stringValue = value
     }
 }

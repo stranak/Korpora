@@ -37,14 +37,31 @@ final class AttributeDisplayPopoverController: NSViewController {
     private let rowsStack = NSStackView()
     private let structuralSectionTitle = NSTextField(labelWithString: "Structural:")
     private let structuralRowsStack = NSStackView()
+    private let scrollView = NSScrollView()
+    private let contentStack = NSStackView()
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
     private var rows: [Row] = []
     /// `attribute` is nil for the "None" radio button.
     private var structuralRadioButtons: [(attribute: String?, button: NSButton)] = []
-    private static let width: CGFloat = 300
+    private static let width: CGFloat = 320
+    /// The scrollable middle section (both attribute lists) never grows
+    /// the popover past this height - a real corpus can declare dozens of
+    /// positional *and* structural attributes (found via manual testing
+    /// 2026-09-08: a ~30-attribute corpus made the un-scrollable popover
+    /// grow off the top of the screen entirely), so this caps it and
+    /// scrolls instead.
+    private static let maxScrollHeight: CGFloat = 320
+    /// More structural attributes than this split into two side-by-side
+    /// columns rather than one long list - same corpus/manual-testing
+    /// motivation as `maxScrollHeight`. Safe to split now that radio
+    /// exclusivity is managed explicitly (`structuralRadioTapped`) rather
+    /// than relying on AppKit's same-superview grouping, which needed
+    /// every button in one literal stack anyway.
+    private static let structuralColumnThreshold = 12
+    private var scrollHeightConstraint: NSLayoutConstraint!
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: Self.width, height: 180))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: Self.width, height: 220))
 
         let title = NSTextField(labelWithString: "Show attributes:")
         title.font = .boldSystemFont(ofSize: 12)
@@ -65,6 +82,21 @@ final class AttributeDisplayPopoverController: NSViewController {
         structuralRowsStack.alignment = .leading
         structuralRowsStack.spacing = 4
 
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = 12
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(headerRow)
+        contentStack.addArrangedSubview(rowsStack)
+        contentStack.addArrangedSubview(structuralSectionTitle)
+        contentStack.addArrangedSubview(structuralRowsStack)
+
+        scrollView.documentView = contentStack
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 0)
+
         errorLabel.font = .systemFont(ofSize: 11)
         errorLabel.textColor = .systemRed
         errorLabel.isHidden = true
@@ -73,9 +105,7 @@ final class AttributeDisplayPopoverController: NSViewController {
         applyButton.keyEquivalent = "\r"
         applyButton.bezelStyle = .rounded
 
-        let views: [NSView] = [
-            title, headerRow, rowsStack, structuralSectionTitle, structuralRowsStack, errorLabel, applyButton,
-        ]
+        let views: [NSView] = [title, scrollView, errorLabel, applyButton]
         for v in views {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
@@ -85,21 +115,16 @@ final class AttributeDisplayPopoverController: NSViewController {
             title.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
             title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
 
-            headerRow.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
-            headerRow.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            scrollView.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
+            scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
+            scrollHeightConstraint,
 
-            rowsStack.topAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 4),
-            rowsStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            rowsStack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -16),
+            contentStack.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            contentStack.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
 
-            structuralSectionTitle.topAnchor.constraint(equalTo: rowsStack.bottomAnchor, constant: 16),
-            structuralSectionTitle.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-
-            structuralRowsStack.topAnchor.constraint(equalTo: structuralSectionTitle.bottomAnchor, constant: 6),
-            structuralRowsStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            structuralRowsStack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -16),
-
-            errorLabel.topAnchor.constraint(equalTo: structuralRowsStack.bottomAnchor, constant: 12),
+            errorLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
             errorLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
             errorLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
 
@@ -109,7 +134,7 @@ final class AttributeDisplayPopoverController: NSViewController {
         ])
 
         view = root
-        preferredContentSize = NSSize(width: Self.width, height: 180)
+        preferredContentSize = NSSize(width: Self.width, height: 220)
 
         // Corpus is an actor - even a non-async method call on it needs an
         // async context, so this can't run inline here (see
@@ -199,18 +224,50 @@ final class AttributeDisplayPopoverController: NSViewController {
         } else {
             structuralSectionTitle.isHidden = false
             structuralRowsStack.isHidden = false
-            func addRadioButton(title: String, attribute: String?) {
+            func makeRadioButton(title: String, attribute: String?) -> NSButton {
                 let button = NSButton(
                     radioButtonWithTitle: title, target: self, action: #selector(structuralRadioTapped(_:)))
                 button.state = selectedStructuralAttribute == attribute ? .on : .off
-                structuralRowsStack.addArrangedSubview(button)
                 structuralRadioButtons.append((attribute: attribute, button: button))
+                return button
             }
-            addRadioButton(title: "None", attribute: nil)
-            for name in qualifiedNames {
-                addRadioButton(title: name, attribute: name)
+            let noneButton = makeRadioButton(title: "None", attribute: nil)
+            let attributeButtons = qualifiedNames.map { makeRadioButton(title: $0, attribute: $0) }
+            let allButtons = [noneButton] + attributeButtons
+
+            if allButtons.count > Self.structuralColumnThreshold {
+                let mid = (allButtons.count + 1) / 2
+                let columns = NSStackView(views: [
+                    Self.verticalStack(Array(allButtons[..<mid])),
+                    Self.verticalStack(Array(allButtons[mid...])),
+                ])
+                columns.orientation = .horizontal
+                columns.alignment = .top
+                columns.spacing = 24
+                structuralRowsStack.addArrangedSubview(columns)
+            } else {
+                allButtons.forEach { structuralRowsStack.addArrangedSubview($0) }
             }
         }
+        updateScrollHeight()
+    }
+
+    private static func verticalStack(_ views: [NSView]) -> NSStackView {
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+        return stack
+    }
+
+    /// Caps the scrollable section at `maxScrollHeight` and sizes the
+    /// popover's own `preferredContentSize` to match - see both
+    /// properties' doc comments for why this can't just grow unbounded.
+    private func updateScrollHeight() {
+        view.layoutSubtreeIfNeeded()
+        let naturalHeight = contentStack.fittingSize.height
+        let scrollHeight = min(naturalHeight, Self.maxScrollHeight)
+        scrollHeightConstraint.constant = scrollHeight
         view.layoutSubtreeIfNeeded()
         preferredContentSize = NSSize(width: Self.width, height: view.fittingSize.height)
     }

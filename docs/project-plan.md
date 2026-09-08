@@ -2463,7 +2463,7 @@ to a toolbar item's view, which is created once and kept for the
 toolbar's lifetime - worth watching for during manual testing, not
 assumed safe.
 
-### 6.5 — Appearance settings: concordance styling (fonts + colors) (not started)
+### 6.5 — Appearance settings: concordance styling (fonts + colors) (AppKit UI done)
 
 Prompted directly by the user - partly closing a loop flagged back in
 Phase 5.3 ("attributes are displayed... Start with grey. Later we'll
@@ -2473,58 +2473,107 @@ make settings panel for that or something").
 - The existing `AppSettings.resultsFontName`/`resultsFontSize`
   (`AppearanceSettingsViewController`, already consumed by `KWICCellView`)
   already *is* the concordance font, already independent from the rest of
-  the app's chrome (menus/buttons/labels, which stay on the system font
-  throughout). **Recommendation: don't add a separate general "UI font"
-  override** - that would cut against this project's own stated "stick to
-  the Macintosh HIG" preference (native Mac apps let you customize
-  *content* fonts, e.g. Mail's message list or Terminal, but not general
-  chrome - that's what System Settings' text size is for). Proceeding on
-  the reading "keep concordance/UI fonts separate" (already true) rather
-  than "add a UI font override" - flag if that's not what was meant.
-- **New**: per-script concordance fonts, for corpora mixing scripts (a
-  multilingual corpus, or loanwords/citations) where one font's glyph
-  coverage isn't ideal for all of them. New
-  `AppSettings.scriptFontOverrides: [String: String]` (Unicode script name
-  → font name, e.g. "Cyrillic" → "Helvetica"), edited via an add/remove
-  table in the Appearance pane (same list-editing pattern as
-  `GeneralSettingsViewController`'s registry-directories list). At
-  render time (`KWICFormatter`/`KWICCellView`'s attributed-string
-  building), classify each token's dominant script via a small,
-  dependency-free `UnicodeScript` classifier (code-point-range based -
-  Latin/Cyrillic/Greek/Arabic/Hebrew/CJK, generic "Other" bucket) and
-  apply the matching override font to that token's run if configured,
-  else fall back to `resultsFont`. Per-token granularity (not
-  per-character) is the practical v1 scope.
+  the app's chrome. No separate general "UI font" override was added -
+  that would cut against this project's own "stick to the Macintosh HIG"
+  preference.
+- **New**: per-script concordance fonts. `AppSettings.scriptFontOverrides:
+  [String: String]` (`UnicodeScript.rawValue` → font name, e.g.
+  "cyrillic" → "Helvetica"), edited via an add/remove table in the
+  Appearance pane. New dependency-free `UnicodeScript.swift`
+  (`Documents/`, no AppKit/engine dependency - pure rendering concern):
+  code-point-range classification covering Latin/Cyrillic/Greek/Hebrew/
+  Arabic/CJK, generic `.other` bucket, with `dominant(in:)` scanning a
+  token's scalars for the first one that classifies (so e.g. `"123fox"`
+  still resolves to `.latin`, not `.other`, from the digits alone).
+  `KWICCellView`'s `wordFont(for:baseFont:style:)` applies the override
+  (if any) to `.word`-kind segments only - not `.secondaryAttribute`
+  segments (POS tags etc. are conventionally Latin regardless of the
+  corpus's own script, so they stay on the base font). Per-token
+  granularity, not per-character, per the original plan.
+- Picking a script's font reuses the exact same Font Panel flow as the
+  base results font (`NSFontManager.shared.target`/`.action` swapped
+  right before showing the panel) - a pull-down button lists scripts not
+  yet overridden; picking one opens the panel for it.
 
 **Colors**:
-- Positional (secondary) attribute color - currently hardcoded
-  `.secondaryLabelColor` (`KWICCellView`) - new
-  `AppSettings.positionalAttributeColor` (archived `NSColor`), edited via
-  a plain `NSColorWell`.
-- Structural attribute color (6.2's new column) - same pattern, new
+- Positional (secondary) attribute color - was hardcoded
+  `.secondaryLabelColor` in `KWICCellView` - now
+  `AppSettings.positionalAttributeColor` (same default), an `NSColorWell`
+  in Appearance.
+- Structural attribute color (6.2's "Doc" column) - same pattern, new
   `AppSettings.structuralAttributeColor`.
 - Alternating row background - `tableView.usesAlternatingRowBackgroundColors`
-  is currently hardcoded `true` with the system default tint; add an
-  on/off toggle plus an optional `NSColorWell` for a custom alternate-row
-  tint (empty/unset = system default).
-- Flagged as candidates, not committed (the ask didn't explicitly mention
-  these, calling them out per "whatever I missed"): CQL syntax-highlighting
-  colors (currently hardcoded systemRed/Purple/Orange/Teal in
-  `CQLQueryField.recolor()`), and a distinct match/keyword highlight color
-  for 6.6's Extended Context sheet.
+  was hardcoded `true` - now `AppSettings.usesAlternatingRowBackground`
+  (same default), a checkbox in Appearance; `ConcordanceViewController`
+  re-applies it live in `settingsDidChange` (previously only
+  `tableView.reloadData()` ran there, for font changes).
+- **Dropped, not built**: a custom tint color for the alternating stripe
+  itself. That needs custom row drawing - `NSTableView`'s own alternating
+  colors aren't independently recolorable via a simple property - and no
+  native Mac app actually exposes this, so it wasn't worth the
+  custom-drawing complexity for a look nothing else offers either.
+  CQL syntax-highlighting colors and a dedicated match/keyword highlight
+  color (flagged as candidates in the original plan) were also left out
+  - genuinely optional, and this sub-phase was already large enough.
+- `NSColor` has no native `UserDefaults` support - new private
+  `AppSettings.color(forKey:)`/`setColor(_:forKey:)` archive via
+  `NSKeyedArchiver`/`Unarchiver` (`NSColor` conforms to
+  `NSSecureCoding`), same shape as every other property here plus one
+  encode/decode step.
 
-**Key files**: `AppSettings.swift` (new properties + an `NSColor`
-archiving helper), `Settings/AppearanceSettingsViewController.swift` (new
-sections), `KWICFormatter.swift`/`KWICCellView.swift` (consume the new
-settings), new small `UnicodeScript.swift` classifier (AppKit-free, no
-engine dependency - lives in `Corpora`, not `ManateeKit`, since it's a
-pure rendering concern).
+**Key files**: new `Documents/UnicodeScript.swift`, `AppSettings.swift`,
+`Settings/AppearanceSettingsViewController.swift` (fully reworked - font
+picker plus three new sections), `KWICCellView.swift`,
+`ConcordanceViewController.swift` (`setUpTableView`/`settingsDidChange`).
 
-**Verify**: unit test `UnicodeScript` classification against
-representative code points per script; `BuildProject`/`RunAllTests`;
-manual test changing colors/fonts and confirming both the on-screen table
-and Print/PDF output (which already mirrors on-screen styling per
-Phase 5.5) reflect them.
+New tests, `UnicodeScriptTests.swift` (3): each covered script classifies
+correctly from a representative word; digits/punctuation/empty/whitespace
+fall back to `.other`; a token mixing leading digits with real script
+text (`"123fox"`, `"123быть"`) still resolves via its first classifying
+scalar rather than stopping at the digits.
+
+Verified: `xcodegen generate` (picked up `UnicodeScript.swift`) then
+`BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**; `RunAllTests`
+→ 35/35 `CorporaTests` passing (3 new). Manually tested and confirmed
+working (screenshot).
+
+**Two unrelated bugs found during that same manual test, on a real
+~30-attribute corpus:**
+
+1. **`FilterSheetController`'s positive/negative radio buttons weren't
+   mutually exclusive** - the exact same root cause as 6.2's structural
+   radio buttons (`NSButton(radioButtonWithTitle:target: nil, action:
+   nil)`, relying on AppKit's automatic same-superview grouping, which
+   doesn't reliably engage with a `nil` target/action). Fixed the same
+   way: explicit `radioTapped(_:)` action turning the other one off.
+   Grepped for every other `radioButtonWithTitle` use in the app to
+   confirm these were the only two spots with the bug.
+2. **The Attributes popover had no scroll view and no height cap** - a
+   corpus declaring dozens of positional *and* structural attributes (a
+   real ~30-attribute corpus, confirmed via screenshot) grew the popover
+   tall enough to run off the top of the screen entirely, with the
+   title/header cut off and no way to scroll up to it. Fixed: the two
+   attribute lists now live inside one `NSScrollView` (a `contentStack`
+   documentView, height-capped at `maxScrollHeight = 320`pt via an
+   explicit `scrollHeightConstraint`, computed from
+   `contentStack.fittingSize.height` after each repopulation), with the
+   main title and Apply/error chrome staying fixed outside it. Also (the
+   user's own related idea, "think about making the structural attributes
+   2 column if there are more than X"): more than `structuralColumnThreshold
+   = 12` structural attributes now split into two side-by-side columns
+   rather than one long list - safe now that radio exclusivity is
+   managed explicitly rather than depending on every button sharing one
+   literal stack view. Deliberately scoped to the structural section only
+   (as asked) - the positional-attribute checklist keeps its existing
+   single-column layout.
+
+Verified (both fixes): `BuildProject(buildForTesting: true)` → **BUILD
+SUCCEEDED**; `RunAllTests` → 35/35 `CorporaTests` passing (unaffected).
+Not yet manually re-tested - next step: reopen the Filter sheet and
+confirm exactly one of Keep/Remove stays checked; reopen the Attributes
+popover on the same large corpus and confirm it now scrolls within a
+fixed height instead of growing off-screen, and that the structural
+section shows two columns.
 
 ### 6.6 — Extended context on the selected line (not started)
 

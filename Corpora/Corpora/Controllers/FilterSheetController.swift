@@ -19,6 +19,14 @@ final class FilterSheetController: NSViewController {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 320))
 
         positiveRadio.state = .on
+        // Not left to AppKit's automatic same-superview radio grouping -
+        // that didn't reliably engage with a `nil` target/action for the
+        // structural-attribute radio group either (Phase 6.2, found via
+        // manual testing) - managed explicitly instead.
+        positiveRadio.target = self
+        positiveRadio.action = #selector(radioTapped(_:))
+        negativeRadio.target = self
+        negativeRadio.action = #selector(radioTapped(_:))
         rankPopUp.addItems(withTitles: ["First match", "Last match"])
         includeKwicCheckbox.state = .on
         queryField.onSubmit = { [weak self] in self?.applyTapped() }
@@ -87,6 +95,11 @@ final class FilterSheetController: NSViewController {
 
         view = root
         preferredContentSize = NSSize(width: 460, height: 320)
+    }
+
+    @objc private func radioTapped(_ sender: NSButton) {
+        positiveRadio.state = sender === positiveRadio ? .on : .off
+        negativeRadio.state = sender === negativeRadio ? .on : .off
     }
 
     @objc private func applyTapped() {
