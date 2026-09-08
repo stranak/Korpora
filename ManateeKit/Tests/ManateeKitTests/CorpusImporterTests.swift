@@ -13,7 +13,7 @@ final class CorpusImporterTests: XCTestCase {
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: tempDir)
-        unsetenv("CORPORA_COMPILED_CORPORA_DIRECTORY")
+        unsetenv("KORPORA_COMPILED_CORPORA_DIRECTORY")
     }
 
     private func writeVerticalFile(_ content: String) throws -> URL {
@@ -77,7 +77,7 @@ final class CorpusImporterTests: XCTestCase {
 
     func testImportCorpusWipesStaleFilesFromAPreviousAttempt() async throws {
         let compiledDir = tempDir.appendingPathComponent("compiled")
-        setenv("CORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
+        setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
 
         let vert = try writeVerticalFile("""
             <doc id="1">
@@ -124,7 +124,7 @@ final class CorpusImporterTests: XCTestCase {
 
     func testImportCorpusRefusesToCompileWhenDeclaredAttributesDontMatchFileColumns() async throws {
         let compiledDir = tempDir.appendingPathComponent("compiled")
-        setenv("CORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
+        setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
 
         // Three tab-separated columns per line (word, lemma, tag), but the
         // caller only declares "lemma" - i.e. exactly the kind of mismatch
@@ -167,7 +167,7 @@ final class CorpusImporterTests: XCTestCase {
 
     func testImportCorpusCompilesAndIsQueryable() async throws {
         let compiledDir = tempDir.appendingPathComponent("compiled")
-        setenv("CORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
+        setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
 
         let vert = try writeVerticalFile("""
             <doc id="1">

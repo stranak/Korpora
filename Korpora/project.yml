@@ -1,4 +1,4 @@
-name: Corpora
+name: Korpora
 options:
   bundleIdPrefix: cz.cuni.mff.ufal
   deploymentTarget:
@@ -10,11 +10,11 @@ packages:
     path: ../ManateeKit
 
 targets:
-  Corpora:
+  Korpora:
     type: application
     platform: macOS
     sources:
-      - path: Corpora
+      - path: Korpora
     dependencies:
       - package: ManateeKit
         product: ManateeKit
@@ -26,28 +26,28 @@ targets:
         SWIFT_VERSION: "5.0"
         ENABLE_HARDENED_RUNTIME: NO
         GENERATE_INFOPLIST_FILE: NO
-        INFOPLIST_FILE: Corpora/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Corpora/Corpora.entitlements
+        INFOPLIST_FILE: Korpora/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Korpora/Korpora.entitlements
 
-  CorporaTests:
+  KorporaTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: CorporaTests
+      - path: KorporaTests
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
         BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Corpora.app/Contents/MacOS/Corpora"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Korpora.app/Contents/MacOS/Korpora"
     dependencies:
-      - target: Corpora
+      - target: Korpora
 
 schemes:
-  Corpora:
+  Korpora:
     build:
       targets:
-        Corpora: all
-        CorporaTests: [test]
+        Korpora: all
+        KorporaTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -59,4 +59,4 @@ schemes:
     test:
       config: Debug
       targets:
-        - CorporaTests
+        - KorporaTests

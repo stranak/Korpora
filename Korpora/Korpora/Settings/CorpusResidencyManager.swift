@@ -28,7 +28,7 @@ final class CorpusResidencyManager {
             guard CorpusMemoryResidency.canKeepResident(
                 sizeBytes: size, currentlyAvailable: CorpusMemoryResidency.availableMemory(),
                 minimumFreeAfter: AppSettings.shared.minimumFreeMemoryAfterResidency) else {
-                NSLog("Corpora: skipping launch-time warm of \"%@\" - not enough free memory right now.", name)
+                NSLog("Korpora: skipping launch-time warm of \"%@\" - not enough free memory right now.", name)
                 continue
             }
             Task.detached(priority: .utility) {
@@ -50,7 +50,7 @@ final class CorpusResidencyManager {
     private func coolDownAllResidentCorpora() {
         for name in CompiledCorpusStore.availableCorpusNames() {
             guard CompiledCorpusStore.metadata(for: name).keepResident else { continue }
-            NSLog("Corpora: system memory pressure critical - releasing warmed pages for \"%@\".", name)
+            NSLog("Korpora: system memory pressure critical - releasing warmed pages for \"%@\".", name)
             CorpusMemoryResidency.unwarm(directory: CompiledCorpusStore.dataDirectory(for: name))
         }
     }

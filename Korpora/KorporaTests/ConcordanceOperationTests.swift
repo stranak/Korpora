@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import ManateeKit
-@testable import Corpora
+@testable import Korpora
 
 @Suite struct ConcordanceOperationTests {
     @Test func lineGroupOperationIsRecognized() {

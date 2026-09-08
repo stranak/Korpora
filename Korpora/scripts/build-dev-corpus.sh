@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the tiny corpus the Xcode scheme points MANATEE_REGISTRY at, so
-# running Corpora from Xcode has a real corpus to pick in the "New
+# running Korpora from Xcode has a real corpus to pick in the "New
 # Concordance" sheet instead of an empty picker. Deliberately NOT the same
 # corpus as ManateeKit's TestCorpusFixture (which stays a minimal 2-<doc>
 # fixture for fast, deterministic automated tests) - this one has 5 <doc>s
@@ -214,7 +214,7 @@ EOF
 
 cat > "$CORPUS/registry/testcorp" << EOF
 NAME "Test Corpus"
-INFO "tiny dev-only corpus for running Corpora from Xcode"
+INFO "tiny dev-only corpus for running Korpora from Xcode"
 PATH "$CORPUS/data"
 VERTICAL "$CORPUS/vert/test.vert"
 LANGUAGE "en"

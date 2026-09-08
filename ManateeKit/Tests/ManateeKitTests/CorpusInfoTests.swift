@@ -65,4 +65,38 @@ final class CorpusInfoTests: XCTestCase {
             // Expected.
         }
     }
+
+    /// Phase 6.6 (Extended Context): a plain-position-range fetch, no live
+    /// query/concordance needed. "the quick brown fox jumps" is the
+    /// fixture's first sentence, positions 0-4.
+    func testPositionalAttributeRangeReturnsSpaceJoinedTokens() async throws {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        let words = try await corpus.positionalAttributeRange(from: 0, to: 5, attribute: "word")
+        XCTAssertEqual(words, "the quick brown fox jumps")
+
+        let lemmas = try await corpus.positionalAttributeRange(from: 3, to: 5, attribute: "lemma")
+        XCTAssertEqual(lemmas, "fox jump")
+    }
+
+    func testPositionalAttributeRangeClampsToCorpusBounds() async throws {
+        // The fixture is 17 tokens (0-16) - a request running off either
+        // end (as "position ± N" naturally does for a hit near the start
+        // or end of the corpus) must clamp, not throw or read garbage.
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        let clampedStart = try await corpus.positionalAttributeRange(from: -10, to: 3, attribute: "word")
+        XCTAssertEqual(clampedStart, "the quick brown")
+
+        let clampedEnd = try await corpus.positionalAttributeRange(from: 15, to: 100, attribute: "word")
+        XCTAssertEqual(clampedEnd, "cat yawns")
+    }
+
+    func testPositionalAttributeRangeThrowsForUnknownAttribute() async throws {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        do {
+            _ = try await corpus.positionalAttributeRange(from: 0, to: 1, attribute: "notreal")
+            XCTFail("expected an error for an unknown positional attribute")
+        } catch {
+            // Expected.
+        }
+    }
 }

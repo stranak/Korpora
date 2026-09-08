@@ -7,7 +7,7 @@ AppSettings.shared.applyEnvironment()
 // The custom NSDocumentController subclass must exist before any document
 // opens, or NSDocumentController.shared silently falls back to the default
 // class - so it's instantiated here, ahead of NSApplication.main().
-_ = CorporaDocumentController()
+_ = KorporaDocumentController()
 
 let app = NSApplication.shared
 let delegate = AppDelegate()

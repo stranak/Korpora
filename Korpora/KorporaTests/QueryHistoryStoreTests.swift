@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Corpora
+@testable import Korpora
 
 @Suite struct QueryHistoryStoreTests {
     /// A private, isolated suite per test - never touches the user's real

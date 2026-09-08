@@ -570,6 +570,41 @@ char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char
     }
 }
 
+char *mtc_corpus_positional_attr_range(MTCCorpus *corp, long long from_position, long long to_position,
+                                        const char *attr_name, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        // Same "call PosAttr::pos2str directly off a position, no live
+        // concordance needed" approach as mtc_corpus_get_struct_attr above
+        // (Phase 5.4) - just over a range of positions instead of one, and
+        // for a plain positional attribute (e.g. "word") rather than a
+        // structural one. Clamped to [0, search_size()) rather than trusting
+        // the caller's range - Extended Context requests position ± N
+        // tokens, which easily runs off either end of the corpus for a hit
+        // near its start/end.
+        long long size = static_cast<long long>(corp->corp->search_size());
+        long long from = std::max<long long>(0, from_position);
+        long long to = std::min<long long>(size, to_position);
+        PosAttr *attr = corp->corp->get_attr(attr_name);
+        std::string result;
+        for (long long pos = from; pos < to; ++pos) {
+            if (pos > from)
+                result += " ";
+            result += attr->pos2str(static_cast<Position>(pos));
+        }
+        return strdup(result.c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading positional attribute range");
+        return nullptr;
+    }
+}
+
 int mtc_create_subcorpus(MTCCorpus *corp, const char *subc_path, const char *struct_name,
                           const char *query, char **error) {
     if (!corp) {

@@ -7,7 +7,7 @@ import Foundation
 public enum SubcorpusStore {
     public static var baseDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return appSupport.appendingPathComponent("Corpora/Subcorpora", isDirectory: true)
+        return appSupport.appendingPathComponent("Korpora/Subcorpora", isDirectory: true)
     }
 
     public static func directory(for corpusName: String) -> URL {

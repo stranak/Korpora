@@ -1,5 +1,5 @@
 import Testing
-@testable import Corpora
+@testable import Korpora
 
 @Suite struct UnicodeScriptTests {
     @Test func dominantClassifiesEachCoveredScript() {

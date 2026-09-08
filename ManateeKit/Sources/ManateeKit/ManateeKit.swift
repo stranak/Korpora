@@ -180,6 +180,25 @@ public actor Corpus {
         return String(cString: cstr)
     }
 
+    /// Space-joined values of positional attribute `attribute` (e.g.
+    /// "word") over corpus-wide token positions `[fromPosition,
+    /// toPosition)` - "Extended Context"'s primitive (Phase 6.6): given a
+    /// hit's own position (`KWICLine.position`) and match length, the
+    /// caller asks for a much wider window around it directly, with no
+    /// live query/concordance needed at all - see
+    /// `mtc_corpus_positional_attr_range`'s own doc comment. Silently
+    /// clamped to the corpus's own bounds by the bridge - a hit near the
+    /// very start/end of the corpus is expected to ask for a range that
+    /// runs off one side.
+    public func positionalAttributeRange(from fromPosition: Int, to toPosition: Int, attribute: String) throws -> String {
+        var error: UnsafeMutablePointer<CChar>?
+        guard let cstr = mtc_corpus_positional_attr_range(handle, Int64(fromPosition), Int64(toPosition), attribute, &error) else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        defer { mtc_free_string(cstr) }
+        return String(cString: cstr)
+    }
+
     /// Opens a previously created subcorpus (see `createSubcorpus`) as its
     /// own `Corpus` - queries against it are automatically restricted to the
     /// subcorpus's range, since `SubCorpus` overrides `filter_query` in C++

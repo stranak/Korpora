@@ -71,6 +71,47 @@ final class KWICCellView: NSTableCellView {
         self.style = style
     }
 
+    /// The inline "Extended Context" display mode (see
+    /// `ConcordanceViewController`'s row-view overlay) needs one
+    /// continuous, word-wrapped paragraph spanning the whole row - not
+    /// three separate Left/Match/Right strings - so the match reads as
+    /// part of a normal sentence rather than as three disconnected
+    /// fragments. Lives here (not on the overlay field itself) purely to
+    /// reuse this file's font/color conventions.
+    static func extendedContextParagraph(before: String, match: String, after: String) -> NSAttributedString {
+        let baseFont = AppSettings.shared.resultsFont
+        let boldFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .boldFontMask)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.alignment = .left
+
+        let result = NSMutableAttributedString()
+        func append(_ text: String, font: NSFont, color: NSColor) {
+            guard !text.isEmpty else { return }
+            if result.length > 0 {
+                result.append(NSAttributedString(string: " ", attributes: [.font: baseFont, .paragraphStyle: paragraphStyle]))
+            }
+            result.append(NSAttributedString(
+                string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraphStyle]))
+        }
+        append(before, font: baseFont, color: .labelColor)
+        append(match, font: boldFont, color: .controlAccentColor)
+        append(after, font: baseFont, color: .labelColor)
+        return result
+    }
+
+    /// The height `paragraph` (from `extendedContextParagraph`) needs to
+    /// word-wrap within `width` - shared by `ConcordanceViewController
+    /// .tableView(_:heightOfRow:)` so the row is sized to exactly match
+    /// what the overlay is about to render, not a guess.
+    static func extendedContextHeight(for paragraph: NSAttributedString, width: CGFloat) -> CGFloat {
+        guard paragraph.length > 0 else { return 0 }
+        let bounding = paragraph.boundingRect(
+            with: NSSize(width: max(width, 10), height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading])
+        return ceil(bounding.height)
+    }
+
     /// Per-token hover tooltips via manual mouse tracking - see
     /// docs/project-plan.md's Phase 5.3 writeup for the full diagnostic
     /// history (an `NSTableViewDelegate`-based attempt never fired for this

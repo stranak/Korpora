@@ -10,9 +10,11 @@ final class ConcordanceSettingsViewController: NSViewController {
     private let viewModeControl = NSSegmentedControl(
         labels: ["KWIC", "Sentence"], trackingMode: .selectOne, target: nil, action: nil)
     private let extendedContextField = NSTextField(string: "")
+    private let extendedContextDisplayControl = NSSegmentedControl(
+        labels: ["Sheet", "Inline"], trackingMode: .selectOne, target: nil, action: nil)
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 180))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 220))
 
         let contextLabel = NSTextField(labelWithString: "Default context width:")
         let leftLabel = NSTextField(labelWithString: "Left:")
@@ -21,6 +23,7 @@ final class ConcordanceSettingsViewController: NSViewController {
         let extendedLabel = NSTextField(labelWithString: "Extended context tokens:")
         extendedLabel.font = .systemFont(ofSize: 11)
         extendedLabel.textColor = .secondaryLabelColor
+        let extendedDisplayLabel = NSTextField(labelWithString: "Extended context display:")
 
         leftContextField.delegate = self
         rightContextField.delegate = self
@@ -28,16 +31,21 @@ final class ConcordanceSettingsViewController: NSViewController {
         viewModeControl.segmentStyle = .texturedRounded
         viewModeControl.target = self
         viewModeControl.action = #selector(viewModeChanged)
+        extendedContextDisplayControl.segmentStyle = .texturedRounded
+        extendedContextDisplayControl.target = self
+        extendedContextDisplayControl.action = #selector(extendedContextDisplayModeChanged)
 
         let settings = AppSettings.shared
         leftContextField.stringValue = String(settings.defaultLeftContext)
         rightContextField.stringValue = String(settings.defaultRightContext)
         extendedContextField.stringValue = String(settings.defaultExtendedContextTokens)
         viewModeControl.selectedSegment = settings.defaultViewMode == .sentence ? 1 : 0
+        extendedContextDisplayControl.selectedSegment = settings.extendedContextDisplayMode == .inline ? 1 : 0
 
         let views: [NSView] = [
             contextLabel, leftLabel, leftContextField, rightLabel, rightContextField,
             viewModeLabel, viewModeControl, extendedLabel, extendedContextField,
+            extendedDisplayLabel, extendedContextDisplayControl,
         ]
         for v in views {
             v.translatesAutoresizingMaskIntoConstraints = false
@@ -69,14 +77,23 @@ final class ConcordanceSettingsViewController: NSViewController {
             extendedLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             extendedContextField.centerYAnchor.constraint(equalTo: extendedLabel.centerYAnchor),
             extendedContextField.leadingAnchor.constraint(equalTo: extendedLabel.trailingAnchor, constant: 8),
+
+            extendedDisplayLabel.topAnchor.constraint(equalTo: extendedLabel.bottomAnchor, constant: 12),
+            extendedDisplayLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
+            extendedContextDisplayControl.centerYAnchor.constraint(equalTo: extendedDisplayLabel.centerYAnchor),
+            extendedContextDisplayControl.leadingAnchor.constraint(equalTo: extendedDisplayLabel.trailingAnchor, constant: 8),
         ])
 
         view = root
-        preferredContentSize = NSSize(width: 420, height: 180)
+        preferredContentSize = NSSize(width: 420, height: 220)
     }
 
     @objc private func viewModeChanged() {
         AppSettings.shared.defaultViewMode = viewModeControl.selectedSegment == 1 ? .sentence : .kwic
+    }
+
+    @objc private func extendedContextDisplayModeChanged() {
+        AppSettings.shared.extendedContextDisplayMode = extendedContextDisplayControl.selectedSegment == 1 ? .inline : .sheet
     }
 }
 

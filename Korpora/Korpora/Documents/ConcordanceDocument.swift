@@ -29,12 +29,31 @@ enum ConcordanceViewMode: String, Codable {
     case sentence
 }
 
+/// How "Extended Context…" (Phase 6.6) presents a hit's wider context - a
+/// global preference (`AppSettings.extendedContextDisplayMode`), not a
+/// per-document one, since it's purely about presentation, not data.
+enum ExtendedContextDisplayMode: String, Codable {
+    /// An independent, non-modal window
+    /// (`ExtendedContextWindowController`) - the original 6.6 behavior
+    /// was a modal sheet; switched to a plain window once multiple could
+    /// need to stay open at once (`AppSettings
+    /// .allowMultipleExtendedContexts`), which a sheet can't support (at
+    /// most one per parent window). Kept the `sheet` case name/rawValue
+    /// for UserDefaults backward compatibility - the Settings UI now
+    /// labels it "Window".
+    case sheet
+    /// The clicked row itself grows in place into a word-wrapped
+    /// paragraph, right in the table - added after the user asked for it
+    /// as an alternative to the sheet.
+    case inline
+}
+
 /// The persisted content is the query, not the materialized rows - stable
 /// and small regardless of result-set size, and the base that the
 /// `operations` chain (see `ConcordanceOperation`) replays against. See
 /// docs/project-plan.md's NSDocument model section.
 final class ConcordanceDocument: NSDocument {
-    static let typeName = "cz.cuni.mff.ufal.corpora.concordance"
+    static let typeName = "cz.cuni.mff.ufal.korpora.concordance"
 
     var corpusName: String = ""
     /// Path to a subcorpus (see `SubcorpusStore`) to query instead of the
@@ -529,6 +548,68 @@ final class ConcordanceDocument: NSDocument {
             }
         }
         return results
+    }
+
+    /// One hit's match plus much wider surrounding context than its table
+    /// row shows - KonText's "concordance detail" (Phase 6.6). Fetches
+    /// directly via `Corpus.positionalAttributeRange` (Phase 5.4/6.6's
+    /// position-indexed lookup pattern), independent of
+    /// `leftContext`/`rightContext`/`viewMode` entirely - a much wider
+    /// window than either would reasonably show inline, and unaffected by
+    /// whichever one is currently active. `AppSettings.shared
+    /// .defaultExtendedContextTokens` (Phase 6.4) sets how many tokens
+    /// each side to ask for; a hit near the very start/end of the corpus
+    /// gets fewer on that side (the bridge clamps the fetch, this clamps
+    /// the "how many words precede the match" math identically, so the
+    /// split into before/match/after stays correct either way).
+    func extendedContext(at rowID: Int) async throws -> (before: String, match: String, after: String) {
+        guard let queryCorpus else { throw AnalysisError.noResultsYet }
+        guard rows.indices.contains(rowID) else { throw AnalysisError.noResultsYet }
+        let line = rows[rowID].line
+        let matchLength = max(line.kwicTokens.count, 1)
+        let tokensAround = AppSettings.shared.defaultExtendedContextTokens
+        let position = line.position
+        let actualTokensBefore = min(tokensAround, position)
+        let text = try await queryCorpus.positionalAttributeRange(
+            from: position - tokensAround, to: position + matchLength + tokensAround, attribute: kwicAttr)
+        let words = text.split(separator: " ").map(String.init)
+        let before = words.prefix(actualTokensBefore).joined(separator: " ")
+        let match = words.dropFirst(actualTokensBefore).prefix(matchLength).joined(separator: " ")
+        let after = words.dropFirst(actualTokensBefore + matchLength).joined(separator: " ")
+        return (before, match, after)
+    }
+
+    /// Identifies which hit an `ExtendedContextWindowController` belongs
+    /// to - the corpus name is always known; document/sentence labels are
+    /// whichever structural attribute values `structuralInfo(at:)` (every
+    /// non-empty structure/attribute enclosing this position) happens to
+    /// have, reusing that lookup rather than querying the engine again:
+    /// document is whichever entry matches `structuralAttributeToShow`
+    /// (the same attribute already shown as its own KWIC column, if any);
+    /// sentence is the first attribute of a structure literally named
+    /// "s" (the common corpus convention for the enclosing sentence),
+    /// falling back to nil if the corpus declares no such structure.
+    struct ExtendedContextInfo {
+        let corpusName: String
+        let documentLabel: String?
+        let sentenceLabel: String?
+
+        var headerLines: [String] {
+            var lines = ["Corpus: \(corpusName)"]
+            if let documentLabel { lines.append("Document: \(documentLabel)") }
+            if let sentenceLabel { lines.append("Sentence: \(sentenceLabel)") }
+            return lines
+        }
+    }
+
+    func extendedContextInfo(at rowID: Int) async throws -> ExtendedContextInfo {
+        let info = try await structuralInfo(at: rowID)
+        let documentLabel = structuralAttributeToShow.flatMap { attribute in
+            info.first { "\($0.structure).\($0.attribute)" == attribute }
+                .map { "\($0.attribute): \($0.value)" }
+        }
+        let sentenceLabel = info.first { $0.structure == "s" }.map { "\($0.attribute): \($0.value)" }
+        return ExtendedContextInfo(corpusName: corpusName, documentLabel: documentLabel, sentenceLabel: sentenceLabel)
     }
 
     // MARK: - Persistence (query + operation chain only, never the materialized rows)

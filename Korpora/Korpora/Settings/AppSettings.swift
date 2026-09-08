@@ -20,6 +20,7 @@ final class AppSettings {
         static let positionalAttributeColor = "positionalAttributeColor"
         static let structuralAttributeColor = "structuralAttributeColor"
         static let usesAlternatingRowBackground = "usesAlternatingRowBackground"
+        static let extendedContextDisplayMode = "extendedContextDisplayMode"
     }
 
     private let defaults: UserDefaults
@@ -144,6 +145,20 @@ final class AppSettings {
         }
     }
 
+    /// How "Extended Context…" presents itself - see
+    /// `ExtendedContextDisplayMode`. Defaults to `.sheet`, the original
+    /// 6.6 behavior.
+    var extendedContextDisplayMode: ExtendedContextDisplayMode {
+        get {
+            defaults.string(forKey: Key.extendedContextDisplayMode)
+                .flatMap(ExtendedContextDisplayMode.init(rawValue:)) ?? .sheet
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Key.extendedContextDisplayMode)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
     /// Per-script concordance font overrides (Unicode script `rawValue` →
     /// font name - see `UnicodeScript`), for a corpus mixing scripts where
     /// `resultsFont` alone isn't ideal for all of them. A script with no
@@ -215,13 +230,13 @@ final class AppSettings {
     /// imported corpus should just work without a separate trip to General
     /// settings), merged on top of whatever `MANATEE_REGISTRY` already is
     /// rather than replacing it - so the Xcode-scheme dev override
-    /// (`Corpora/project.yml`, which points at `DevCorpus`) keeps working
+    /// (`Korpora/project.yml`, which points at `DevCorpus`) keeps working
     /// until/alongside a real preference being set, instead of being
     /// clobbered by this.
     func applyEnvironment() {
         let compiledDirectory = compiledCorporaDirectory?.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? compiledCorporaDirectory! : CompiledCorpusStore.baseDirectory.path
-        setenv("CORPORA_COMPILED_CORPORA_DIRECTORY", compiledDirectory, 1)
+        setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDirectory, 1)
 
         var directories = corpusRegistryDirectories.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         let inherited = ProcessInfo.processInfo.environment["MANATEE_REGISTRY"]?

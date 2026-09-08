@@ -204,6 +204,21 @@ char *mtc_corpus_struct_attr_name(MTCCorpus *corp, const char *struct_name, int 
  * this corpus. */
 char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char *struct_attr_name, char **error);
 
+/* Space-joined values of positional attribute "attr_name" (e.g. "word")
+ * over corpus-wide token positions [from_position, to_position) - the
+ * "Extended Context" feature's primitive: given a hit's own position (see
+ * mtc_kwic_get_pos) and match length, the caller asks for a much wider
+ * window around it directly, without needing a live KWIC/concordance
+ * view at all (same "position-indexed lookup" precedent as
+ * mtc_corpus_get_struct_attr above, just over a range and for a plain
+ * positional attribute instead of a structural one). The range is
+ * silently clamped to the corpus's own bounds - a hit near the very
+ * start/end of the corpus is expected to ask for a range that runs off
+ * one side. Empty string (not NULL) for an empty/inverted range; NULL and
+ * *error set only for an attr_name that doesn't exist in this corpus. */
+char *mtc_corpus_positional_attr_range(MTCCorpus *corp, long long from_position, long long to_position,
+                                       const char *attr_name, char **error);
+
 /* -------------------- subcorpora --------------------
  * A subcorpus is a Manatee-native concept: a saved range file restricting a
  * parent corpus to the hits of one CQL query scoped to a structure (e.g. one

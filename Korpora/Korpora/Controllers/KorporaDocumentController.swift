@@ -8,5 +8,5 @@ import Cocoa
 /// automatic untitled-document-at-launch path calls
 /// `openUntitledDocumentAndDisplay(false)` and shows the window itself
 /// through a separate path, not through this override.
-final class CorporaDocumentController: NSDocumentController {
+final class KorporaDocumentController: NSDocumentController {
 }

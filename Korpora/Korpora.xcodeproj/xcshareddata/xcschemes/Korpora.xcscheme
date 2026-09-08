@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A732E1D8AFE1C69B6E976DA7"
-               BuildableName = "Corpora.app"
-               BlueprintName = "Corpora"
-               ReferencedContainer = "container:Corpora.xcodeproj">
+               BlueprintIdentifier = "2B917CA4AF4211A86396CC11"
+               BuildableName = "Korpora.app"
+               BlueprintName = "Korpora"
+               ReferencedContainer = "container:Korpora.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -29,10 +29,10 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "128BED2A2DB69C10B825014D"
-               BuildableName = "CorporaTests.xctest"
-               BlueprintName = "CorporaTests"
-               ReferencedContainer = "container:Corpora.xcodeproj">
+               BlueprintIdentifier = "8F4BA2CBCF5E415BC25C81A9"
+               BuildableName = "KorporaTests.xctest"
+               BlueprintName = "KorporaTests"
+               ReferencedContainer = "container:Korpora.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,10 +46,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A732E1D8AFE1C69B6E976DA7"
-            BuildableName = "Corpora.app"
-            BlueprintName = "Corpora"
-            ReferencedContainer = "container:Corpora.xcodeproj">
+            BlueprintIdentifier = "2B917CA4AF4211A86396CC11"
+            BuildableName = "Korpora.app"
+            BlueprintName = "Korpora"
+            ReferencedContainer = "container:Korpora.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -58,10 +58,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "128BED2A2DB69C10B825014D"
-               BuildableName = "CorporaTests.xctest"
-               BlueprintName = "CorporaTests"
-               ReferencedContainer = "container:Corpora.xcodeproj">
+               BlueprintIdentifier = "8F4BA2CBCF5E415BC25C81A9"
+               BuildableName = "KorporaTests.xctest"
+               BlueprintName = "KorporaTests"
+               ReferencedContainer = "container:Korpora.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -82,10 +82,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A732E1D8AFE1C69B6E976DA7"
-            BuildableName = "Corpora.app"
-            BlueprintName = "Corpora"
-            ReferencedContainer = "container:Corpora.xcodeproj">
+            BlueprintIdentifier = "2B917CA4AF4211A86396CC11"
+            BuildableName = "Korpora.app"
+            BlueprintName = "Korpora"
+            ReferencedContainer = "container:Korpora.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -108,10 +108,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A732E1D8AFE1C69B6E976DA7"
-            BuildableName = "Corpora.app"
-            BlueprintName = "Corpora"
-            ReferencedContainer = "container:Corpora.xcodeproj">
+            BlueprintIdentifier = "2B917CA4AF4211A86396CC11"
+            BuildableName = "Korpora.app"
+            BlueprintName = "Korpora"
+            ReferencedContainer = "container:Korpora.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

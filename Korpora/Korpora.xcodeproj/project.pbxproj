@@ -1,0 +1,631 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		060E5D3B9CA606588879B548 /* SortPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4005D8384BD2DA78535DA1 /* SortPopoverController.swift */; };
+		1646290BB74EF2EF5D5A25C7 /* ContextPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE414BB1705FBC35C5E276F /* ContextPopoverController.swift */; };
+		16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */; };
+		1938B1A7AFC746B80688FF6E /* CorporaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */; };
+		1C1033F37ED198EBDCED9FED /* FilterSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */; };
+		2361BEBD2F8EC06105F54B5F /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5BD468A9C191CD0CB9A323 /* ConcordanceOperation.swift */; };
+		29B81AF1A74883E0E7A12393 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CEB379EAD1C7D1F10F792C /* AppSettings.swift */; };
+		2A3E4066F2F30C0CF2347756 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */; };
+		2B2B70AE01B0E3943F49F804 /* QueryHistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */; };
+		2C2DBAEE4CA8A8AA5B831246 /* KorporaDocumentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC667DAE0261FA8BD9966E36 /* KorporaDocumentController.swift */; };
+		332D394CACC2683A315A91C0 /* ConcordanceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */; };
+		45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */; };
+		4AB1276625BB1338E6EEFCA0 /* UnicodeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */; };
+		4B12DE00ECB62CF1B94A5E85 /* ExtendedContextWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */; };
+		52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */; };
+		5460A66C8408B07767556999 /* SamplePopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */; };
+		59997812E5187B68B3AB9863 /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F115CEAC930466168A9217 /* SortableTableView.swift */; };
+		6277F53E976159C5958D88C6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2244ED579AEB14CE01DD800F /* AppDelegate.swift */; };
+		6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */; };
+		6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */; };
+		7F41071BF0E94BB152F02C33 /* ConcordanceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */; };
+		8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */; };
+		93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674887DFEED6258891E125A /* OperationsPopoverController.swift */; };
+		9706A787B7D8B81891AC6D95 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A2ABBCF839D0C66351D969 /* main.swift */; };
+		97CB75829A78ECC1D477B9CE /* ConcordanceExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */; };
+		9E0E01C3DC4DE65D38AB17B9 /* CollocationSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BC23CBE793C2ED01EFAE067 /* CollocationSheetController.swift */; };
+		9FEF942A2023A921E3D832A0 /* ConcordanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA20AB3943E5955AFF4F9E1 /* ConcordanceSettingsViewController.swift */; };
+		A1626887D340E9D9566D6217 /* AppearanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F142C472071C00A420ABC5 /* AppearanceSettingsViewController.swift */; };
+		A67B412E8379D165C7EB23DC /* FrequencySheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FC66C90A00125753A67D28 /* FrequencySheetController.swift */; };
+		ABB771AD9CD40A0BB1F5332E /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA396783428D5410E30C0F8 /* ConcordanceDocument.swift */; };
+		B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1FD3479E35618789EA56FC /* CQLQueryField.swift */; };
+		D2292F83A25C875C1174CC94 /* ActiveImportTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */; };
+		D2DB97BA102AA3F70C5066BF /* HistoryPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */; };
+		D70E975D7CE75D961FED9942 /* CorpusImportSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73CC906E25B06673D997CBD4 /* CorpusImportSheetController.swift */; };
+		DA2EEF3E76DF1BE3F5518902 /* UnicodeScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */; };
+		DF41E0A7E0BECE4B5D74495C /* NewConcordanceSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F498141E2902F7FE889DE76F /* NewConcordanceSheetController.swift */; };
+		F2A45E9E1E451D9DAC934FF9 /* CollocationWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */; };
+		F36D175CD48D51F2E3C45511 /* NewSubcorpusPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F74892CDE3F550C94B79B31 /* NewSubcorpusPopoverController.swift */; };
+		F61F339881C039427D569C76 /* CorpusResidencyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */; };
+		F624C1BCF4D833A208DDD6B0 /* ConcordanceWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118D96F87811C199B75B172C /* ConcordanceWindowController.swift */; };
+		F862FD9EFBFAFD408F69D5F0 /* ManateeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 451B02C818B4142D28EA7E25 /* ManateeKit */; };
+		F89A78E1B12E53AFE9E4F061 /* QueryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */; };
+		FFC77053A7C5DCBD559DB120 /* FrequencyWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		347AE67C3253200892902E24 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FD3195342015191BA2A36769 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2B917CA4AF4211A86396CC11;
+			remoteInfo = Korpora;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0B7823CD7A43E310862382A0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICFormatterTests.swift; sourceTree = "<group>"; };
+		10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICFormatter.swift; sourceTree = "<group>"; };
+		118D96F87811C199B75B172C /* ConcordanceWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceWindowController.swift; sourceTree = "<group>"; };
+		16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStore.swift; sourceTree = "<group>"; };
+		194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributeDisplayPopoverController.swift; sourceTree = "<group>"; };
+		206361B4B6C7135D9E8D6D48 /* Korpora.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Korpora.entitlements; sourceTree = "<group>"; };
+		20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedContextWindowController.swift; sourceTree = "<group>"; };
+		2244ED579AEB14CE01DD800F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorporaSettingsViewController.swift; sourceTree = "<group>"; };
+		29FC66C90A00125753A67D28 /* FrequencySheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencySheetController.swift; sourceTree = "<group>"; };
+		36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICCellView.swift; sourceTree = "<group>"; };
+		38F142C472071C00A420ABC5 /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
+		3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceViewController.swift; sourceTree = "<group>"; };
+		50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScriptTests.swift; sourceTree = "<group>"; };
+		548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverController.swift; sourceTree = "<group>"; };
+		5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
+		5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		5D9611D2AC5061EA2B01028F /* ManateeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ManateeKit; path = ../ManateeKit; sourceTree = SOURCE_ROOT; };
+		6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
+		6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveImportTracker.swift; sourceTree = "<group>"; };
+		6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporter.swift; sourceTree = "<group>"; };
+		73CC906E25B06673D997CBD4 /* CorpusImportSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusImportSheetController.swift; sourceTree = "<group>"; };
+		75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSheetController.swift; sourceTree = "<group>"; };
+		7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceOperationTests.swift; sourceTree = "<group>"; };
+		7F74892CDE3F550C94B79B31 /* NewSubcorpusPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSubcorpusPopoverController.swift; sourceTree = "<group>"; };
+		8BA396783428D5410E30C0F8 /* ConcordanceDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceDocument.swift; sourceTree = "<group>"; };
+		8D4005D8384BD2DA78535DA1 /* SortPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortPopoverController.swift; sourceTree = "<group>"; };
+		8DE414BB1705FBC35C5E276F /* ContextPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextPopoverController.swift; sourceTree = "<group>"; };
+		8EA20AB3943E5955AFF4F9E1 /* ConcordanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceSettingsViewController.swift; sourceTree = "<group>"; };
+		9BC23CBE793C2ED01EFAE067 /* CollocationSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationSheetController.swift; sourceTree = "<group>"; };
+		AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScript.swift; sourceTree = "<group>"; };
+		AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusResidencyManager.swift; sourceTree = "<group>"; };
+		B5A2ABBCF839D0C66351D969 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B674887DFEED6258891E125A /* OperationsPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsPopoverController.swift; sourceTree = "<group>"; };
+		BAA221175004C97F623B41C8 /* KorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
+		C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsViewController.swift; sourceTree = "<group>"; };
+		CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationWindowController.swift; sourceTree = "<group>"; };
+		CF1FD3479E35618789EA56FC /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
+		D0F115CEAC930466168A9217 /* SortableTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortableTableView.swift; sourceTree = "<group>"; };
+		D1CEB379EAD1C7D1F10F792C /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStoreTests.swift; sourceTree = "<group>"; };
+		DA5BD468A9C191CD0CB9A323 /* ConcordanceOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceOperation.swift; sourceTree = "<group>"; };
+		EC667DAE0261FA8BD9966E36 /* KorporaDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KorporaDocumentController.swift; sourceTree = "<group>"; };
+		F498141E2902F7FE889DE76F /* NewConcordanceSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConcordanceSheetController.swift; sourceTree = "<group>"; };
+		F564FB37D52D1AD65CC90F09 /* Korpora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Korpora.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		344996EA9D0EC3329DFC7351 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F862FD9EFBFAFD408F69D5F0 /* ManateeKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		263061363AB85CD916D020FF /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				5D9611D2AC5061EA2B01028F /* ManateeKit */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		2651DD11363C8C1BC5B0E0FD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F564FB37D52D1AD65CC90F09 /* Korpora.app */,
+				BAA221175004C97F623B41C8 /* KorporaTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3884778F62C23F3C51ACF9F9 /* Controllers */ = {
+			isa = PBXGroup;
+			children = (
+				6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */,
+				194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */,
+				9BC23CBE793C2ED01EFAE067 /* CollocationSheetController.swift */,
+				CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */,
+				3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */,
+				118D96F87811C199B75B172C /* ConcordanceWindowController.swift */,
+				8DE414BB1705FBC35C5E276F /* ContextPopoverController.swift */,
+				73CC906E25B06673D997CBD4 /* CorpusImportSheetController.swift */,
+				20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */,
+				75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */,
+				29FC66C90A00125753A67D28 /* FrequencySheetController.swift */,
+				BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */,
+				548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */,
+				EC667DAE0261FA8BD9966E36 /* KorporaDocumentController.swift */,
+				F498141E2902F7FE889DE76F /* NewConcordanceSheetController.swift */,
+				7F74892CDE3F550C94B79B31 /* NewSubcorpusPopoverController.swift */,
+				B674887DFEED6258891E125A /* OperationsPopoverController.swift */,
+				6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */,
+				8D4005D8384BD2DA78535DA1 /* SortPopoverController.swift */,
+			);
+			path = Controllers;
+			sourceTree = "<group>";
+		};
+		661A2B36F0D8637FD4135D34 = {
+			isa = PBXGroup;
+			children = (
+				9E97DF74688196CB341F9B0E /* Korpora */,
+				779D82994C6A303E2DDC3D8B /* KorporaTests */,
+				263061363AB85CD916D020FF /* Packages */,
+				2651DD11363C8C1BC5B0E0FD /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		779D82994C6A303E2DDC3D8B /* KorporaTests */ = {
+			isa = PBXGroup;
+			children = (
+				5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */,
+				7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */,
+				0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */,
+				D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */,
+				50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */,
+			);
+			path = KorporaTests;
+			sourceTree = "<group>";
+		};
+		908803DD9C3C6921806E9206 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				CF1FD3479E35618789EA56FC /* CQLQueryField.swift */,
+				36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */,
+				D0F115CEAC930466168A9217 /* SortableTableView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		9E97DF74688196CB341F9B0E /* Korpora */ = {
+			isa = PBXGroup;
+			children = (
+				2244ED579AEB14CE01DD800F /* AppDelegate.swift */,
+				0B7823CD7A43E310862382A0 /* Info.plist */,
+				206361B4B6C7135D9E8D6D48 /* Korpora.entitlements */,
+				B5A2ABBCF839D0C66351D969 /* main.swift */,
+				3884778F62C23F3C51ACF9F9 /* Controllers */,
+				E35D1AF2A62F3C261539018C /* Documents */,
+				BEECC4DA17FD8ED40EAA3591 /* Settings */,
+				908803DD9C3C6921806E9206 /* Views */,
+			);
+			path = Korpora;
+			sourceTree = "<group>";
+		};
+		BEECC4DA17FD8ED40EAA3591 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				38F142C472071C00A420ABC5 /* AppearanceSettingsViewController.swift */,
+				D1CEB379EAD1C7D1F10F792C /* AppSettings.swift */,
+				8EA20AB3943E5955AFF4F9E1 /* ConcordanceSettingsViewController.swift */,
+				27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */,
+				AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */,
+				C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */,
+				16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */,
+				5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		E35D1AF2A62F3C261539018C /* Documents */ = {
+			isa = PBXGroup;
+			children = (
+				8BA396783428D5410E30C0F8 /* ConcordanceDocument.swift */,
+				6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */,
+				DA5BD468A9C191CD0CB9A323 /* ConcordanceOperation.swift */,
+				10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */,
+				AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */,
+			);
+			path = Documents;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2B917CA4AF4211A86396CC11 /* Korpora */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1396CF2ABAD136E067FBFBB7 /* Build configuration list for PBXNativeTarget "Korpora" */;
+			buildPhases = (
+				CE3682BFB80ACACAB34A2529 /* Sources */,
+				344996EA9D0EC3329DFC7351 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Korpora;
+			packageProductDependencies = (
+				451B02C818B4142D28EA7E25 /* ManateeKit */,
+			);
+			productName = Korpora;
+			productReference = F564FB37D52D1AD65CC90F09 /* Korpora.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8F4BA2CBCF5E415BC25C81A9 /* KorporaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3AB5975450A397D394F67798 /* Build configuration list for PBXNativeTarget "KorporaTests" */;
+			buildPhases = (
+				45F9E8EDBC03BEB2F0F930A2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5550BCBB1E3ADF006F1BCF18 /* PBXTargetDependency */,
+			);
+			name = KorporaTests;
+			packageProductDependencies = (
+			);
+			productName = KorporaTests;
+			productReference = BAA221175004C97F623B41C8 /* KorporaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FD3195342015191BA2A36769 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2B917CA4AF4211A86396CC11 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 13B3B70DE762F0628F87648F /* Build configuration list for PBXProject "Korpora" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 661A2B36F0D8637FD4135D34;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0B9162BCEC2109170E58EEC2 /* XCLocalSwiftPackageReference "../ManateeKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2651DD11363C8C1BC5B0E0FD /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2B917CA4AF4211A86396CC11 /* Korpora */,
+				8F4BA2CBCF5E415BC25C81A9 /* KorporaTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		45F9E8EDBC03BEB2F0F930A2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				97CB75829A78ECC1D477B9CE /* ConcordanceExporterTests.swift in Sources */,
+				6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */,
+				45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */,
+				2B2B70AE01B0E3943F49F804 /* QueryHistoryStoreTests.swift in Sources */,
+				DA2EEF3E76DF1BE3F5518902 /* UnicodeScriptTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE3682BFB80ACACAB34A2529 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D2292F83A25C875C1174CC94 /* ActiveImportTracker.swift in Sources */,
+				6277F53E976159C5958D88C6 /* AppDelegate.swift in Sources */,
+				29B81AF1A74883E0E7A12393 /* AppSettings.swift in Sources */,
+				A1626887D340E9D9566D6217 /* AppearanceSettingsViewController.swift in Sources */,
+				16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */,
+				B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */,
+				9E0E01C3DC4DE65D38AB17B9 /* CollocationSheetController.swift in Sources */,
+				F2A45E9E1E451D9DAC934FF9 /* CollocationWindowController.swift in Sources */,
+				ABB771AD9CD40A0BB1F5332E /* ConcordanceDocument.swift in Sources */,
+				7F41071BF0E94BB152F02C33 /* ConcordanceExporter.swift in Sources */,
+				2361BEBD2F8EC06105F54B5F /* ConcordanceOperation.swift in Sources */,
+				9FEF942A2023A921E3D832A0 /* ConcordanceSettingsViewController.swift in Sources */,
+				332D394CACC2683A315A91C0 /* ConcordanceViewController.swift in Sources */,
+				F624C1BCF4D833A208DDD6B0 /* ConcordanceWindowController.swift in Sources */,
+				1646290BB74EF2EF5D5A25C7 /* ContextPopoverController.swift in Sources */,
+				1938B1A7AFC746B80688FF6E /* CorporaSettingsViewController.swift in Sources */,
+				D70E975D7CE75D961FED9942 /* CorpusImportSheetController.swift in Sources */,
+				F61F339881C039427D569C76 /* CorpusResidencyManager.swift in Sources */,
+				4B12DE00ECB62CF1B94A5E85 /* ExtendedContextWindowController.swift in Sources */,
+				1C1033F37ED198EBDCED9FED /* FilterSheetController.swift in Sources */,
+				A67B412E8379D165C7EB23DC /* FrequencySheetController.swift in Sources */,
+				FFC77053A7C5DCBD559DB120 /* FrequencyWindowController.swift in Sources */,
+				52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */,
+				D2DB97BA102AA3F70C5066BF /* HistoryPopoverController.swift in Sources */,
+				8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */,
+				6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */,
+				2C2DBAEE4CA8A8AA5B831246 /* KorporaDocumentController.swift in Sources */,
+				DF41E0A7E0BECE4B5D74495C /* NewConcordanceSheetController.swift in Sources */,
+				F36D175CD48D51F2E3C45511 /* NewSubcorpusPopoverController.swift in Sources */,
+				93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */,
+				F89A78E1B12E53AFE9E4F061 /* QueryHistoryStore.swift in Sources */,
+				5460A66C8408B07767556999 /* SamplePopoverController.swift in Sources */,
+				2A3E4066F2F30C0CF2347756 /* SettingsWindowController.swift in Sources */,
+				060E5D3B9CA606588879B548 /* SortPopoverController.swift in Sources */,
+				59997812E5187B68B3AB9863 /* SortableTableView.swift in Sources */,
+				4AB1276625BB1338E6EEFCA0 /* UnicodeScript.swift in Sources */,
+				9706A787B7D8B81891AC6D95 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5550BCBB1E3ADF006F1BCF18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2B917CA4AF4211A86396CC11 /* Korpora */;
+			targetProxy = 347AE67C3253200892902E24 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3A6166325892E6B9636B229D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Korpora/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cz.cuni.mff.ufal.mac-corpora.dev";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		5124E1E918813FA8D76E6DA0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Korpora/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cz.cuni.mff.ufal.mac-corpora.dev";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		72AF9B8104CCAF7BBD0072E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		84CABE5D6D6E95883295165A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8F5742E96BD601F1A06A6AA4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = cz.cuni.mff.ufal.KorporaTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Korpora.app/Contents/MacOS/Korpora";
+			};
+			name = Debug;
+		};
+		FD4CCF630905CC5784F912B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = cz.cuni.mff.ufal.KorporaTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Korpora.app/Contents/MacOS/Korpora";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1396CF2ABAD136E067FBFBB7 /* Build configuration list for PBXNativeTarget "Korpora" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3A6166325892E6B9636B229D /* Debug */,
+				5124E1E918813FA8D76E6DA0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		13B3B70DE762F0628F87648F /* Build configuration list for PBXProject "Korpora" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84CABE5D6D6E95883295165A /* Debug */,
+				72AF9B8104CCAF7BBD0072E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3AB5975450A397D394F67798 /* Build configuration list for PBXNativeTarget "KorporaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F5742E96BD601F1A06A6AA4 /* Debug */,
+				FD4CCF630905CC5784F912B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		0B9162BCEC2109170E58EEC2 /* XCLocalSwiftPackageReference "../ManateeKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ManateeKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		451B02C818B4142D28EA7E25 /* ManateeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ManateeKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = FD3195342015191BA2A36769 /* Project object */;
+}
