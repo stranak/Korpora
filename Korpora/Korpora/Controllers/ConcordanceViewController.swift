@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 final class ConcordanceViewController: NSViewController {
     private enum Section { case main }
-    private enum Column: String { case group, doc, left, kwic, right }
+    private enum Column: String { case disclosure, group, doc, left, kwic, right }
 
     private let document: ConcordanceDocument
     private let queryField = CQLQueryField()
@@ -28,10 +28,23 @@ final class ConcordanceViewController: NSViewController {
     // Inline "Extended Context" (`AppSettings.extendedContextDisplayMode
     // == .inline`) - transient UI state, not part of `ConcordanceDocument`,
     // since it's purely presentational and doesn't survive a real replay
-    // (see `refresh(animated:)`). At most one row expanded at a time,
-    // matching the sheet mode's own "if only one selected" framing.
-    private var expandedRowID: Int?
-    private var expandedContext: (before: String, match: String, after: String)?
+    // (see `refresh(animated:)`).
+    //
+    // A set/dictionary rather than 6.6's single `expandedRowID: Int?`,
+    // because `AppSettings.allowMultipleExtendedContexts` (6.6a) lets any
+    // number of rows be expanded at once. With that setting off these still
+    // never hold more than one entry - `collapseAllExpansions` runs first -
+    // so the one-at-a-time default is preserved exactly.
+    private var expandedRowIDs: Set<Int> = []
+    private var expandedContexts: [Int: (before: String, match: String, after: String)] = [:]
+
+    /// Governs both presentations - see `AppSettings
+    /// .allowMultipleExtendedContexts`. Read fresh rather than cached, so
+    /// flipping it in Settings takes effect on the next interaction
+    /// without needing a `settingsDidChange` hook.
+    private var allowsMultipleExtendedContexts: Bool {
+        AppSettings.shared.allowMultipleExtendedContexts
+    }
 
     weak var windowController: ConcordanceWindowController?
 
@@ -111,6 +124,15 @@ final class ConcordanceViewController: NSViewController {
     /// fresh per-cell.
     @objc private func settingsDidChange() {
         tableView.usesAlternatingRowBackgroundColors = AppSettings.shared.usesAlternatingRowBackground
+        // `allowMultipleExtendedContexts` (6.6a) can be toggled while this
+        // window is open: show/hide the triangle column to match, and if
+        // it was just switched *off* while several rows were expanded,
+        // collapse them rather than leaving a state the setting no longer
+        // permits (and which nothing would then bring back into line).
+        updateDisclosureColumn()
+        if !allowsMultipleExtendedContexts, expandedRowIDs.count > 1 {
+            collapseAllExpansions()
+        }
         tableView.reloadData()
     }
 
@@ -382,6 +404,19 @@ final class ConcordanceViewController: NSViewController {
         // Interface Builder's default checkbox state is checked.
         tableView.allowsMultipleSelection = true
 
+        // Per-row expand/collapse triangle for inline Extended Context
+        // (6.6a). Only shown when several rows may be expanded at once -
+        // see `updateDisclosureColumn` for why, and note the overlay's
+        // leading inset deliberately clears this column so the triangle
+        // stays clickable while its own row is expanded.
+        let disclosure = NSTableColumn(identifier: .init(Column.disclosure.rawValue))
+        disclosure.title = ""
+        disclosure.width = 18
+        disclosure.minWidth = 18
+        disclosure.maxWidth = 18
+        disclosure.resizingMask = []
+        disclosure.isHidden = !allowsMultipleExtendedContexts
+
         let group = NSTableColumn(identifier: .init(Column.group.rawValue))
         group.title = ""
         group.width = 32
@@ -428,6 +463,7 @@ final class ConcordanceViewController: NSViewController {
         right.width = 270
         right.sortDescriptorPrototype = NSSortDescriptor(key: Column.right.rawValue, ascending: true)
 
+        tableView.addTableColumn(disclosure)
         tableView.addTableColumn(group)
         tableView.addTableColumn(doc)
         tableView.addTableColumn(left)
@@ -441,6 +477,15 @@ final class ConcordanceViewController: NSViewController {
         }
         tableView.dataSource = dataSource
         tableView.delegate = self
+        // Double-click a line to show its Extended Context (6.6a) - the
+        // same action the "Extended Context…" context-menu item runs, and
+        // like it, keyed off `clickedRow`. AppKit reports `clickedRow ==
+        // -1` for a double-click that didn't land on a row (the header,
+        // or empty space below the last line), which `showExtendedContext`
+        // already rejects via its `rows.indices.contains` guard - so a
+        // double-click on a sort header can't be mistaken for a row.
+        tableView.target = self
+        tableView.doubleAction = #selector(showExtendedContext(_:))
 
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
@@ -454,9 +499,28 @@ final class ConcordanceViewController: NSViewController {
             self, selector: #selector(columnDidResize), name: NSTableView.columnDidResizeNotification, object: tableView)
     }
 
+    /// Left/Right auto-grow changes the table's width, so every expanded
+    /// row's word-wrapped height needs recomputing - all of them now, not
+    /// just one (6.6a). Dragging the structural-attribute column also
+    /// moves the overlay's leading inset, so the on-screen overlays get
+    /// re-laid-out here too.
     @objc private func columnDidResize(_ notification: Notification) {
-        guard let expandedRowID else { return }
-        tableView.noteHeightOfRows(withIndexesChanged: IndexSet([expandedRowID]))
+        guard !expandedRowIDs.isEmpty else { return }
+        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(expandedRowIDs))
+        for row in expandedRowIDs {
+            guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) else { continue }
+            applyOverlay(to: rowView, row: row)
+        }
+    }
+
+    /// Shows/hides the 6.6a disclosure-triangle column to match
+    /// `AppSettings.allowMultipleExtendedContexts`, which can be toggled
+    /// while a concordance window is already open (see
+    /// `settingsDidChange`).
+    private func updateDisclosureColumn() {
+        guard let column = tableView.tableColumns.first(
+            where: { $0.identifier.rawValue == Column.disclosure.rawValue }) else { return }
+        column.isHidden = !allowsMultipleExtendedContexts
     }
 
     /// Header click (or programmatic assignment from `syncSortIndicators`)
@@ -473,7 +537,7 @@ final class ConcordanceViewController: NSViewController {
         case .left: anchor = .left
         case .kwic: anchor = .kwic
         case .right: anchor = .right
-        case .group, .doc: return
+        case .disclosure, .group, .doc: return
         }
         let level = SortLevel(attribute: "word", anchor: anchor, span: 1)
         document.performSort(SortCriteria(level), descending: !descriptor.ascending)
@@ -518,13 +582,22 @@ final class ConcordanceViewController: NSViewController {
 
     private func makeCell(for column: NSTableColumn?, rowID: Int) -> NSView {
         guard document.rows.indices.contains(rowID) else { return NSView() }
-        // The expanded row's content is rendered entirely by the
-        // full-row-width overlay `applyOverlay` adds directly to its
-        // `NSTableRowView` (one continuous paragraph, not chopped by
-        // column boundaries) - every column cell underneath it is just
-        // blank while that's showing.
-        guard rowID != expandedRowID else { return NSView() }
+        let kind = column.flatMap { Column(rawValue: $0.identifier.rawValue) }
+        // An expanded row's *text* is rendered entirely by the overlay
+        // `applyOverlay` adds to its `NSTableRowView` (one continuous
+        // paragraph, not chopped by column boundaries), so the Left/Match/
+        // Right cells underneath go blank. The leading metadata columns
+        // are the exception (6.6a item 2): the overlay now starts to their
+        // right rather than covering them, so they keep their content -
+        // that's the whole point, since a covered disclosure triangle
+        // couldn't be clicked to collapse the row again.
+        if expandedRowIDs.contains(rowID), let kind, !Self.leadingMetadataColumns.contains(kind) {
+            return NSView()
+        }
         let row = document.rows[rowID]
+        if kind == .disclosure {
+            return makeDisclosureCell(rowID: rowID)
+        }
         let cell = KWICCellView()
         let inlineAttributes = document.inlineAttributes
         let tooltipAttributes = document.tooltipAttributes
@@ -533,7 +606,7 @@ final class ConcordanceViewController: NSViewController {
                 for: tokens, inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
             cell.configure(displayLine: displayLine, alignment: alignment, style: style)
         }
-        switch column.flatMap({ Column(rawValue: $0.identifier.rawValue) }) {
+        switch kind {
         case .group:
             cell.configureGroup(row.group)
         case .doc:
@@ -544,39 +617,112 @@ final class ConcordanceViewController: NSViewController {
             configure(row.line.kwicTokens, alignment: .center, style: .highlighted)
         case .right:
             configure(row.line.rightTokens, alignment: .left, style: .plain)
-        case nil:
+        case .disclosure, nil:
             break
         }
         return cell
     }
 
+    /// The columns that sit *left* of the KWIC text and hold per-line
+    /// metadata rather than context - the inline Extended Context overlay
+    /// starts to their right (see `overlayLeadingInset`) instead of
+    /// spanning the literal full row width as it did in 6.6.
+    ///
+    /// All three, not just `doc`: the user's report named the structural
+    /// attribute column, but a paragraph starting at x=0 runs over a
+    /// visible line-group number just as badly, and over the disclosure
+    /// triangle it would break collapsing outright.
+    private static let leadingMetadataColumns: Set<Column> = [.disclosure, .group, .doc]
+
+    /// A disclosure triangle whose state mirrors whether `rowID` is
+    /// currently expanded. `tag` carries the row id through to
+    /// `disclosureToggled` - the cheapest way to get it back, since a
+    /// diffable data source hands cells out per row id anyway.
+    private func makeDisclosureCell(rowID: Int) -> NSView {
+        let button = NSButton()
+        button.bezelStyle = .disclosure
+        button.setButtonType(.onOff)
+        button.title = ""
+        button.tag = rowID
+        button.state = expandedRowIDs.contains(rowID) ? .on : .off
+        button.target = self
+        button.action = #selector(disclosureToggled(_:))
+        button.setAccessibilityLabel("Extended context")
+        let container = NSView()
+        button.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(button)
+        // Top-aligned on an expanded row, whose cell is as tall as the
+        // whole wrapped paragraph - centering there would strand the
+        // triangle halfway down a tall row, far from the line it belongs
+        // to. A collapsed row is one line tall, so centering is right.
+        let vertical = expandedRowIDs.contains(rowID)
+            ? button.topAnchor.constraint(equalTo: container.topAnchor, constant: 2)
+            : button.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+        NSLayoutConstraint.activate([
+            button.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            vertical,
+        ])
+        return container
+    }
+
+    @objc private func disclosureToggled(_ sender: NSButton) {
+        toggleInlineExtendedContext(for: sender.tag)
+    }
+
     /// Toggles the inline "Extended Context" expansion for `row` - see
-    /// `AppSettings.extendedContextDisplayMode`. Re-clicking the already-
-    /// expanded row collapses it; expanding a different row while one is
-    /// already expanded collapses the old one first (single-expansion,
-    /// matching the sheet mode's own "if only one selected" framing).
+    /// `AppSettings.extendedContextDisplayMode`. Re-triggering an
+    /// already-expanded row always collapses it, whichever trigger was
+    /// used (context menu, double-click, or the 6.6a disclosure triangle).
+    ///
+    /// Expanding a *different* row depends on
+    /// `allowMultipleExtendedContexts`: with it on, the new row joins the
+    /// existing expansions; with it off, they all collapse first, which is
+    /// exactly 6.6's single-expansion behavior.
     private func toggleInlineExtendedContext(for row: Int) {
         guard document.rows.indices.contains(row) else { return }
-        if expandedRowID == row {
-            let previous = expandedRowID
-            expandedRowID = nil
-            expandedContext = nil
-            applyExpansionChange(affected: [previous].compactMap { $0 })
+        if expandedRowIDs.contains(row) {
+            expandedRowIDs.remove(row)
+            expandedContexts[row] = nil
+            applyExpansionChange(affected: [row])
             return
         }
         Task { @MainActor in
             do {
                 let context = try await document.extendedContext(at: row)
-                let previous = expandedRowID
-                expandedRowID = row
-                expandedContext = context
+                // Re-checked after the await, not before: the row could
+                // have been collapsed (or the whole table replayed) while
+                // the fetch was in flight.
+                guard document.rows.indices.contains(row) else { return }
                 var changed = [row]
-                if let previous, previous != row { changed.append(previous) }
+                if !allowsMultipleExtendedContexts {
+                    changed.append(contentsOf: expandedRowIDs.filter { $0 != row })
+                    expandedRowIDs.removeAll()
+                    expandedContexts.removeAll()
+                }
+                expandedRowIDs.insert(row)
+                expandedContexts[row] = context
                 applyExpansionChange(affected: changed)
             } catch {
                 self.showErrorAlert(error)
             }
         }
+    }
+
+    /// Collapses every inline expansion, refreshing whichever rows were
+    /// affected. Used by `refresh(animated:)` (a replay renumbers row ids,
+    /// so an expansion no longer refers to a meaningful line) and by
+    /// `settingsDidChange` when multi-expansion is switched off while more
+    /// than one row is open.
+    private func collapseAllExpansions() {
+        guard !expandedRowIDs.isEmpty else { return }
+        let previously = Array(expandedRowIDs)
+        expandedRowIDs.removeAll()
+        expandedContexts.removeAll()
+        for row in previously {
+            guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) else { continue }
+            applyOverlay(to: rowView, row: row)
+        }
+        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(previously))
     }
 
     /// Common tail of every expand/collapse transition: resize the
@@ -598,20 +744,64 @@ final class ConcordanceViewController: NSViewController {
     }
 
     /// Adds, updates, or removes the inline Extended Context overlay on
-    /// `rowView` depending on whether `row` is currently
-    /// `expandedRowID` - idempotent, since it's called both eagerly (see
+    /// `rowView` depending on whether `row` is currently expanded -
+    /// idempotent, since it's called both eagerly (see
     /// `applyExpansionChange`) and passively whenever AppKit hands back
     /// a row view (`tableView(_:didAdd:forRow:)`), including a recycled
     /// one that may already carry a stale overlay from a different row.
+    ///
+    /// That recycling case matters more now than it did in 6.6: with
+    /// several rows expandable at once, a recycled row view is more likely
+    /// to arrive carrying an overlay, and both "was expanded, now isn't"
+    /// and "was expanded, still is but for a *different* row's text" have
+    /// to resolve correctly. Keying every branch off `expandedContexts[row]`
+    /// (never off remembered per-view state) is what makes that safe.
     private func applyOverlay(to rowView: NSTableRowView, row: Int) {
         let existing = rowView.subviews.compactMap { $0 as? ExtendedContextOverlayField }.first
-        guard row == expandedRowID, let expandedContext else {
+        guard expandedRowIDs.contains(row), let context = expandedContexts[row] else {
             existing?.removeFromSuperview()
             return
         }
         let overlay = existing ?? makeOverlayField(in: rowView)
         overlay.attributedStringValue = KWICCellView.extendedContextParagraph(
-            before: expandedContext.before, match: expandedContext.match, after: expandedContext.after)
+            before: context.before, match: context.match, after: context.after)
+        // Re-applied on every call, not just at creation: the structural
+        // attribute column can be shown/hidden or dragged wider at any
+        // time, and a recycled overlay carries the previous row's inset.
+        overlay.leadingInset?.constant = overlayLeadingInset()
+    }
+
+    /// Where the inline paragraph starts, measured from the row view's
+    /// leading edge - far enough right to clear the metadata columns (see
+    /// `leadingMetadataColumns`) so it doesn't render over the structural
+    /// attribute value, the line-group number, or the disclosure triangle.
+    private func overlayLeadingInset() -> CGFloat {
+        let widths = tableView.tableColumns
+            .filter { column in
+                guard let kind = Column(rawValue: column.identifier.rawValue) else { return false }
+                return Self.leadingMetadataColumns.contains(kind) && !column.isHidden
+            }
+            .map(\.width)
+        return Self.overlayLeadingInset(visibleMetadataColumnWidths: widths)
+    }
+
+    /// The arithmetic behind `overlayLeadingInset()`, split out as a pure
+    /// function so it can be unit-tested without an `NSTableView` (see
+    /// `ExtendedContextOverlayInsetTests`) - AppKit column geometry is
+    /// otherwise only reachable from a live, laid-out window.
+    ///
+    /// `NSTableView` puts `intercellSpacing.width` between columns, so a
+    /// visible metadata column occupies its own width plus that gap; the
+    /// trailing `textPadding` then matches the 8pt the overlay has always
+    /// used against the row's leading edge, keeping the paragraph from
+    /// butting up against the column to its left.
+    static func overlayLeadingInset(
+        visibleMetadataColumnWidths widths: [CGFloat],
+        intercellSpacing: CGFloat = 3,
+        textPadding: CGFloat = 8
+    ) -> CGFloat {
+        guard !widths.isEmpty else { return textPadding }
+        return widths.reduce(0) { $0 + $1 + intercellSpacing } + textPadding
     }
 
     private func makeOverlayField(in rowView: NSTableRowView) -> ExtendedContextOverlayField {
@@ -622,8 +812,11 @@ final class ConcordanceViewController: NSViewController {
         field.maximumNumberOfLines = 0
         field.translatesAutoresizingMaskIntoConstraints = false
         rowView.addSubview(field)
+        let leading = field.leadingAnchor.constraint(
+            equalTo: rowView.leadingAnchor, constant: overlayLeadingInset())
+        field.leadingInset = leading
         NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: rowView.leadingAnchor, constant: 8),
+            leading,
             field.trailingAnchor.constraint(equalTo: rowView.trailingAnchor, constant: -8),
             field.topAnchor.constraint(equalTo: rowView.topAnchor, constant: 4),
             field.bottomAnchor.constraint(equalTo: rowView.bottomAnchor, constant: -4),
@@ -640,12 +833,8 @@ final class ConcordanceViewController: NSViewController {
         // `tableView.reloadData()` directly rather than through here) can
         // renumber/reorder row ids, so any inline Extended Context
         // expansion no longer refers to a meaningful row.
-        if animated, let previouslyExpanded = expandedRowID {
-            expandedRowID = nil
-            expandedContext = nil
-            if let rowView = tableView.rowView(atRow: previouslyExpanded, makeIfNecessary: false) {
-                applyOverlay(to: rowView, row: previouslyExpanded)
-            }
+        if animated {
+            collapseAllExpansions()
         }
         statusLabel.stringValue = document.status
         var snapshot = NSDiffableDataSourceSnapshot<Section, Int>()
@@ -742,6 +931,16 @@ final class ConcordanceViewController: NSViewController {
                 do {
                     let (before, match, after) = try await document.extendedContext(at: row)
                     let info = try await document.extendedContextInfo(at: row)
+                    // Unless several are allowed (6.6a), a new Extended
+                    // Context replaces the open one instead of stacking -
+                    // matching what the sheet it replaced could do, and
+                    // what inline mode does in the same setting. Only
+                    // Extended Context windows are closed: Collocations/
+                    // Frequency share `auxiliaryWindowControllers` but
+                    // aren't governed by this setting.
+                    if !allowsMultipleExtendedContexts {
+                        closeExtendedContextWindows()
+                    }
                     show(ExtendedContextWindowController(info: info, before: before, match: match, after: after))
                 } catch {
                     self.showErrorAlert(error)
@@ -751,20 +950,40 @@ final class ConcordanceViewController: NSViewController {
         }
         toggleInlineExtendedContext(for: row)
     }
+
+    /// Closes any open Extended Context windows. `show(_:)`'s
+    /// `willCloseNotification` observer is what actually drops them from
+    /// `auxiliaryWindowControllers`, so this doesn't prune the array
+    /// itself. `close()` posts that notification *synchronously*, so the
+    /// observer mutates `auxiliaryWindowControllers` mid-loop - safe only
+    /// because Swift's array value semantics mean `for ... in` walks the
+    /// value captured when the loop began, not the live property.
+    private func closeExtendedContextWindows() {
+        for controller in auxiliaryWindowControllers where controller is ExtendedContextWindowController {
+            controller.close()
+        }
+    }
 }
 
 extension ConcordanceViewController: NSTableViewDelegate {
-    /// Only the currently-expanded row (inline Extended Context - see
-    /// `expandedRowID`) ever differs from `tableView.rowHeight`; sized to
-    /// how tall the single full-row-width paragraph the overlay shows
-    /// needs to be at the row's *current* width (kept correct across
-    /// window resizes by `columnDidResize`, since Left/Right auto-growing
-    /// changes the table's own width too).
+    /// Only an expanded row (inline Extended Context - see
+    /// `expandedRowIDs`) ever differs from `tableView.rowHeight`; sized to
+    /// how tall its paragraph needs to be at the row's *current* width
+    /// (kept correct across window resizes by `columnDidResize`, since
+    /// Left/Right auto-growing changes the table's own width too).
+    ///
+    /// The available width now subtracts the metadata columns the overlay
+    /// no longer covers (6.6a item 2) - otherwise a row with the
+    /// structural attribute column showing would be measured wider than
+    /// the paragraph actually gets to be, and come out too short.
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        guard row == expandedRowID, let expandedContext else { return tableView.rowHeight }
+        guard expandedRowIDs.contains(row), let context = expandedContexts[row] else {
+            return tableView.rowHeight
+        }
         let paragraph = KWICCellView.extendedContextParagraph(
-            before: expandedContext.before, match: expandedContext.match, after: expandedContext.after)
-        let height = KWICCellView.extendedContextHeight(for: paragraph, width: tableView.bounds.width - 16)
+            before: context.before, match: context.match, after: context.after)
+        let available = tableView.bounds.width - overlayLeadingInset() - 8
+        let height = KWICCellView.extendedContextHeight(for: paragraph, width: max(available, 100))
         return max(tableView.rowHeight, height + 8)
     }
 
@@ -780,10 +999,15 @@ extension ConcordanceViewController: NSTableViewDelegate {
 }
 
 /// Marker subclass so the inline Extended Context overlay (one
-/// continuous, full-row-width paragraph - see `applyOverlay`) can be
-/// found among a recycled `NSTableRowView`'s subviews and removed/reused,
-/// without separate tagging or associated-object bookkeeping.
-private final class ExtendedContextOverlayField: NSTextField {}
+/// continuous paragraph spanning everything right of the metadata columns
+/// - see `applyOverlay`) can be found among a recycled `NSTableRowView`'s
+/// subviews and removed/reused, without separate tagging or
+/// associated-object bookkeeping. It also carries its own leading
+/// constraint, since that inset is recomputed whenever the structural
+/// attribute column appears, disappears, or is resized.
+private final class ExtendedContextOverlayField: NSTextField {
+    var leadingInset: NSLayoutConstraint?
+}
 
 extension ConcordanceViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {

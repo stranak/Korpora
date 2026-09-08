@@ -210,7 +210,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6 done, 46/46 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6 done, builds cleanly, 35/35 CorporaTests passing; 6.7-6.11 not started | partial — 6.1-6.5 confirmed by user; 6.6 (incl. inline display mode) not yet manually click-tested, see Phase 6 writeup |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6a done (6.6a is AppKit-only, no engine change), 47/47 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6a done, builds cleanly, 41/41 KorporaTests passing; 6.7-6.11 not started | partial — 6.1-6.6 all confirmed by user; **6.6a (four refinements from that click-test) built but not yet click-tested** |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -2682,12 +2682,25 @@ approach `mtc_corpus_get_struct_attr` established. Wrapped in
   same `tableView.clickedRow` pattern, single-row only, matching the
   user's "if only one selected" framing since the context menu already
   only makes sense for a single clicked row).
-- Display: new `ExtendedContextSheetController.swift` - a sheet (not
-  `NSAlert`, since context can be long and needs scrolling) built on
+- Display: new `ExtendedContextWindowController.swift` - not an `NSAlert`,
+  since context can be long and needs scrolling - built on
   `NSTextView.scrollableTextView()` (not a hand-assembled
   `NSScrollView`+`NSTextView` pair - already wires up wrapping/resizing
   correctly), read-only, with the match bolded and accent-colored between
   the plain-styled before/after text.
+  - **Was a sheet, is now a plain non-modal window** (an
+    `NSWindowController` shown through `ConcordanceViewController`'s
+    existing `show(_:)`/`auxiliaryWindowControllers` disposable-window
+    pattern, same as Collocations/Frequency): a sheet can only ever have
+    one open per parent window, which can't support several Extended
+    Contexts on screen at once. The `ExtendedContextDisplayMode` case
+    keeps its `sheet` name/rawValue for UserDefaults backward
+    compatibility, but the Settings UI labels it **"Window"**.
+  - Each window shows which hit it belongs to -
+    `ConcordanceDocument.ExtendedContextInfo` (corpus / document /
+    sentence, rendered by its `headerLines`, fetched by
+    `extendedContextInfo(at rowID:)`) - since once several can be open
+    side by side, nothing else on screen says which window is which line.
 
 **Follow-up - inline display mode**: the user asked for a second way to
 see this - expanding the clicked row itself in place into a
@@ -2750,9 +2763,18 @@ via a new setting (6.4's Concordance pane), not a replacement.
   }.first` rather than separate tagging/bookkeeping.
 
 **Key files**: `mtcbridge.h`/`.cc`, `ManateeKit.swift`,
-`ConcordanceDocument.swift`, `ExtendedContextSheetController.swift`,
+`ConcordanceDocument.swift`, `ExtendedContextWindowController.swift`,
 `ConcordanceViewController.swift`, `KWICCellView.swift`, `AppSettings.swift`,
 `ConcordanceSettingsViewController.swift`.
+
+**Known dangling reference**: doc comments in
+`ExtendedContextWindowController` and on `ExtendedContextDisplayMode` both
+cite `AppSettings.allowMultipleExtendedContexts` as the reason the sheet
+became a window, but **that setting does not exist** - the rationale was
+written ahead of the setting, and `AppSettings.swift` has zero occurrences
+of it. Multiple windows do in fact work today (the `show(_:)` pattern
+retains each one), just unconditionally rather than behind a preference.
+6.6a below is what makes the comments true.
 
 New tests, `CorpusInfoTests.swift` (3): a plain in-bounds range returns
 the expected space-joined words for both "word" and "lemma"; a range
@@ -2764,19 +2786,209 @@ Verified: `cd ManateeKit && swift test` → **46/46 passing** (3 new);
 `xcodegen generate` (picked up the new sheet controller) then
 `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**; `RunAllTests`
 → 35/35 `CorporaTests` passing (unaffected - no AppKit-layer test exists
-for this feature, same "one-shot sheet, not logic worth isolating"
-reasoning as 5.4's "Document Info…"). Not yet manually click-tested -
-next steps: (1) right-click a line, choose "Extended Context…", confirm
-the sheet shows much wider context with the match visibly bolded, and
-try a hit near the very start/end of a corpus to exercise the clamping;
-(2) switch the new setting to "Inline", right-click a line and choose
-"Extended Context…" again, confirm the row itself expands in place into
-one uninterrupted word-wrapped paragraph spanning the full row width
-(not split across Left/Match/Right) with the match bolded, confirm
-re-triggering the same row collapses it, expanding a different row
-collapses the old one, resizing the window keeps the expanded row's
-height correct, and scrolling the expanded row off-screen and back
-still shows it correctly (exercises the `didAdd` passive path).
+for this feature, same "one-shot window, not logic worth isolating"
+reasoning as 5.4's "Document Info…").
+
+**Manually click-tested by the user 2026-09-08: works, but needs
+refinements** - four of them, written up as 6.6a below. Nothing found was
+a defect in what's described above; they're all changes to the *design*,
+two of which deliberately revisit earlier decisions recorded here.
+
+### 6.6a — Extended Context refinements (AppKit UI done)
+
+All four came from the user's own click-through of 6.6. Ordered
+cheapest-first, which also happens to be lowest-risk-first; items 3 and 4
+were near-trivial next to 1 and 2.
+
+**The three open questions this section originally left are settled** (all
+resolved as the recommendations recorded here, confirmed by the user's
+"implement it" plus the explicit reminder that item 1 is *only* an option):
+1. The disclosure triangle appears **only** when
+   `allowMultipleExtendedContexts` is on. With one-at-a-time expansion
+   there's little to disclose and the triangle would only add a column of
+   chrome, so the default stays visually identical to 6.6.
+2. The overlay clears **all** leading metadata columns, not just `doc`.
+   The user's report named the structural attribute column, but a
+   paragraph starting at x=0 runs over a visible line-group number just as
+   badly - and over the disclosure triangle it would break collapsing
+   outright, which settled it.
+3. Double-clicking an expanded row **collapses** it, so the gesture is a
+   toggle like every other trigger.
+
+**Item 4 - Window carries Match info, gated on the multiplicity setting.**
+Mostly already built (see 6.6 above): it is already an
+`NSWindowController`, already shows corpus/document/sentence via
+`ExtendedContextInfo.headerLines`, and already supports several open at
+once through `show(_:)`. All that's missing is the **gate**: opening a
+second Extended Context should only be additive when the new setting is
+on; with it off, opening one for a different row should replace the
+existing window rather than stack up. Implementation is in
+`ConcordanceViewController.showExtendedContext(_:)` plus
+`auxiliaryWindowControllers` bookkeeping - it needs to distinguish
+Extended Context windows from Collocations/Frequency ones, since only the
+former are subject to the limit.
+
+**Item 3 - Double-click a row to show Extended Context.** Currently the
+only trigger is the "Extended Context…" row context-menu item (added next
+to "Document Info…", see `menuNeedsUpdate`). There is **no** `doubleAction`
+wiring anywhere in the project today. Set `tableView.target`/
+`tableView.doubleAction` to a new selector that reuses
+`showExtendedContext(_:)`'s body, keyed off `tableView.clickedRow` exactly
+as the context-menu path already is. Two things to settle:
+- Double-clicking an *already expanded* inline row should collapse it, so
+  the gesture stays a toggle and matches the context-menu behavior.
+- `SortableTableView` handles click-to-sort on *headers*; confirm a
+  double-click in the header area can't be mistaken for a row
+  double-click (`clickedRow == -1` guards this, but it needs checking).
+
+**Item 1 - Disclosure-triangle expand/collapse, multiple rows at once -
+strictly an opt-in Settings option.** This is the one that revisits a
+recorded decision: 6.6 documents "one expansion at a time" as deliberate
+(`expandedRowID: Int?` and `expandedContext` are both singular, and
+"expanding a different row collapses whichever was open first").
+
+**The default must not change.** With the new setting **off**, behavior is
+exactly what ships today: one inline expansion at a time, no triangle.
+With it **on**: a disclosure triangle per row, and any number of rows
+expanded simultaneously.
+- `expandedRowID: Int?` → a `Set<Int>`, and `expandedContext:
+  (before:match:after:)?` → a `[Int: (before:match:after:)]` keyed by row
+  id. Every consumer follows: `makeCell` (returns a blank `NSView()` for
+  an expanded row), `tableView(_:heightOfRow:)`, `applyExpansionChange`,
+  and `applyOverlay(to:row:)`.
+- `applyOverlay` is the one to be careful with. It is currently the single
+  idempotent add/update/remove choke point, called both eagerly and
+  passively from `tableView(_:didAdd:forRow:)` - and the passive path
+  exists precisely because AppKit hands back *recycled* row views that may
+  carry a stale overlay from a different row. With one possible expanded
+  row that check is `row == expandedRowID`; with a set it becomes set
+  membership, and the "recycled view carrying a stale overlay" case gets
+  strictly more likely, not less. Worth a deliberate pass.
+- The `columnDidResizeNotification` observer currently renotes the height
+  of the single expanded row; it must renote all of them.
+- **Open question**: should the triangle also appear when the setting is
+  *off* (as a nicer affordance for the existing single-expansion mode), or
+  only when on? Written above as "only when on" so the default is
+  byte-for-byte today's behavior, but the triangle is arguably an
+  improvement in both modes. Needs a decision before implementing.
+
+**Item 2 - Inline paragraph must not run under the Structural Attribute
+column.** Also revisits a recorded decision, and the reason matters: the
+full-row overlay is not incidental. The first version of 6.6's inline mode
+rendered before/match/after into the existing Left/Match/Right cells and
+was **rejected by the user** ("it must be an uninterrupted paragraph, not
+split into left/match/right"); the fix was to pin the overlay to the *row
+view's* own leading/trailing anchors, deliberately ignoring column
+boundaries.
+
+So this item is a refinement of that, not a reversal - still **one
+uninterrupted paragraph**, just starting to the right of 6.2's structural
+attribute column when that column is visible, so the paragraph doesn't
+overlap the "Doc" value.
+- Today `makeOverlayField(in:)` pins
+  `field.leadingAnchor == rowView.leadingAnchor + 8`. That constant
+  becomes dynamic: the right edge of the structural-attribute column when
+  it's showing, via `tableView.rect(ofColumn:)` for `Column.doc`'s index.
+- The column is hidden exactly when `document.structuralAttributeToShow ==
+  nil` (`doc.isHidden` is set from it in two places), so that's the
+  condition - and it can change at runtime, so the inset has to be
+  recomputed, not just set once at overlay-creation time. The existing
+  `columnDidResizeNotification` observer is the natural hook, since
+  resizing the Doc column moves its right edge too.
+- **Open question**: the `Column.group` (line-group) column sits *before*
+  `doc`. The user's wording named only the Structural Attribute column, so
+  the above insets past `doc` only - but if the group column is visible,
+  the paragraph would still start over it. Settle whether the inset should
+  clear *all* leading metadata columns (group + doc) or only doc.
+
+**New settings** (both in 6.4's Concordance pane,
+`ConcordanceSettingsViewController`, alongside the existing "Extended
+context display: Window | Inline" control):
+- `allowMultipleExtendedContexts: Bool`, default **`false`** - this is the
+  Item 1 / Item 4 gate, and it governs *both* presentations from one
+  switch: multiple inline expansions **and** multiple stacked windows.
+  That single-setting reading is what makes the existing dangling doc
+  comments (see 6.6's "Known dangling reference") correct. Default `false`
+  preserves today's behavior in both modes.
+- Item 1's disclosure triangle rides on the same setting rather than
+  getting its own, pending the open question above.
+
+**Implementation notes** (what the code actually ended up doing, where it
+differs from or adds to the sketch above):
+
+- `Column` gained a leading `disclosure` case, so `headerSortChanged`'s
+  switch needed it too (it returns for any non-sortable column).
+- The triangle cell is top-aligned on an expanded row and centered on a
+  collapsed one - an expanded row's cell is as tall as the whole wrapped
+  paragraph, and centering there strands the triangle halfway down, far
+  from the line it belongs to.
+- `makeCell` now returns real content for the metadata columns of an
+  expanded row (only Left/Match/Right go blank), since the overlay no
+  longer covers them.
+- `tableView(_:heightOfRow:)` subtracts the overlay's leading inset from
+  the available width. Without that, a row with the structural attribute
+  column showing is measured wider than the paragraph actually gets to be
+  and comes out too short - a bug the item 2 change would otherwise have
+  introduced.
+- `applyOverlay` re-applies the leading inset on *every* call, not just at
+  creation: the structural attribute column can be shown/hidden or dragged
+  at any time, and a recycled overlay arrives carrying the previous row's
+  inset. `ExtendedContextOverlayField` holds its own leading
+  `NSLayoutConstraint` so there's something to update.
+- `columnDidResize` now also re-lays-out the on-screen overlays, not just
+  row heights, since dragging the Doc column moves the inset.
+- `settingsDidChange` shows/hides the triangle column and, if
+  multi-expansion was just switched *off* while several rows were open,
+  collapses them - otherwise the window would sit in a state the setting
+  no longer permits, with nothing to bring it back into line.
+- `toggleInlineExtendedContext` re-checks `document.rows.indices` *after*
+  its `await`, since the row can be collapsed or the table replayed while
+  the fetch is in flight.
+- `closeExtendedContextWindows` filters `auxiliaryWindowControllers` by
+  type, so Collocations/Frequency windows (which share that array but
+  aren't governed by this setting) are left alone.
+- Also fixed in passing: the Settings segmented control still read
+  **"Sheet"** for a mode that has presented a plain window since 6.6's
+  follow-up work. Now "Window", matching what it does.
+
+**Testing.** As with 6.6 itself, none of this is engine-layer: no new
+bridge primitive, no new `ManateeKit` API - all four items are AppKit
+presentation over data `extendedContext(at:)`/`extendedContextInfo(at:)`
+already return, so `ManateeKitTests` is untouched at 47/47.
+
+The one genuinely unit-testable piece was extracted for exactly that
+reason: `ConcordanceViewController.overlayLeadingInset(
+visibleMetadataColumnWidths:intercellSpacing:textPadding:)`, a static pure
+function, covered by 6 new tests in
+`KorporaTests/ExtendedContextOverlayInsetTests.swift` - no visible columns
+gives back plain 8pt padding (i.e. byte-for-byte 6.6 behavior), each
+visible column contributes its own `intercellSpacing` gap, dropping or
+widening a column shifts the inset by exactly that much, and fractional
+widths (which AppKit hands out after a uniform autoresize) survive
+unrounded. The live-geometry half (`overlayLeadingInset()`, which filters
+`tableView.tableColumns` by visibility) stays untested, since AppKit
+column geometry needs a laid-out window.
+
+Note for whoever writes the next `#expect`: spelling an expected value as
+a multi-term `+` chain on the right-hand side (`18 + 3 + 32 + …`) makes
+the macro report both sides as **equal** and still fail the expectation.
+Two of these tests hit that. Use a single literal and put the derivation
+in a comment.
+
+Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
+`RunAllTests` → **41/41 KorporaTests** (6 new); `cd ManateeKit && swift
+test` → 47/47 unchanged; app launches with no constraint/exception log
+output. **Not yet manually click-tested** - next steps: (1) with the new
+checkbox *off*, confirm nothing changed from 6.6 (no triangle column,
+one inline expansion at a time, a second Window replaces the first);
+(2) turn it on, confirm the triangle column appears, several rows expand
+at once, and each triangle collapses its own row; (3) with a structural
+attribute chosen, confirm an expanded row's paragraph starts right of the
+Doc value rather than under it, and that dragging the Doc column wider
+moves the paragraph with it and keeps the row's height correct;
+(4) double-click a line (both modes) and double-click an expanded row to
+collapse it; (5) turn the checkbox off while several rows are expanded and
+confirm they collapse.
 
 ### 6.7 — New engine primitive: attribute value enumeration (not started)
 

@@ -21,6 +21,7 @@ final class AppSettings {
         static let structuralAttributeColor = "structuralAttributeColor"
         static let usesAlternatingRowBackground = "usesAlternatingRowBackground"
         static let extendedContextDisplayMode = "extendedContextDisplayMode"
+        static let allowMultipleExtendedContexts = "allowMultipleExtendedContexts"
     }
 
     private let defaults: UserDefaults
@@ -155,6 +156,25 @@ final class AppSettings {
         }
         set {
             defaults.set(newValue.rawValue, forKey: Key.extendedContextDisplayMode)
+            NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    /// Whether more than one Extended Context can be visible at once
+    /// (Phase 6.6a) - governs *both* presentations from this single
+    /// switch: several rows expanded simultaneously in `.inline` mode, and
+    /// several stacked windows in `.sheet` (labelled "Window") mode.
+    ///
+    /// Defaults to `false`, which is exactly 6.6's shipped behavior:
+    /// expanding one row collapses whichever was open, and opening a
+    /// window for another row replaces the previous one. Turning it on is
+    /// also what puts the per-row disclosure triangle in the concordance
+    /// table - with one-at-a-time expansion there's little to disclose,
+    /// and the triangle would only add a column of chrome.
+    var allowMultipleExtendedContexts: Bool {
+        get { defaults.bool(forKey: Key.allowMultipleExtendedContexts) }
+        set {
+            defaults.set(newValue, forKey: Key.allowMultipleExtendedContexts)
             NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
         }
     }
