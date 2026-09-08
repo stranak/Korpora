@@ -18,6 +18,17 @@ struct ConcordanceRow {
     }
 }
 
+/// KWIC (a fixed number of tokens each side, `leftContext`/`rightContext`)
+/// vs. Sentence (context expands to the enclosing `<s>` boundary,
+/// regardless of `leftContext`/`rightContext`'s numeric value - see
+/// `ConcordanceDocument.effectiveLeftContext`/`.effectiveRightContext`).
+/// KonText keeps this as a switch independent of the numeric context
+/// width control, rather than folding it into that same control.
+enum ConcordanceViewMode: String, Codable {
+    case kwic
+    case sentence
+}
+
 /// The persisted content is the query, not the materialized rows - stable
 /// and small regardless of result-set size, and the base that the
 /// `operations` chain (see `ConcordanceOperation`) replays against. See
@@ -32,6 +43,14 @@ final class ConcordanceDocument: NSDocument {
     var initialQuery: String = ""
     var leftContext = "-10"
     var rightContext = "10"
+    /// See `ConcordanceViewMode`. `leftContext`/`rightContext` themselves
+    /// are left untouched by this - `effectiveLeftContext`/
+    /// `.effectiveRightContext` (what's actually sent to the engine)
+    /// override them to a structure-aligned spec in `.sentence` mode, so
+    /// switching back to `.kwic` trivially restores whatever numeric
+    /// width was last set via `setContext`, with no separate "remembered
+    /// width" state needed.
+    private(set) var viewMode: ConcordanceViewMode = .kwic
     var kwicAttr = "word"
     /// Additional positional attributes (e.g. "lemma", "tag") shown
     /// alongside `kwicAttr` per token - see `KWICFormatter`. Independent,
@@ -265,6 +284,26 @@ final class ConcordanceDocument: NSDocument {
         refetchDisplay()
     }
 
+    /// What's actually sent to the engine for left/right context - see
+    /// `ConcordanceViewMode`. `-1:s`/`1:s` are manatee-open's own
+    /// Bonito/Sketch-Engine-style context-spec syntax for "expand to the
+    /// enclosing `<s>` boundary" (confirmed in `concord/concctx.cc`),
+    /// already supported end-to-end since `leftContext`/`rightContext`
+    /// were free-form strings, not parsed integers, from the start.
+    private var effectiveLeftContext: String { viewMode == .sentence ? "-1:s" : leftContext }
+    private var effectiveRightContext: String { viewMode == .sentence ? "1:s" : rightContext }
+
+    /// KWIC vs. Sentence - same "pure display setting" status as
+    /// `setContext`. Toggling this back to `.kwic` needs no bookkeeping
+    /// of its own to restore the previous numeric width: `leftContext`/
+    /// `rightContext` were never touched while in `.sentence` mode (see
+    /// `effectiveLeftContext`/`.effectiveRightContext`).
+    func setViewMode(_ mode: ConcordanceViewMode) {
+        guard mode != viewMode else { return }
+        viewMode = mode
+        refetchDisplay()
+    }
+
     /// Which secondary positional attributes (e.g. "lemma"/"tag") to show
     /// inline vs. in a hover tooltip - independent per attribute (an
     /// attribute can be in both, one, or neither list; see
@@ -297,8 +336,8 @@ final class ConcordanceDocument: NSDocument {
     /// a display-only refetch.
     private func refetchDisplay() {
         guard liveConcordance != nil else { return }
-        let leftContext = leftContext
-        let rightContext = rightContext
+        let leftContext = effectiveLeftContext
+        let rightContext = effectiveRightContext
         let kwicAttr = kwicAttr
         let secondaryAttributes = attributesToFetch
         let structuralAttributeToShow = structuralAttributeToShow
@@ -329,8 +368,8 @@ final class ConcordanceDocument: NSDocument {
         let corpusName = corpusName
         let subcorpusPath = subcorpusPath
         let query = initialQuery
-        let leftContext = leftContext
-        let rightContext = rightContext
+        let leftContext = effectiveLeftContext
+        let rightContext = effectiveRightContext
         let kwicAttr = kwicAttr
         let secondaryAttributes = attributesToFetch
         let structuralAttributeToShow = structuralAttributeToShow
@@ -508,6 +547,10 @@ final class ConcordanceDocument: NSDocument {
         // synthesized decoding already treats a missing key as nil for an
         // Optional property, so no `?? []`-style fallback is needed.
         var structuralAttributeToShow: String?
+        // Missing key (a document saved before this existed) decodes to
+        // nil, not `.kwic` directly - `read(from:)` supplies that default
+        // explicitly, same reasoning as `inlineAttributes ?? []` below.
+        var viewMode: ConcordanceViewMode?
         var operations: [ConcordanceOperation]
     }
 
@@ -516,7 +559,7 @@ final class ConcordanceDocument: NSDocument {
             corpusName: corpusName, subcorpusPath: subcorpusPath, initialQuery: initialQuery,
             leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
             inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes,
-            structuralAttributeToShow: structuralAttributeToShow,
+            structuralAttributeToShow: structuralAttributeToShow, viewMode: viewMode,
             operations: operations)
         return try JSONEncoder().encode(state)
     }
@@ -532,6 +575,7 @@ final class ConcordanceDocument: NSDocument {
         inlineAttributes = state.inlineAttributes ?? []
         tooltipAttributes = state.tooltipAttributes ?? []
         structuralAttributeToShow = state.structuralAttributeToShow
+        viewMode = state.viewMode ?? .kwic
         operations = state.operations
     }
 }

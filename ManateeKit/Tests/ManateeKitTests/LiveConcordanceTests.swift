@@ -71,6 +71,30 @@ final class LiveConcordanceTests: XCTestCase {
         XCTAssertEqual(lines[0].kwicTokens[0].secondaryAttributes, [:])
     }
 
+    /// Phase 6.3 (Sentence view): "-1:s"/"1:s" are manatee-open's own
+    /// context-spec syntax for "expand to the enclosing <s> boundary" -
+    /// confirms that actually works end to end through this bridge/API,
+    /// not just that the strings pass through unchanged.
+    func testKwicLinesWithSentenceAlignedContextStopsAtSentenceBoundary() async throws {
+        // "jumps" is the last word of its sentence ("the quick brown fox
+        // jumps") - sentence-aligned right context must stop there, not
+        // continue into the next sentence/doc the way a numeric context
+        // width (e.g. "10") would.
+        let jumpsLive = try await makeLiveConcordance(#"[word="jumps"]"#)
+        let jumpsLines = try await jumpsLive.kwicLines(leftContext: "-1:s", rightContext: "1:s")
+        XCTAssertEqual(jumpsLines.count, 1)
+        XCTAssertEqual(jumpsLines[0].left, "the quick brown fox")
+        XCTAssertEqual(jumpsLines[0].right, "")
+
+        // "the lazy" is the second sentence's opening bigram - sentence-
+        // aligned left context must not reach back into the previous
+        // sentence's "jumps".
+        let theLive = try await makeLiveConcordance(#"[word="the"][word="lazy"]"#)
+        let theLines = try await theLive.kwicLines(leftContext: "-1:s", rightContext: "1:s")
+        XCTAssertEqual(theLines.count, 1)
+        XCTAssertEqual(theLines[0].left, "")
+    }
+
     func testKwicLinesThrowsForUnknownSecondaryAttribute() async throws {
         let live = try await makeLiveConcordance(#"[word="fox"]"#)
         do {

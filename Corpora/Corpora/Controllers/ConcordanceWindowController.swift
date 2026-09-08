@@ -10,6 +10,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let filter = NSToolbarItem.Identifier("filter")
         static let shuffle = NSToolbarItem.Identifier("shuffle")
         static let sample = NSToolbarItem.Identifier("sample")
+        static let viewMode = NSToolbarItem.Identifier("viewMode")
         static let context = NSToolbarItem.Identifier("context")
         static let attributes = NSToolbarItem.Identifier("attributes")
         static let collocations = NSToolbarItem.Identifier("collocations")
@@ -21,6 +22,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     private var filterButton: NSButton?
     private var shuffleButton: NSButton?
     private var sampleButton: NSButton?
+    private var contextButton: NSButton?
 
     convenience init(document: ConcordanceDocument) {
         let viewController = ConcordanceViewController(document: document)
@@ -45,7 +47,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ItemID.history, ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.context,
+        [ItemID.history, ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.viewMode, ItemID.context,
          ItemID.attributes, ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
     }
 
@@ -95,15 +97,30 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                 action: #selector(ConcordanceViewController.sampleTapped(_:)))
             sampleButton = button
             return makeItem(identifier, label: "Sample", view: button)
+        case ItemID.viewMode:
+            let segmented = NSSegmentedControl(
+                labels: ["KWIC", "Sentence"], trackingMode: .selectOne,
+                target: viewController, action: #selector(ConcordanceViewController.viewModeChanged(_:)))
+            segmented.segmentStyle = .texturedRounded
+            segmented.selectedSegment = viewController.viewMode == .sentence ? 1 : 0
+            segmented.toolTip = "KWIC: fixed-width context. Sentence: expand to the enclosing sentence."
+            return makeItem(identifier, label: "View", view: segmented)
         case ItemID.context:
-            // Not tracked in a stored property/`updateToolbarState` - unlike
-            // sort/filter/shuffle/sample, widening context is a display
-            // setting (see `ConcordanceDocument.setContext`), not a corpus
-            // operation, so it never needs to disable when line groups exist.
+            // Disabled in Sentence view - see `updateToolbarState` - since
+            // a fixed-width context doesn't apply while context instead
+            // expands to the enclosing sentence
+            // (`ConcordanceDocument.effectiveLeftContext`/`.effectiveRightContext`).
+            // Otherwise not tracked in a stored property/`updateToolbarState`
+            // itself - unlike sort/filter/shuffle/sample, widening context is
+            // a display setting (see `ConcordanceDocument.setContext`), not a
+            // corpus operation, so it never needs to disable when line
+            // groups exist.
             let button = makeButton(
                 symbol: "arrow.left.and.right", label: "Context",
                 tooltip: "Adjust how much left/right context is shown", target: viewController,
                 action: #selector(ConcordanceViewController.contextTapped(_:)))
+            button.isEnabled = viewController.viewMode != .sentence
+            contextButton = button
             return makeItem(identifier, label: "Context", view: button)
         case ItemID.attributes:
             // Not tracked in a stored property/`updateToolbarState` - same
@@ -164,10 +181,11 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
     /// *existing* operations (including bulk-clearing line groups) doesn't
     /// conflict with an active line-group view the way starting a *new*
     /// sort/filter/shuffle/sample would.
-    func updateToolbarState(hasLineGroups: Bool) {
+    func updateToolbarState(hasLineGroups: Bool, viewMode: ConcordanceViewMode) {
         sortButton?.isEnabled = !hasLineGroups
         filterButton?.isEnabled = !hasLineGroups
         shuffleButton?.isEnabled = !hasLineGroups
         sampleButton?.isEnabled = !hasLineGroups
+        contextButton?.isEnabled = viewMode != .sentence
     }
 }

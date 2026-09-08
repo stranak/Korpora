@@ -27,6 +27,13 @@ final class ConcordanceViewController: NSViewController {
 
     weak var windowController: ConcordanceWindowController?
 
+    /// `ConcordanceWindowController` needs this to set the "KWIC | Sentence"
+    /// segmented control's initial selection and the Context button's
+    /// initial enabled state, both at toolbar-item-creation time, before
+    /// any `refresh()`/`updateToolbarState` call happens - `document`
+    /// itself stays `private` since nothing else needs broader access.
+    var viewMode: ConcordanceViewMode { document.viewMode }
+
     init(document: ConcordanceDocument) {
         self.document = document
         super.init(nibName: nil, bundle: nil)
@@ -137,6 +144,10 @@ final class ConcordanceViewController: NSViewController {
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
+    @objc func viewModeChanged(_ sender: NSSegmentedControl) {
+        document.setViewMode(sender.selectedSegment == 1 ? .sentence : .kwic)
+    }
+
     @objc func attributesTapped(_ sender: NSButton) {
         let popover = NSPopover()
         let controller = AttributeDisplayPopoverController()
@@ -149,7 +160,7 @@ final class ConcordanceViewController: NSViewController {
             guard let self else { return }
             document.setAttributeDisplay(inlineAttributes: inlineAttributes, tooltipAttributes: tooltipAttributes)
             document.setStructuralAttributeDisplay(structuralAttribute)
-            updateStructuralColumnVisibility()
+            updateStructuralColumn()
             popover?.close()
         }
         popover.contentViewController = controller
@@ -157,15 +168,19 @@ final class ConcordanceViewController: NSViewController {
         popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
-    /// The "Doc" column is hidden entirely (rather than always shown but
-    /// empty) whenever no structural attribute is configured. The initial
-    /// state (including for a reopened saved document already carrying a
+    /// The structural-attribute column is hidden entirely (rather than
+    /// always shown but empty) whenever no structural attribute is
+    /// configured, and titled after whichever one is - e.g. "doc.title",
+    /// not a fixed "Doc" - so multiple lines' worth of context isn't
+    /// needed to tell what the column even shows. The initial state
+    /// (including for a reopened saved document already carrying a
     /// non-nil `structuralAttributeToShow`) is set directly in
     /// `setUpTableView`; this is the update path for `attributesTapped`'s
     /// Apply changing it afterward.
-    private func updateStructuralColumnVisibility() {
-        tableView.tableColumn(withIdentifier: .init(Column.doc.rawValue))?.isHidden =
-            document.structuralAttributeToShow == nil
+    private func updateStructuralColumn() {
+        guard let column = tableView.tableColumn(withIdentifier: .init(Column.doc.rawValue)) else { return }
+        column.isHidden = document.structuralAttributeToShow == nil
+        column.title = document.structuralAttributeToShow ?? "Doc"
     }
 
     @objc func historyTapped(_ sender: NSButton) {
@@ -365,11 +380,12 @@ final class ConcordanceViewController: NSViewController {
         // Fixed-width (manual drag only, no auto-grow) like `group` - a
         // structural attribute value (e.g. "doc.title") is constant for
         // the whole line, so it doesn't participate in the Left/Right
-        // symmetric-growth centering below. Hidden (zero width) unless
+        // symmetric-growth centering below. Hidden (zero width) and
+        // titled after the chosen attribute unless
         // `document.structuralAttributeToShow` is set - see
-        // `updateStructuralColumnVisibility`.
+        // `updateStructuralColumn`.
         let doc = NSTableColumn(identifier: .init(Column.doc.rawValue))
-        doc.title = "Doc"
+        doc.title = document.structuralAttributeToShow ?? "Doc"
         doc.resizingMask = .userResizingMask
         doc.width = 120
         doc.minWidth = 0
@@ -517,7 +533,7 @@ final class ConcordanceViewController: NSViewController {
         // nothing changed and leave the (now stale) cell alone.
         snapshot.reloadItems(ids)
         dataSource.apply(snapshot, animatingDifferences: animated)
-        windowController?.updateToolbarState(hasLineGroups: document.hasLineGroups)
+        windowController?.updateToolbarState(hasLineGroups: document.hasLineGroups, viewMode: document.viewMode)
         syncSortIndicators()
         // If the Operations popover is open, its line-group rows are sourced
         // from `document.rows` (see `updateOperationsPopover`), which only

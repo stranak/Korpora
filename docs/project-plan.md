@@ -2266,16 +2266,22 @@ not just on click like the existing "Document Info…" popup.
     incidental improvement to existing behavior, not just new-feature
     scaffolding. Revisit if still slow once 6.11 (pagination) caps how
     many rows are ever materialized at once.
-- New fixed-width "Doc" table column, between `group` and `left`
-  (`resizingMask = .userResizingMask`, no `.autoresizingMask` - stays out
-  of 6.1's Left/Right symmetric-growth centering), hidden entirely
-  (`NSTableColumn.isHidden`) whenever `structuralAttributeToShow` is nil
-  rather than shown-but-blank. New `KWICCellView.configureStructuralInfo(_:)`
+- New fixed-width structural-attribute table column, between `group` and
+  `left` (`resizingMask = .userResizingMask`, no `.autoresizingMask` -
+  stays out of 6.1's Left/Right symmetric-growth centering), hidden
+  entirely (`NSTableColumn.isHidden`) whenever `structuralAttributeToShow`
+  is nil rather than shown-but-blank. New `KWICCellView.configureStructuralInfo(_:)`
   - a small secondary-style label, same spirit as the existing
   `configureGroup` badge, not routed through `KWICFormatter`'s per-token
   segment machinery since the value is constant for the whole line.
   Color is `.secondaryLabelColor` for now; 6.5 will make it a real
-  setting.
+  setting. **Revised after manual testing**: the column header was
+  originally a fixed "Doc" title regardless of which attribute was
+  chosen - the user asked for it to reflect the actual attribute (e.g.
+  "doc.title", "doc.author") instead, so `updateStructuralColumn()` (was
+  `updateStructuralColumnVisibility()`) now sets `column.title =
+  document.structuralAttributeToShow ?? "Doc"` alongside `isHidden`, and
+  `setUpTableView` seeds the same title at creation time.
 - `AttributeDisplayPopoverController` gained a second section,
   "Structural" - a radio-button group (`NSButton(radioButtonWithTitle:)`),
   one per fully-qualified name (e.g. "doc.title") plus "None", sourced
@@ -2310,7 +2316,7 @@ the Attributes popover's new Structural section on a corpus that has one,
 confirm the "Doc" column appears with the right value per row and stays
 hidden when nothing's checked.
 
-### 6.3 — KWIC / Sentence view switch (not started)
+### 6.3 — KWIC / Sentence view switch (done)
 
 **Confirmed free ride** (Explore agent, `manatee-open/concord/concctx.cc`
 :174-280): `KWICLines`' left/right context parameters are already
@@ -2320,18 +2326,35 @@ free-form `const char*` strings, not integers, all the way from Swift
 parses Bonito/Sketch-Engine-style context specs including `"-1:s"`/`"1:s"`
 ("expand to the enclosing `<s>` boundary"), with graceful fallback to
 ±3 tokens if the structure doesn't exist or isn't found at that position.
-**Zero new bridge/engine code required.**
+**Zero new bridge/engine code required** beyond one config literal.
 
-**Design**:
-- A toolbar segmented control, "KWIC | Sentence" (separate from the
-  existing numeric Context popover, since it's a different concept -
-  KonText keeps them separate too).
-- Sentence mode calls a mode-aware context setter with
-  `leftContext = "-1:s"`, `rightContext = "1:s"` instead of numeric
-  strings; KWIC mode restores the last numeric width used.
-- One small bridge fix: `mtcbridge.cc:195`'s hardcoded `maxctx=100` would
-  truncate any sentence longer than 100 tokens - raise it to something
-  generous (e.g. 2000); no need to make it user-configurable for v1.
+**Implemented**:
+- New `ConcordanceViewMode` enum (`.kwic`/`.sentence`),
+  `ConcordanceDocument.viewMode` (persisted, defaults to `.kwic` for
+  back-compat), and `setViewMode(_:)`. `leftContext`/`rightContext`
+  themselves are **never touched** by view-mode switching - a new
+  private `effectiveLeftContext`/`effectiveRightContext` pair (used only
+  at the two `live.kwicLines(...)` call sites in `replay()`/
+  `refetchDisplay()`) resolves to `"-1:s"`/`"1:s"` in `.sentence` mode or
+  the real numeric strings otherwise. This means switching to Sentence
+  view and back to KWIC needs no separate "remembered width" bookkeeping
+  at all - `setContext`'s numeric value was simply never overwritten in
+  the first place.
+- Toolbar gained a "KWIC | Sentence" `NSSegmentedControl` (new
+  `ItemID.viewMode`, between Sample and Context), wired to
+  `ConcordanceViewController.viewModeChanged(_:)`. The existing numeric
+  Context button is disabled while in Sentence mode (doesn't apply, per
+  the plan) - `ConcordanceWindowController.updateToolbarState` gained a
+  `viewMode` parameter alongside `hasLineGroups` for this.
+- `ConcordanceViewController` gained a small `var viewMode:
+  ConcordanceViewMode { document.viewMode }` accessor - `document`
+  itself stays `private`, but `ConcordanceWindowController` needs the
+  current mode at toolbar-item-creation time (segmented control's
+  initial selection, Context button's initial enabled state), before any
+  `refresh()`/`updateToolbarState` call has happened yet.
+- `mtcbridge.cc:195`'s hardcoded `maxctx=100` (would have truncated any
+  sentence longer than 100 tokens) raised to 2000 - generous for any
+  realistic `<s>`, still bounding a pathological/mistagged structure.
 - Table structure is unchanged (still Left/Match/Right columns) - a
   sentence's pre-match/post-match text just naturally fills Left/Right
   instead of a fixed token count. Existing single-line truncation
@@ -2339,14 +2362,26 @@ parses Bonito/Sketch-Engine-style context specs including `"-1:s"`/`"1:s"`
   row-overlap bug fix) stays as-is; 6.6's Extended Context popover is the
   escape hatch for seeing a truncated line in full.
 
-**Key files**: `ConcordanceDocument.swift` (new mode-aware context
-setter), `ConcordanceWindowController.swift`/`ConcordanceViewController.swift`
-(new toolbar segmented control), `ManateeKit/Sources/CManatee/mtcbridge.cc`
-(`maxctx` literal).
+**Key files**: `ConcordanceDocument.swift`, `ConcordanceWindowController.swift`,
+`ConcordanceViewController.swift`, `ManateeKit/Sources/CManatee/mtcbridge.cc`.
 
-**Verify**: `swift test` (unchanged, no engine test needed for a config
-value); manual test toggling the switch on a corpus with real sentences,
-confirm each line's context stops at sentence boundaries.
+New test, `LiveConcordanceTests.testKwicLinesWithSentenceAlignedContextStopsAtSentenceBoundary`:
+queries `"jumps"` (the last word of its sentence in the fixture corpus)
+with `rightContext: "1:s"` and asserts the right context is empty rather
+than spilling into the next sentence/doc the way a numeric width would;
+queries `"the lazy"` (the next sentence's opening bigram) with
+`leftContext: "-1:s"` and asserts the left context doesn't reach back
+into the previous sentence's "jumps" - a real end-to-end check that the
+context-spec string does what's claimed, not just that it passes
+through unchanged.
+
+Verified: `cd ManateeKit && swift test` → **43/43 passing** (1 new);
+`BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
+`RunAllTests` → 32/32 `CorporaTests` passing (unaffected). Not yet
+manually click-tested - next step: toggle the KWIC/Sentence switch on a
+corpus with real multi-token sentences and confirm each line's context
+stops at sentence boundaries, and that the Context button visibly
+disables/re-enables with the switch.
 
 ### 6.4 — Concordance settings tab (behavioral defaults) (not started)
 

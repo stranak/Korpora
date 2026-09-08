@@ -192,8 +192,15 @@ MTCKwic *mtc_kwic_open(MTCCorpus *corp, MTCConcordance *conc,
         // so this is safe whether or not any operation has run yet.
         RangeStream *view = conc->conc->RS(true);
         MTCKwic *mk = new MTCKwic;
+        // maxctx clamps structure-aligned context specs (e.g. "-1:s"/"1:s",
+        // used by Sentence view - see ConcordanceDocument.ConcordanceViewMode)
+        // to at most this many tokens each side. 100 was fine for KonText's
+        // usual numeric KWIC widths, but too tight for a real sentence -
+        // 2000 comfortably covers any realistic <s>, while still bounding
+        // a pathological/mistagged structure from pulling in the whole
+        // corpus.
         mk->kl = new KWICLines(corp->corp, view, left_ctx, right_ctx,
-                               kwic_attr, kwic_attr, "", "", 100);
+                               kwic_attr, kwic_attr, "", "", 2000);
         mk->corp = corp->corp;
         return mk;
     } catch (std::exception &e) {
