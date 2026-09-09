@@ -4,13 +4,23 @@ import Cocoa
 /// text field. Used both in the "new concordance" sheet and in a document
 /// window's persistent query bar.
 ///
-/// Attribute-name/tag-value completion needs corpus registry introspection,
-/// which isn't in the shim yet (planned for Phase 2) - for now this only
-/// completes CQL's own keywords/operators.
+/// Completes CQL's own keywords always, plus - when an owner supplies a
+/// `completionProvider` - the corpus's attribute names and attribute
+/// values, depending on where the caret is (Phase 6.8; see
+/// `CQLCompletionContext`). Without a provider it still completes keywords,
+/// so a field with no corpus context behaves exactly as it did before.
 final class CQLQueryField: NSView {
-    private static let keywords = [
+    // Not `private` - `CQLCompletionProvider` serves these for the
+    // `.keyword` context, so that all three candidate kinds come from one
+    // place rather than being split across the two types.
+    static let keywords = [
         "within", "containing", "meet", "union", "contains",
     ]
+
+    /// Supplies attribute-name/value candidates for one corpus. Set by
+    /// whichever controller owns this field and knows which corpus is
+    /// being queried; nil means keyword-only completion.
+    var completionProvider: CQLCompletionProvider?
 
     private static let minHeight: CGFloat = 22
     private static let maxHeight: CGFloat = 160
@@ -146,11 +156,31 @@ final class CQLQueryField: NSView {
             }
         }
 
+        /// Synchronous by AppKit's design, which is the whole difficulty:
+        /// attribute *values* live in an on-disk lexicon behind an actor,
+        /// so they can't be awaited here. Instead the provider serves
+        /// whatever it already has and starts a fetch for what it doesn't;
+        /// when that lands, `complete(nil)` re-opens the popup and this
+        /// runs again, by which time the value is cached.
+        ///
+        /// The re-trigger can't loop: the provider caches misses as well as
+        /// hits, so the second pass finds an entry either way and starts no
+        /// further fetch.
         override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String]? {
-            let word = (string as NSString).substring(with: charRange).lowercased()
-            guard !word.isEmpty else { return nil }
-            let matches = CQLQueryField.keywords.filter { $0.hasPrefix(word) }
-            return matches.isEmpty ? nil : matches
+            guard let provider = (delegate as? CQLQueryField)?.completionProvider else {
+                // No corpus context - keywords only, as before 6.8.
+                let word = (string as NSString).substring(with: charRange).lowercased()
+                guard !word.isEmpty else { return nil }
+                let matches = CQLQueryField.keywords.filter { $0.hasPrefix(word) }
+                return matches.isEmpty ? nil : matches
+            }
+            let context = CQLCompletionContext.at(text: string, partialWordRange: charRange)
+            return provider.candidates(for: context) { [weak self] in
+                // Only reached when a value fetch just finished. Re-ask for
+                // completions rather than trying to inject them into the
+                // popup that has since been dismissed.
+                self?.complete(nil)
+            }
         }
     }
 }

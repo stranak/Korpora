@@ -108,6 +108,13 @@ final class ConcordanceViewController: NSViewController {
 
         queryField.text = document.initialQuery
         queryField.onSubmit = { [weak self] in self?.runQuery() }
+        // Attribute-name/value completion for the corpus this document is
+        // querying (6.8). Deliberately the corpus, not the subcorpus: a
+        // subcorpus restricts which *hits* come back, not which attributes
+        // or values exist, and it shares the parent's lexicon anyway.
+        if !document.corpusName.isEmpty {
+            queryField.completionProvider = CQLCompletionProvider(corpusName: document.corpusName)
+        }
 
         document.onResultsChanged = { [weak self] animated in self?.refresh(animated: animated) }
         refresh()
@@ -156,6 +163,7 @@ final class ConcordanceViewController: NSViewController {
 
     @objc func filterTapped(_ sender: Any) {
         let sheet = FilterSheetController()
+        sheet.corpusName = document.corpusName
         sheet.onApply = { [weak self] spec in
             self?.document.performFilter(spec)
         }

@@ -7,6 +7,13 @@ import ManateeKit
 final class FilterSheetController: NSViewController {
     var onApply: ((PNFilterSpec) -> Void)?
 
+    /// Set by the presenting controller so the filter's own CQL field gets
+    /// the same attribute-name/value completion as the main query bar
+    /// (6.8) - it's the same bracketed CQL against the same corpus, so
+    /// having completion in one field and not the other would just look
+    /// broken. Nil falls back to keyword-only completion.
+    var corpusName: String?
+
     private let positiveRadio = NSButton(radioButtonWithTitle: "Keep matching lines", target: nil, action: nil)
     private let negativeRadio = NSButton(radioButtonWithTitle: "Remove matching lines", target: nil, action: nil)
     private let leftField = NSTextField(string: "-5")
@@ -30,6 +37,9 @@ final class FilterSheetController: NSViewController {
         rankPopUp.addItems(withTitles: ["First match", "Last match"])
         includeKwicCheckbox.state = .on
         queryField.onSubmit = { [weak self] in self?.applyTapped() }
+        if let corpusName, !corpusName.isEmpty {
+            queryField.completionProvider = CQLCompletionProvider(corpusName: corpusName)
+        }
 
         let title = NSTextField(labelWithString: "Filter Concordance")
         title.font = .boldSystemFont(ofSize: 13)

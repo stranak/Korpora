@@ -140,6 +140,7 @@ final class NewConcordanceSheetController: NSViewController {
             infoLabel.stringValue = ""
             subcorpusPopUp.removeAllItems()
             currentCorpusInfo = nil
+            queryField.completionProvider = nil
             return
         }
         reloadSubcorpusList(for: name)
@@ -149,6 +150,13 @@ final class NewConcordanceSheetController: NSViewController {
                 let corpus = try Corpus(name: name)
                 let info = try await corpus.info()
                 currentCorpusInfo = info
+                // Rebuilt per selected corpus, and handed the attribute
+                // names we just fetched so the provider doesn't repeat the
+                // same info() call (6.8). Its value cache is per-corpus,
+                // which is the other reason not to reuse one across a
+                // corpus change.
+                queryField.completionProvider = CQLCompletionProvider(
+                    corpusName: name, attributeNames: info.attributes)
                 var parts: [String] = []
                 if !info.attributes.isEmpty {
                     parts.append("Attributes: " + info.attributes.joined(separator: ", "))
@@ -162,6 +170,7 @@ final class NewConcordanceSheetController: NSViewController {
                 infoLabel.stringValue = parts.joined(separator: "\n")
             } catch {
                 currentCorpusInfo = nil
+                queryField.completionProvider = nil
                 infoLabel.stringValue = "\(error)"
             }
         }
