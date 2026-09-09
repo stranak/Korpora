@@ -1,4 +1,4 @@
-# mac-corpora
+# Korpora
 
 `ManateeKit` wraps `manatee-open` (the corpus-query engine behind KonText).
 `Korpora` is the native AppKit macOS app built on top of it. It was renamed
@@ -34,7 +34,13 @@ them by repo-relative path.
 ## Repos
 
 - `ManateeKit/`, `Korpora/`, `scripts/` — this repo
-  (`github.com/stranak/mac-corpora`).
+  (`github.com/stranak/Korpora`, renamed from `mac-corpora` along with the
+  app). The local checkout directory is `korpora/`.
+  - **The bundle identifier is deliberately still
+    `cz.cuni.mff.ufal.mac-corpora.dev`** and must stay that way: it's a
+    live identifier, not a name, and `UserDefaults` is keyed by it.
+    Changing it would orphan every stored setting (fonts, colors, query
+    history, context widths) and silently reset the app to defaults.
 - `manatee-open/` — a separate git checkout, sibling to this repo, not
   nested/submoduled. Must be `stranak/manatee-open`'s
   `macos-arm64-portability` branch, not upstream `czcorpus/manatee-open` —

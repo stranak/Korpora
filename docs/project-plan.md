@@ -22,12 +22,29 @@ variable:
 | `CORPORA_COMPILED_CORPORA_DIRECTORY` | `KORPORA_COMPILED_CORPORA_DIRECTORY` |
 | `~/Library/Application Support/Corpora/` | `~/Library/Application Support/Korpora/` |
 
+The GitHub repo followed too (`stranak/mac-corpora` → `stranak/Korpora`);
+the local checkout directory is `korpora/`.
+
 So every "Corpora" that meant *the app* is now "Korpora". "Corpora" as the
 plural of *corpus* is correct and stays — the Settings tab,
 `CorporaSettingsViewController`, `AppSettings.compiledCorporaDirectory`,
 `reloadCorpora()`. `project.yml` points `sources:`/`INFOPLIST_FILE`/
 `CODE_SIGN_ENTITLEMENTS` at the renamed directories; re-run `xcodegen
 generate` in `Korpora/` after any further move.
+
+**Two things deliberately keep an old name — do not "finish the rename"
+by changing either:**
+
+- `PRODUCT_BUNDLE_IDENTIFIER = cz.cuni.mff.ufal.mac-corpora.dev`
+  (`project.yml` and the generated `project.pbxproj`). It's a live
+  identifier, not a name: `UserDefaults` is keyed by bundle id, so
+  changing it orphans every stored setting — fonts, colors, query history,
+  context widths, `allowMultipleExtendedContexts` — and the app silently
+  comes up with defaults. Also worth noting the `.dev` suffix: this
+  identifier was never meant to be the shipping one anyway.
+- `ExtendedContextDisplayMode.sheet`, whose raw value persists in
+  `UserDefaults` even though it has presented a plain window since 6.6's
+  follow-up. Same reasoning; the Settings UI labels it "Window" instead.
 
 Two things broke on the directory rename, and both are *baked-in absolute
 paths* — the one category no source-level rename can catch:
@@ -111,7 +128,8 @@ agent's purpose-built tools instead.)
 Three places hold parts of this work; know which before assuming something
 is "done":
 
-- **`github.com/stranak/mac-corpora`, branch `main`** — the pushed baseline.
+- **`github.com/stranak/Korpora`, branch `main`** (was `mac-corpora`,
+  renamed with the app) — the pushed baseline.
   Holds only the pre-Phase-0 engine: `.gitignore`, `ManateeKit/Package.swift`,
   `ManateeKit/Sources/CManatee/{include/mtcbridge.h,mtcbridge.cc}`,
   `ManateeKit/Sources/ManateeKit/ManateeKit.swift`,
@@ -130,7 +148,7 @@ is "done":
   pushed history, so there's no commit to point to for that decision — this
   paragraph is the record of it.
 
-`manatee-open` itself is **not pinned** by anything in `mac-corpora` — it's
+`manatee-open` itself is **not pinned** by anything in `Korpora` — it's
 excluded via `.gitignore` and `scripts/setup-dev-machine.sh` only checks
 that a `manatee-open` checkout exists next to this repo, it doesn't clone or
 check out a branch. On a fresh machine, clone it explicitly and check out

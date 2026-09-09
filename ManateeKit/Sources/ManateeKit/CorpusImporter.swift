@@ -433,7 +433,7 @@ public enum CorpusImporter {
             .deletingLastPathComponent() // ManateeKit (Sources/ManateeKit)
             .deletingLastPathComponent() // Sources
             .deletingLastPathComponent() // ManateeKit (package root)
-            .deletingLastPathComponent() // mac-corpora
+            .deletingLastPathComponent() // repo root
             .appendingPathComponent("manatee-open")
     }
 }

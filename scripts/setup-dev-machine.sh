@@ -1,6 +1,6 @@
 #!/bin/sh
 # Sets up a fresh Mac to build manatee-open + ManateeKit.
-# Run from the mac-corpora checkout root, after both `manatee-open` and
+# Run from this repo's checkout root, after both `manatee-open` and
 # `ManateeKit` are present as siblings (this script's grandparent dir).
 #
 # Prerequisites this does NOT install: Xcode Command Line Tools.
