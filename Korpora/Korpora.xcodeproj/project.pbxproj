@@ -52,6 +52,7 @@
 		F624C1BCF4D833A208DDD6B0 /* ConcordanceWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118D96F87811C199B75B172C /* ConcordanceWindowController.swift */; };
 		F862FD9EFBFAFD408F69D5F0 /* ManateeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 451B02C818B4142D28EA7E25 /* ManateeKit */; };
 		F89A78E1B12E53AFE9E4F061 /* QueryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */; };
+		FE3E752BE968D4DE9C1779B1 /* CQLAutoPairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */; };
 		FFC77053A7C5DCBD559DB120 /* FrequencyWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */; };
 /* End PBXBuildFile section */
 
@@ -74,6 +75,7 @@
 		194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributeDisplayPopoverController.swift; sourceTree = "<group>"; };
 		206361B4B6C7135D9E8D6D48 /* Korpora.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Korpora.entitlements; sourceTree = "<group>"; };
 		20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedContextWindowController.swift; sourceTree = "<group>"; };
+		2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLAutoPairingTests.swift; sourceTree = "<group>"; };
 		2244ED579AEB14CE01DD800F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorporaSettingsViewController.swift; sourceTree = "<group>"; };
 		29FC66C90A00125753A67D28 /* FrequencySheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencySheetController.swift; sourceTree = "<group>"; };
@@ -188,6 +190,7 @@
 			children = (
 				5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */,
 				7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */,
+				2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */,
 				7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */,
 				EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */,
 				0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */,
@@ -332,6 +335,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FE3E752BE968D4DE9C1779B1 /* CQLAutoPairingTests.swift in Sources */,
 				C6212C93C0C81D9DD271EBD5 /* CQLCompletionContextTests.swift in Sources */,
 				97CB75829A78ECC1D477B9CE /* ConcordanceExporterTests.swift in Sources */,
 				6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */,

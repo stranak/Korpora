@@ -1,4 +1,5 @@
 import Foundation
+import ManateeKit
 import Testing
 
 @testable import Korpora
@@ -39,17 +40,22 @@ struct CQLCompletionContextTests {
 
     /// Right after `[` there's no partial word yet - an empty prefix, which
     /// must still classify as an attribute name so the popup can offer the
-    /// full attribute list.
+    /// whole attribute list.
     @Test func emptyPrefixJustInsideABracketIsStillAnAttributeName() {
         #expect(contextTypingAtEnd("[", prefix: "") == .attributeName(prefix: ""))
     }
 
-    /// A second attribute in the same bracket, after a completed first one -
-    /// the closed quote must not leave the parser thinking it's in a value.
+    /// A second attribute in the same bracket, after a completed first one:
+    /// the closed quote must not leave the parser thinking it's still in a
+    /// value, and the `&` must not read as a finished identifier.
     @Test func attributeNameAfterACompletedValueInTheSameBracket() {
         #expect(
             contextTypingAtEnd(#"[word="fox" & ta"#, prefix: "ta")
                 == .attributeName(prefix: "ta"))
+    }
+
+    @Test func emptyPrefixAfterABooleanOperatorIsAnAttributeName() {
+        #expect(contextTypingAtEnd(#"[word="fox" & "#, prefix: "") == .attributeName(prefix: ""))
     }
 
     /// Nested/adjacent brackets: the *last* unclosed one is what counts.
@@ -59,71 +65,52 @@ struct CQLCompletionContextTests {
                 == .attributeName(prefix: "ta"))
     }
 
-    // MARK: - attribute values
+    // MARK: - comparison operators
 
-    @Test func wordInsideAnOpenQuoteIsThatAttributesValue() {
-        #expect(
-            contextTypingAtEnd(#"[word="fo"#, prefix: "fo")
-                == .attributeValue(attribute: "word", prefix: "fo"))
+    /// Right after a finished attribute name, an operator is the only thing
+    /// that can legally come next. There's no partial word to type it into,
+    /// which is exactly why offering it as a completion is worth doing.
+    @Test func emptyPrefixAfterAnAttributeNameOffersOperators() {
+        #expect(contextTypingAtEnd("[word ", prefix: "") == .comparisonOperator(prefix: ""))
     }
 
-    @Test func emptyPrefixJustInsideAnOpenQuoteIsStillAValue() {
-        #expect(
-            contextTypingAtEnd(#"[lemma=""#, prefix: "")
-                == .attributeValue(attribute: "lemma", prefix: ""))
+    @Test func operatorPositionIsFoundWithoutASpaceToo() {
+        #expect(contextTypingAtEnd("[word", prefix: "") == .comparisonOperator(prefix: ""))
     }
 
-    /// Whitespace and the various comparison operators between the name and
-    /// the quote must not swallow the name.
-    @Test func operatorAndSpacingVariantsAllYieldTheSameAttribute() {
-        let variants = [#"[word="fo"#, #"[word = "fo"#, #"[word!="fo"#, #"[word != "fo"#]
-        for variant in variants {
-            #expect(
-                contextTypingAtEnd(variant, prefix: "fo")
-                    == .attributeValue(attribute: "word", prefix: "fo"),
-                "variant \(variant)")
-        }
+    @Test func operatorPositionAfterADottedStructuralName() {
+        #expect(contextTypingAtEnd("[doc.author ", prefix: "") == .comparisonOperator(prefix: ""))
     }
 
-    /// A dotted structural attribute name is one identifier, not two.
-    @Test func dottedStructuralAttributeNameIsKeptWhole() {
-        #expect(
-            contextTypingAtEnd(#"[doc.author="Tw"#, prefix: "Tw")
-                == .attributeValue(attribute: "doc.author", prefix: "Tw"))
+    /// Once the operator is typed, we're no longer in operator position -
+    /// `=` is not an identifier character.
+    @Test func afterTheOperatorItselfIsNotOperatorPosition() {
+        #expect(contextTypingAtEnd("[word=", prefix: "") == .attributeName(prefix: ""))
     }
 
-    /// The unbracketed form the "New Subcorpus…" popover uses - value
-    /// completion should still work there, since it's recognized by the
-    /// unclosed quote rather than by being inside brackets.
-    @Test func unbracketedAttributeValueIsStillRecognized() {
-        #expect(
-            contextTypingAtEnd(#"author="Tw"#, prefix: "Tw")
-                == .attributeValue(attribute: "author", prefix: "Tw"))
+    // MARK: - inside a quoted value: nothing
+
+    /// Values are corpus data, not language - 6.8 deliberately doesn't
+    /// complete them, and completing keywords inside a string would be
+    /// actively wrong.
+    @Test func insideAnOpenQuoteNothingIsOffered() {
+        #expect(contextTypingAtEnd(#"[word="fo"#, prefix: "fo") == .quotedValue)
     }
 
-    /// A value in the *second* attribute of a bracket: the earlier
-    /// completed pair's quotes are balanced, so only the live quote counts.
-    @Test func valueOfASecondAttributeAfterACompletedFirstOne() {
-        #expect(
-            contextTypingAtEnd(#"[word="fox" & tag="N"#, prefix: "N")
-                == .attributeValue(attribute: "tag", prefix: "N"))
+    @Test func emptyPrefixJustInsideAnOpenQuoteOffersNothing() {
+        #expect(contextTypingAtEnd(#"[lemma=""#, prefix: "") == .quotedValue)
     }
 
     /// An escaped quote inside a value doesn't close it - otherwise
-    /// everything after it would be misread as being outside the string.
+    /// everything after it would be misread as language.
     @Test func escapedQuoteInsideAValueDoesNotCloseIt() {
-        #expect(
-            contextTypingAtEnd(#"[word="say \"he"#, prefix: "he")
-                == .attributeValue(attribute: "word", prefix: "he"))
+        #expect(contextTypingAtEnd(#"[word="say \"he"#, prefix: "he") == .quotedValue)
     }
 
-    /// A bare string with no attribute before it: recognized as a value,
-    /// but with no attribute to look values up in. The provider turns an
-    /// empty attribute into "no candidates" rather than guessing.
-    @Test func quotedStringWithNoAttributeYieldsAnEmptyAttribute() {
-        #expect(
-            contextTypingAtEnd(#"["fo"#, prefix: "fo")
-                == .attributeValue(attribute: "", prefix: "fo"))
+    /// The unbracketed form the "New Subcorpus…" popover uses is still
+    /// recognized as a value, so nothing is offered there either.
+    @Test func unbracketedQuotedValueOffersNothing() {
+        #expect(contextTypingAtEnd(#"author="Tw"#, prefix: "Tw") == .quotedValue)
     }
 
     // MARK: - robustness
@@ -133,7 +120,7 @@ struct CQLCompletionContextTests {
     @Test func outOfBoundsRangeIsClampedNotFatal() {
         let context = CQLCompletionContext.at(
             text: "[word", partialWordRange: NSRange(location: 99, length: 40))
-        #expect(context == .attributeName(prefix: ""))
+        #expect(context == .comparisonOperator(prefix: ""))
     }
 
     @Test func emptyTextIsAKeywordContext() {
@@ -143,26 +130,39 @@ struct CQLCompletionContextTests {
     }
 }
 
-/// The regex escaping that turns typed text into a literal prefix pattern.
-/// Manatee matches the whole value, so completion appends ".*" - which
-/// means anything the user types that looks like a metacharacter has to be
-/// escaped or it silently changes the search.
-struct CQLCompletionRegexEscapingTests {
-    @Test func plainTextIsUnchanged() {
-        #expect(CQLCompletionProvider.escapeForRegex("fox") == "fox")
+/// The candidate lists themselves - in particular that structural
+/// attributes are offered in the dotted form CQL actually accepts.
+struct CQLCompletionCandidateTests {
+    private let info = CorpusInfo(
+        name: "test", sizeTokens: 17, attributes: ["word", "lemma", "tag"],
+        structures: [
+            StructureInfo(name: "doc", attributes: ["id", "author"]),
+            StructureInfo(name: "s", attributes: []),
+        ])
+
+    @Test func bothPositionalAndStructuralNamesAreOffered() {
+        let names = CQLCompletionProvider.attributeNames(from: info)
+        #expect(names == ["doc.author", "doc.id", "lemma", "tag", "word"])
     }
 
-    @Test func dotIsEscapedSoItMatchesALiteralDot() {
-        #expect(CQLCompletionProvider.escapeForRegex("a.b") == #"a\.b"#)
+    /// A structure with no attributes of its own contributes nothing -
+    /// there's no `s.` to complete to.
+    @Test func aStructureWithNoAttributesContributesNothing() {
+        let names = CQLCompletionProvider.attributeNames(from: info)
+        #expect(!names.contains { $0.hasPrefix("s.") })
     }
 
-    @Test func everyMetacharacterIsEscaped() {
-        #expect(
-            CQLCompletionProvider.escapeForRegex(#".*+?[](){}|^$\"#)
-                == #"\.\*\+\?\[\]\(\)\{\}\|\^\$\\"#)
+    @Test func emptyPrefixOffersEverything() {
+        let all = CQLCompletionProvider.matching(["word", "lemma"], prefix: "")
+        #expect(all == ["word", "lemma"])
     }
 
-    @Test func emptyStringStaysEmpty() {
-        #expect(CQLCompletionProvider.escapeForRegex("") == "")
+    @Test func prefixMatchingIsCaseInsensitive() {
+        let matches = CQLCompletionProvider.matching(["doc.author", "doc.id", "word"], prefix: "DOC.")
+        #expect(matches == ["doc.author", "doc.id"])
+    }
+
+    @Test func noMatchesIsNilSoAppKitShowsNoPopup() {
+        #expect(CQLCompletionProvider.matching(["word"], prefix: "zz") == nil)
     }
 }

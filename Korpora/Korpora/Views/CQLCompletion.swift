@@ -7,19 +7,28 @@ import ManateeKit
 /// Pure syntax, deliberately: it takes a string and an offset and returns a
 /// case, with no `Corpus`, no actor and no I/O, so the position logic - the
 /// part that's actually easy to get wrong - is unit-testable without a live
-/// window or corpus (see `CQLCompletionContextTests`). Turning a case into
-/// actual candidates is `CQLCompletionProvider`'s job.
+/// window or corpus (see `CQLCompletionContextTests`).
+///
+/// Scope note: this deliberately does **not** complete attribute *values*
+/// from the corpus. Completion here is about the CQL language and the
+/// corpus's schema (attribute names), both of which are small, fixed and
+/// knowable up front - so everything stays synchronous. Value completion
+/// would mean reading a lexicon of up to ~700k entries from disk behind an
+/// actor, inside AppKit's synchronous completion callback.
 enum CQLCompletionContext: Equatable {
     /// Not inside a token bracket - CQL's own keywords (`within`,
     /// `containing`, …) are all that makes sense.
     case keyword(prefix: String)
-    /// Inside `[…]` but not inside a quoted value: an attribute name, e.g.
-    /// the `lem` of `[lem`.
+    /// Inside `[…]`, positioned where an attribute name goes: e.g. the
+    /// `lem` of `[lem`.
     case attributeName(prefix: String)
-    /// Inside a quoted value belonging to `attribute`, e.g. the `fo` of
-    /// `[word="fo`. `attribute` is whatever name preceded the `=`, verbatim
-    /// and unvalidated - the provider decides whether the corpus has it.
-    case attributeValue(attribute: String, prefix: String)
+    /// Inside `[…]`, right after an attribute name, where a comparison
+    /// operator goes: the caret in `[word ` or `[doc.author `.
+    case comparisonOperator(prefix: String)
+    /// Inside a quoted string. Nothing is offered: the contents are corpus
+    /// data (or a regex over it), not language, and completing language
+    /// keywords in the middle of a `"…"` would be actively wrong.
+    case quotedValue
 
     /// Classifies the caret at `partialWordRange` (exactly what
     /// `NSTextView.completions(forPartialWordRange:…)` is handed) within
@@ -27,9 +36,9 @@ enum CQLCompletionContext: Equatable {
     ///
     /// Everything is decided by scanning *backwards* from the start of the
     /// partial word rather than by parsing the query as a whole: a query
-    /// being typed is usually not valid CQL yet - `[word="fo` has an
-    /// unclosed quote and an unclosed bracket - so there's nothing to parse
-    /// forwards, and a real CQL parser would simply reject it.
+    /// being typed is usually not valid CQL yet - `[word=` has an unclosed
+    /// bracket - so there's nothing to parse forwards, and a real CQL
+    /// parser would simply reject it.
     static func at(text: String, partialWordRange: NSRange) -> CQLCompletionContext {
         let ns = text as NSString
         let start = max(0, min(partialWordRange.location, ns.length))
@@ -37,41 +46,42 @@ enum CQLCompletionContext: Equatable {
         let prefix = ns.substring(with: NSRange(location: start, length: length))
         let before = ns.substring(to: start)
 
-        // A value is recognized by an unclosed quote, which also covers the
-        // unbracketed `author="Tw` form the "New Subcorpus…" popover uses
-        // (see `Corpus.createSubcorpus` on why that one has no brackets).
-        if let quoteStart = unclosedQuoteStart(in: before) {
-            let attribute = attributeName(endingBefore: quoteStart, in: before)
-            return .attributeValue(attribute: attribute, prefix: prefix)
+        if hasUnclosedQuote(in: before) {
+            return .quotedValue
         }
-        if isInsideBrackets(before) {
-            return .attributeName(prefix: prefix)
+        guard isInsideBrackets(before) else {
+            return .keyword(prefix: prefix)
         }
-        return .keyword(prefix: prefix)
+        // Inside brackets the position is decided by what the last
+        // non-space character is: an identifier character means a name was
+        // just finished, so an operator comes next.
+        if prefix.isEmpty, endsWithIdentifier(before) {
+            return .comparisonOperator(prefix: prefix)
+        }
+        return .attributeName(prefix: prefix)
     }
 
-    /// The offset of the `"` that opens a still-unclosed string, or nil if
-    /// every quote in `before` is balanced. A `\"` doesn't count - it's an
-    /// escaped quote inside a string, not a delimiter.
-    private static func unclosedQuoteStart(in before: String) -> Int? {
+    /// True when a `"` in `before` is still open. A `\"` doesn't count -
+    /// it's an escaped quote inside a string, not a delimiter.
+    private static func hasUnclosedQuote(in before: String) -> Bool {
         let ns = before as NSString
-        var openedAt: Int?
+        var open = false
         var index = 0
         while index < ns.length {
             let ch = ns.character(at: index)
             if ch == UInt16(UnicodeScalar("\\").value) {
                 // Skip the escaped character, whatever it is. Only
-                // meaningful while inside a string, but skipping it outside
-                // one too is harmless and keeps this a single pass.
+                // meaningful inside a string, but skipping it outside one
+                // is harmless and keeps this a single pass.
                 index += 2
                 continue
             }
             if ch == UInt16(UnicodeScalar("\"").value) {
-                openedAt = openedAt == nil ? index : nil
+                open.toggle()
             }
             index += 1
         }
-        return openedAt
+        return open
     }
 
     /// True when the last unmatched `[` in `before` is still open - i.e.
@@ -82,25 +92,17 @@ enum CQLCompletionContext: Equatable {
         return open > close
     }
 
-    /// Reads the attribute name immediately left of the opening quote at
-    /// `quoteStart`, skipping the comparison operator and any whitespace
-    /// between them - so `word="`, `word = "`, `word!="` and `word !== "`
-    /// all yield "word". Empty string when there's no identifier there
-    /// (e.g. a bare `"…"` string), which the provider treats as "no
-    /// attribute, nothing to offer".
-    private static func attributeName(endingBefore quoteStart: Int, in before: String) -> String {
+    /// True when `before`, ignoring trailing spaces/tabs, ends in an
+    /// identifier character - so `[word `, `[doc.author ` and `[word` all
+    /// qualify, while `[`, `[word=` and `[word="x" & ` do not.
+    private static func endsWithIdentifier(_ before: String) -> Bool {
         let ns = before as NSString
-        var index = quoteStart - 1
-        // The operator and its surrounding spaces: = == != and stray ! < >.
-        while index >= 0, "=!<> \t".utf16.contains(ns.character(at: index)) {
+        var index = ns.length - 1
+        while index >= 0, " \t".utf16.contains(ns.character(at: index)) {
             index -= 1
         }
-        let nameEnd = index
-        while index >= 0, isIdentifierCharacter(ns.character(at: index)) {
-            index -= 1
-        }
-        guard nameEnd > index else { return "" }
-        return ns.substring(with: NSRange(location: index + 1, length: nameEnd - index))
+        guard index >= 0 else { return false }
+        return isIdentifierCharacter(ns.character(at: index))
     }
 
     private static func isIdentifierCharacter(_ ch: unichar) -> Bool {
@@ -109,137 +111,181 @@ enum CQLCompletionContext: Equatable {
     }
 }
 
-/// Turns a `CQLCompletionContext` into candidate strings for one corpus.
+/// The candidate lists behind `CQLCompletionContext`, for one corpus.
 ///
-/// Exists because `NSTextView.completions(forPartialWordRange:…)` is
-/// **synchronous** while `Corpus` is an actor and its lexicon lives on
-/// disk - there is no way to await inside that callback. So attribute
-/// names are prefetched once (they come from already-parsed registry
-/// metadata and are tiny), and attribute *values* are served from a cache
-/// that a background fetch fills, re-triggering the completion popup when
-/// it lands (see `CQLQueryField.InternalTextView.completions`).
+/// Fully synchronous by design - see `CQLCompletionContext`'s scope note.
+/// The only thing it needs from the corpus is its *schema*, which comes
+/// from registry metadata already parsed at open time (`Corpus.info()`),
+/// so it's fetched once up front and never touched again.
+///
+/// `@MainActor` for the mutable `attributeNames` only; the candidate lists
+/// and the two pure functions over them are `nonisolated`, both because
+/// they touch no state and because a `CQLQueryField` with no provider
+/// still needs them from a synchronous AppKit callback.
 @MainActor
 final class CQLCompletionProvider {
-    /// A completion popup is a list to glance at, not a data browser -
-    /// `lemma` has 708,671 distinct values on syn2025 (see Phase 6.7), so
-    /// the limit is what keeps this usable rather than a nicety.
-    private static let maxValueCandidates = 50
+    /// CQL's word-like language constructs. Matches the set
+    /// `CQLQueryField.recolor` already highlights as keywords, so what's
+    /// completed and what's colored can't drift apart.
+    nonisolated static let keywords = [
+        "within", "containing", "meet", "union", "contains",
+    ]
 
-    private let corpusName: String
-    private var corpus: Corpus?
-    private var attributeNames: [String] = []
-    /// Keyed by attribute *and* prefix, and it deliberately caches misses
-    /// too: an empty array recorded for a prefix is what stops
-    /// `completions` from re-fetching (and so re-triggering itself) for a
-    /// prefix already known to match nothing.
-    private var valueCache: [String: [String]] = [:]
-    private var inFlight: Set<String> = []
+    /// Comparison operators, matching the set `CQLQueryField.recolor`
+    /// highlights. Offered right after an attribute name, where they're the
+    /// only thing that can legally come next - and where there's no partial
+    /// word to type them into, which is why they're completion candidates
+    /// rather than something you'd only ever type by hand.
+    nonisolated static let comparisonOperators = ["=", "!=", "<", ">"]
 
-    init(corpusName: String, attributeNames: [String] = []) {
-        self.corpusName = corpusName
-        self.attributeNames = attributeNames
-        if attributeNames.isEmpty {
-            prefetchAttributeNames()
-        }
+    private(set) var attributeNames: [String] = []
+
+    /// For an owner that has to look the corpus up itself (the query bar,
+    /// the Filter sheet).
+    init(corpusName: String) {
+        prefetchAttributeNames(corpusName: corpusName)
     }
 
-    /// Candidates for `context`, or nil when there's nothing to offer yet.
+    /// For an owner that already has `info()` in hand - the New Concordance
+    /// sheet fetches it anyway to fill its info label, so re-fetching would
+    /// be pure waste.
+    init(corpusInfo: CorpusInfo) {
+        attributeNames = Self.attributeNames(from: corpusInfo)
+    }
+
+    /// Both kinds of attribute name, which is what makes this useful for
+    /// real queries: positional attributes verbatim (`word`, `lemma`,
+    /// `tag`) plus structural ones in the dotted `structure.attribute`
+    /// form (`doc.author`, `s.id`) that CQL accepts inside `[…]` - the same
+    /// spelling `Corpus.structuralAttributeValue(at:attribute:)` takes.
     ///
-    /// `onValuesFetched` is called only when values had to be fetched: the
-    /// return value is nil in that case, and the caller should re-ask once
-    /// the callback fires.
-    func candidates(for context: CQLCompletionContext, onValuesFetched: @escaping () -> Void) -> [String]? {
+    /// Sorted, since the two groups arrive in unrelated registry order and
+    /// a completion popup is read by eye.
+    nonisolated static func attributeNames(from info: CorpusInfo) -> [String] {
+        let structural = info.structures.flatMap { structure in
+            structure.attributes.map { "\(structure.name).\($0)" }
+        }
+        return (info.attributes + structural).sorted()
+    }
+
+    /// Candidates for `context`, or nil when there's nothing to offer.
+    func candidates(for context: CQLCompletionContext) -> [String]? {
         switch context {
         case .keyword(let prefix):
-            return Self.matching(CQLQueryField.keywords, prefix: prefix)
+            return Self.matching(Self.keywords, prefix: prefix)
         case .attributeName(let prefix):
             return Self.matching(attributeNames, prefix: prefix)
-        case .attributeValue(let attribute, let prefix):
-            guard !attribute.isEmpty, attributeNames.contains(attribute) else { return nil }
-            let key = Self.cacheKey(attribute, prefix)
-            if let cached = valueCache[key] {
-                return cached.isEmpty ? nil : cached
-            }
-            fetchValues(attribute: attribute, prefix: prefix, key: key, then: onValuesFetched)
+        case .comparisonOperator(let prefix):
+            return Self.matching(Self.comparisonOperators, prefix: prefix)
+        case .quotedValue:
             return nil
         }
     }
 
-    private static func matching(_ candidates: [String], prefix: String) -> [String]? {
+    /// Prefix-matched case-insensitively; an empty prefix offers
+    /// everything, which is what makes the caret right after `[` (or after
+    /// an attribute name) useful rather than dead.
+    nonisolated static func matching(_ candidates: [String], prefix: String) -> [String]? {
         guard !prefix.isEmpty else { return candidates.isEmpty ? nil : candidates }
         let lowered = prefix.lowercased()
         let matches = candidates.filter { $0.lowercased().hasPrefix(lowered) }
         return matches.isEmpty ? nil : matches
     }
 
-    private static func cacheKey(_ attribute: String, _ prefix: String) -> String {
-        // \u{0} can't occur in either part, so this can't collide the way
-        // a "." or ":" separator could against a dotted attribute name.
-        "\(attribute)\u{0}\(prefix)"
-    }
-
-    private func prefetchAttributeNames() {
+    private func prefetchAttributeNames(corpusName: String) {
+        guard !corpusName.isEmpty else { return }
         Task { @MainActor [weak self] in
-            guard let self else { return }
             do {
-                let corpus = try await self.openCorpus()
-                self.attributeNames = try await corpus.info().attributes
+                let corpus = try await Corpus(name: corpusName)
+                self?.attributeNames = Self.attributeNames(from: try await corpus.info())
             } catch {
                 // Completion is an optional convenience - a corpus that
-                // can't be opened or read just means no candidates, never
-                // an error in the user's face while they're typing.
-                self.attributeNames = []
+                // can't be opened or read just means no attribute
+                // candidates, never an error in the user's face while
+                // they're typing.
+                self?.attributeNames = []
             }
         }
     }
+}
 
-    private func fetchValues(attribute: String, prefix: String, key: String, then completion: @escaping () -> Void) {
-        guard !inFlight.contains(key) else { return }
-        inFlight.insert(key)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer { self.inFlight.remove(key) }
-            do {
-                let corpus = try await self.openCorpus()
-                // Whole-value matching, so a prefix search needs the
-                // trailing ".*" - see `Corpus.attributeValues`. The typed
-                // text is escaped first: someone typing "a." in a lemma
-                // box means a literal dot, not "any character".
-                let pattern = Self.escapeForRegex(prefix) + ".*"
-                self.valueCache[key] = try await corpus.attributeValues(
-                    attribute: attribute, matching: pattern, ignoreCase: true,
-                    limit: Self.maxValueCandidates)
-            } catch {
-                // Cache the failure as a miss, so a broken attribute or
-                // corpus doesn't re-fetch on every keystroke.
-                self.valueCache[key] = []
-            }
-            completion()
-        }
+/// Auto-closing brackets and quotes for `CQLQueryField` (Phase 6.8): type
+/// `[` and get `[]` with the caret inside, type the closing character when
+/// it's already there and step over it instead of doubling it.
+///
+/// Pure functions over (text, selection, typed character) so the rules are
+/// unit-testable without a text view - the same reason
+/// `CQLCompletionContext` is separate from the field.
+enum CQLAutoPairing {
+    /// Left-right pairs CQL actually uses: token brackets, quoted values,
+    /// grouping parens, and structure tags.
+    static let pairs: [Character: Character] = ["[": "]", "\"": "\"", "(": ")", "<": ">"]
+
+    /// The closing halves, which is what "step over instead of inserting"
+    /// keys off. `"` is deliberately both an opener and a closer - the same
+    /// character does both jobs, so which one it is depends entirely on
+    /// what's to the right of the caret.
+    static var closers: Set<Character> { Set(pairs.values) }
+
+    enum Action: Equatable {
+        /// Replace the selection with `text`, then put the caret
+        /// `caretOffset` characters into it. Auto-pairing always uses an
+        /// offset that lands *between* the two halves.
+        case insert(text: String, caretOffset: Int)
+        /// The typed character is already the next one - move the caret
+        /// past it rather than inserting a duplicate.
+        case moveOver
+        /// Nothing special; let `NSTextView` insert it normally.
+        case passThrough
     }
 
-    private func openCorpus() async throws -> Corpus {
-        if let corpus { return corpus }
-        let opened = try await Corpus(name: corpusName)
-        corpus = opened
-        return opened
+    static func action(forTyping input: String, text: String, selectedRange: NSRange) -> Action {
+        guard input.count == 1, let character = input.first else { return .passThrough }
+        let ns = text as NSString
+        let caret = max(0, min(selectedRange.location, ns.length))
+
+        // Wrap a selection rather than replacing it: selecting `fox` and
+        // typing `"` should give `"fox"`, which is the one case where the
+        // caret offset is not 1.
+        if selectedRange.length > 0, let close = pairs[character] {
+            let selected = ns.substring(with: NSRange(
+                location: caret, length: min(selectedRange.length, ns.length - caret)))
+            return .insert(text: "\(character)\(selected)\(close)", caretOffset: 1 + selected.count)
+        }
+
+        // Step over an existing closer. Checked before the opener case so
+        // that `"` closes a string it's sitting at the end of instead of
+        // opening a new one.
+        if closers.contains(character), caret < ns.length,
+           ns.character(at: caret) == character.utf16.first {
+            return .moveOver
+        }
+
+        if let close = pairs[character] {
+            return .insert(text: "\(character)\(close)", caretOffset: 1)
+        }
+        return .passThrough
     }
 
-    /// Escapes Manatee's regex metacharacters so the typed prefix is
-    /// matched literally - someone typing "a." in a lemma box means a
-    /// literal dot, not "any character".
-    ///
-    /// `nonisolated` because it touches no state: it's pure string work
-    /// that happens to live here, and inheriting the type's `@MainActor`
-    /// would only make it unusable from a synchronous test.
-    nonisolated static func escapeForRegex(_ text: String) -> String {
-        var result = ""
-        for character in text {
-            if #"\.*+?[](){}|^$"#.contains(character) {
-                result.append("\\")
-            }
-            result.append(character)
-        }
-        return result
+    /// Whether backspace should delete both halves of an empty pair - the
+    /// caret sitting in `[|]` or `"|"`, which is exactly what's left after
+    /// auto-pairing something and changing your mind.
+    static func deletesEmptyPair(text: String, selectedRange: NSRange) -> Bool {
+        guard selectedRange.length == 0 else { return false }
+        let ns = text as NSString
+        let caret = selectedRange.location
+        guard caret > 0, caret < ns.length else { return false }
+        guard let open = Character(utf16: ns.character(at: caret - 1)),
+              let close = Character(utf16: ns.character(at: caret)) else { return false }
+        return pairs[open] == close
+    }
+}
+
+extension Character {
+    /// Nil for an unpaired surrogate, which can't be a bracket or quote
+    /// anyway - so callers can treat nil as "not a pair character".
+    fileprivate init?(utf16 unit: unichar) {
+        guard let scalar = UnicodeScalar(unit) else { return nil }
+        self = Character(scalar)
     }
 }

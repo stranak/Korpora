@@ -4,22 +4,23 @@ import Cocoa
 /// text field. Used both in the "new concordance" sheet and in a document
 /// window's persistent query bar.
 ///
-/// Completes CQL's own keywords always, plus - when an owner supplies a
-/// `completionProvider` - the corpus's attribute names and attribute
-/// values, depending on where the caret is (Phase 6.8; see
-/// `CQLCompletionContext`). Without a provider it still completes keywords,
-/// so a field with no corpus context behaves exactly as it did before.
+/// Completion covers the CQL *language* and the corpus *schema* - keywords,
+/// comparison operators, and both positional and structural attribute
+/// names - depending on where the caret is (Phase 6.8; see
+/// `CQLCompletionContext`). Brackets and quotes also auto-close, with the
+/// caret left between them (`CQLAutoPairing`).
+///
+/// It deliberately does **not** complete attribute values from the corpus:
+/// everything here is small, fixed and knowable up front, which is what
+/// keeps it synchronous and predictable.
+///
+/// Without a `completionProvider` it still completes keywords and
+/// operators and still auto-pairs, so a field with no corpus context is
+/// fully functional - it just can't offer attribute names.
 final class CQLQueryField: NSView {
-    // Not `private` - `CQLCompletionProvider` serves these for the
-    // `.keyword` context, so that all three candidate kinds come from one
-    // place rather than being split across the two types.
-    static let keywords = [
-        "within", "containing", "meet", "union", "contains",
-    ]
-
-    /// Supplies attribute-name/value candidates for one corpus. Set by
-    /// whichever controller owns this field and knows which corpus is
-    /// being queried; nil means keyword-only completion.
+    /// Supplies language and attribute-name candidates for one corpus. Set
+    /// by whichever controller owns this field and knows which corpus is
+    /// being queried; nil means no attribute names.
     var completionProvider: CQLCompletionProvider?
 
     private static let minHeight: CGFloat = 22
@@ -156,31 +157,57 @@ final class CQLQueryField: NSView {
             }
         }
 
-        /// Synchronous by AppKit's design, which is the whole difficulty:
-        /// attribute *values* live in an on-disk lexicon behind an actor,
-        /// so they can't be awaited here. Instead the provider serves
-        /// whatever it already has and starts a fetch for what it doesn't;
-        /// when that lands, `complete(nil)` re-opens the popup and this
-        /// runs again, by which time the value is cached.
-        ///
-        /// The re-trigger can't loop: the provider caches misses as well as
-        /// hits, so the second pass finds an entry either way and starts no
-        /// further fetch.
         override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String]? {
-            guard let provider = (delegate as? CQLQueryField)?.completionProvider else {
-                // No corpus context - keywords only, as before 6.8.
-                let word = (string as NSString).substring(with: charRange).lowercased()
-                guard !word.isEmpty else { return nil }
-                let matches = CQLQueryField.keywords.filter { $0.hasPrefix(word) }
-                return matches.isEmpty ? nil : matches
-            }
             let context = CQLCompletionContext.at(text: string, partialWordRange: charRange)
-            return provider.candidates(for: context) { [weak self] in
-                // Only reached when a value fetch just finished. Re-ask for
-                // completions rather than trying to inject them into the
-                // popup that has since been dismissed.
-                self?.complete(nil)
+            if let provider = (delegate as? CQLQueryField)?.completionProvider {
+                return provider.candidates(for: context)
             }
+            // No corpus, so no attribute names - but the language half
+            // needs nothing from a corpus and still works.
+            switch context {
+            case .keyword(let prefix):
+                return CQLCompletionProvider.matching(CQLCompletionProvider.keywords, prefix: prefix)
+            case .comparisonOperator(let prefix):
+                return CQLCompletionProvider.matching(
+                    CQLCompletionProvider.comparisonOperators, prefix: prefix)
+            case .attributeName, .quotedValue:
+                return nil
+            }
+        }
+
+        /// Auto-closes brackets and quotes, and steps over a closer that's
+        /// already there instead of doubling it - see `CQLAutoPairing`.
+        ///
+        /// Routed through `insertText(_:replacementRange:)` rather than
+        /// `keyDown`, so it applies to whatever produces the character
+        /// (including a dead-key sequence or the character palette) and so
+        /// it composes with `NSTextView`'s own undo grouping.
+        override func insertText(_ string: Any, replacementRange: NSRange) {
+            let input = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
+            switch CQLAutoPairing.action(
+                forTyping: input, text: self.string, selectedRange: selectedRange()) {
+            case .insert(let text, let caretOffset):
+                let start = selectedRange().location
+                super.insertText(text, replacementRange: replacementRange)
+                setSelectedRange(NSRange(location: start + caretOffset, length: 0))
+            case .moveOver:
+                setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
+            case .passThrough:
+                super.insertText(string, replacementRange: replacementRange)
+            }
+        }
+
+        /// Backspacing out of a freshly auto-paired `[|]` removes both
+        /// halves - otherwise auto-pairing leaves litter behind every time
+        /// someone changes their mind.
+        override func deleteBackward(_ sender: Any?) {
+            guard CQLAutoPairing.deletesEmptyPair(text: string, selectedRange: selectedRange()) else {
+                super.deleteBackward(sender)
+                return
+            }
+            let caret = selectedRange().location
+            replaceCharacters(in: NSRange(location: caret - 1, length: 2), with: "")
+            didChangeText()
         }
     }
 }

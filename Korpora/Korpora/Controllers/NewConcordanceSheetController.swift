@@ -150,13 +150,10 @@ final class NewConcordanceSheetController: NSViewController {
                 let corpus = try Corpus(name: name)
                 let info = try await corpus.info()
                 currentCorpusInfo = info
-                // Rebuilt per selected corpus, and handed the attribute
-                // names we just fetched so the provider doesn't repeat the
-                // same info() call (6.8). Its value cache is per-corpus,
-                // which is the other reason not to reuse one across a
-                // corpus change.
-                queryField.completionProvider = CQLCompletionProvider(
-                    corpusName: name, attributeNames: info.attributes)
+                // Rebuilt per selected corpus, from the info() we just
+                // fetched rather than making the provider repeat that call
+                // (6.8).
+                queryField.completionProvider = CQLCompletionProvider(corpusInfo: info)
                 var parts: [String] = []
                 if !info.attributes.isEmpty {
                     parts.append("Attributes: " + info.attributes.joined(separator: ", "))

@@ -228,7 +228,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8 done, builds cleanly, 61/61 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); **6.8 built but not yet click-tested**; 6.9-6.11 not started |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8 done, builds cleanly, 79/79 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); **6.8 rescoped by the user and rebuilt, not yet click-tested**; 6.9-6.11 not started |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -3106,119 +3106,128 @@ Verified: `cd ManateeKit && swift test` → **59/59 passing** (12 new);
 → 41/41 `KorporaTests` unaffected. No AppKit surface yet - that's 6.8/6.9 -
 so there is nothing to click-test for this item.
 
-### 6.8 — CQL attribute-name/value autocomplete (AppKit UI done)
+### 6.8 — CQL language + attribute-name completion, auto-pairing (AppKit UI done)
 
-`CQLQueryField`'s own doc comment already flags this as deferred
+`CQLQueryField`'s own doc comment had flagged this as deferred
 ("Attribute-name/tag-value completion needs corpus registry
-introspection, which isn't in the shim yet"). Now it is (6.7).
+introspection, which isn't in the shim yet"). 6.7 made it possible.
 
-**Design**: `CQLQueryField.InternalTextView.completions(forPartialWordRange:...)`
-currently only matches the hardcoded `keywords` array
-(`within`/`containing`/etc.). Extend it to also complete: attribute names
-(from `Corpus.info().attributes`, already available, no new engine work)
-when the caret is right after `[` or inside `[attr`, and attribute
-*values* (via 6.7's `regexp2strids`, prefix-filtered by what's typed so
-far) when the caret is inside a `="..."` value position for a recognized
-attribute name. Needs the CQL field to know which corpus it's editing
-against - currently `CQLQueryField` is corpus-agnostic; it'll need a
-`corpusName`/`Corpus` reference injected by whichever controller owns it
-(`ConcordanceViewController`, `NewConcordanceSheetController`).
+**Scope narrowed by the user (2026-09-09), after a first version shipped
+with corpus value completion.** The original sketch (and that first
+implementation) completed attribute *values* out of the corpus lexicon via
+6.7's `regexp2strids`. The user didn't want that: completion should cover
+**the CQL language, positional and structural attribute names, and
+operators** - "much more limited things" - plus **auto-closing brackets and
+quotes with the caret left between them**.
 
-**Key files**: `CQLQueryField.swift`, its two owners for wiring the
-corpus reference through.
+That's a better feature boundary, not just a smaller one:
 
-**Verify**: new test coverage asserting completion candidates for a few
-caret positions against the fixture corpus's known attributes/values;
-manual test in both the query bar and the New Concordance sheet.
+- Everything offered is now **small, fixed and knowable up front** - a
+  keyword list, an operator list, and a corpus's schema (from registry
+  metadata parsed at open time). So completion is **fully synchronous**.
+- The removed version needed an async re-trigger, because
+  `NSTextView.completions(forPartialWordRange:…)` is synchronous while a
+  708k-entry lexicon lives on disk behind an actor: it returned nil on a
+  cache miss, fetched in a `Task`, then called `complete(nil)` to reopen
+  the popup. That machinery (plus a per-prefix cache that had to record
+  misses to avoid re-triggering itself, an in-flight set, a 50-candidate
+  cap, and regex-escaping of the typed prefix) is **all gone**.
+- 6.7 is not orphaned by this - it stays, tested, and **6.9** (Text-Types
+  subcorpus building) is its real consumer, which is what it was written
+  for.
 
-**The design problem the sketch above missed**:
-`NSTextView.completions(forPartialWordRange:…)` is **synchronous**, while
-`Corpus` is an actor whose lexicon lives on disk. There is no way to await
-inside that callback, so "prefix-filtered by what's typed so far" can't be
-a simple call. Resolved by splitting the feature in three:
+**Implemented** in three pieces, two of them pure and unit-tested:
 
-- **`CQLCompletionContext`** (`Views/CQLCompletion.swift`) - a pure
-  `enum` + `at(text:partialWordRange:)`, no `Corpus`, no actor, no I/O.
-  Classifies the caret as `.keyword`, `.attributeName`, or
-  `.attributeValue(attribute:prefix:)`. It works by scanning *backwards*
-  from the partial word, deliberately: a query mid-typing (`[word="fo`) is
-  not valid CQL, so there is nothing to parse forwards and a real CQL
-  parser would just reject it.
-- **`CQLCompletionProvider`** - `@MainActor`, one per corpus. Prefetches
-  attribute names once (cheap - already-parsed registry metadata) and
-  serves attribute *values* from a cache that a background `Task` fills.
-- **The async re-trigger** - when a value isn't cached,
-  `completions(…)` starts the fetch, returns nil, and calls
-  `complete(nil)` when it lands, re-opening the popup with the value now
-  cached. **This can't loop**, because the cache records misses as well as
-  hits: the second pass finds an entry either way and starts no further
-  fetch. An in-flight set stops duplicate fetches for the same key.
+- **`CQLCompletionContext`** (`Views/CQLCompletion.swift`) - a pure `enum`
+  + `at(text:partialWordRange:)`, no `Corpus`, no actor, no I/O. Cases:
+  `.keyword` (outside brackets), `.attributeName` (inside `[…]`),
+  `.comparisonOperator` (inside `[…]` right after a name), and
+  `.quotedValue` (inside `"…"` - **offers nothing**, since the contents are
+  corpus data or a regex over it, and completing language keywords inside a
+  string would be actively wrong). It scans *backwards* from the partial
+  word deliberately: a query mid-typing (`[word=`) isn't valid CQL, so
+  there's nothing to parse forwards and a real parser would reject it.
+- **`CQLCompletionProvider`** - the candidate lists. `keywords` and
+  `comparisonOperators` match the sets `CQLQueryField.recolor` already
+  syntax-highlights, so what's completed and what's colored can't drift
+  apart. Attribute names are **both kinds**: positional verbatim (`word`,
+  `lemma`) plus structural in the dotted `structure.attribute` form
+  (`doc.author`) that CQL accepts inside `[…]` - the same spelling
+  `Corpus.structuralAttributeValue(at:attribute:)` takes - sorted, since
+  the two groups arrive in unrelated registry order.
+- **`CQLAutoPairing`** - pure rules over (text, selection, typed
+  character), returning `.insert(text:caretOffset:)` / `.moveOver` /
+  `.passThrough`. Pairs `[]`, `""`, `()`, `<>`; steps over a closer that's
+  already there rather than doubling it; wraps a selection (select `fox`,
+  type `"`, get `"fox"`); and backspace inside an empty pair deletes both
+  halves. Applied in `InternalTextView.insertText(_:replacementRange:)`
+  rather than `keyDown`, so it also covers dead keys and the character
+  palette and composes with `NSTextView`'s undo grouping.
 
-Other notes:
+Notes:
 
-- Values are capped at **50** candidates via 6.7's `limit`. Not a nicety:
-  `lemma` has 708,671 distinct values on syn2025.
-- The typed prefix is **regex-escaped** before `"\(prefix).*"` is built.
-  Manatee matches the whole value, so the `.*` is required - but that
-  means someone typing "a." in a lemma box would otherwise silently get
-  "any character" instead of a literal dot.
-- `CQLQueryField.keywords` became non-private so the provider serves all
-  three candidate kinds from one place.
-- `escapeForRegex` is `nonisolated` - it's pure string work, and
-  inheriting the type's `@MainActor` made it unusable from a synchronous
-  test.
-- A field with **no** provider still completes keywords exactly as before
-  6.8, so the four owners can be wired independently.
+- **`"` is both opener and closer**, so which job it does depends entirely
+  on what's to the right of the caret - the step-over check runs *before*
+  the open-pair check, or typing `"` at the end of `"fox"` would start a
+  new string instead of finishing that one.
+- Multi-character input (a paste, an IME commit) is never auto-paired;
+  guessing at a pasted fragment would corrupt it.
+- Operators are offered where there's **no partial word to type them
+  into** (right after an attribute name), which is exactly why offering
+  them as completions is worth doing at all.
+- A field with **no** provider still completes keywords and operators and
+  still auto-pairs - only attribute names need a corpus. So the four
+  owners can be wired independently.
+- `keywords`/`comparisonOperators`/`attributeNames(from:)`/`matching(_:prefix:)`
+  are `nonisolated`: pure, and a provider-less field needs them from a
+  synchronous AppKit callback.
+- **`ManateeKit` change**: `CorpusInfo` and `StructureInfo` had `public
+  let`s but only synthesized *internal* initializers, so a client could
+  read one but never build one - which blocked unit-testing anything that
+  takes a `CorpusInfo`. Both now have public memberwise inits.
 
-**Wired three of the four CQL fields, not the two this sketch names** -
-there are four (`grep 'CQLQueryField()'`), and the sketch only accounted
-for the query bar and the New Concordance sheet:
+**Wired three of the four CQL fields, not the two the sketch named** -
+there are four (`grep 'CQLQueryField()'`):
 
 | Field | Wired | Why |
 | --- | --- | --- |
 | `ConcordanceViewController` query bar | yes | `document.corpusName` |
-| `NewConcordanceSheetController` | yes | rebuilt per selected corpus, reusing the `info()` it already fetches; cleared on the no-corpus and error paths |
+| `NewConcordanceSheetController` | yes | rebuilt per selected corpus from the `info()` it already fetches; cleared on the no-corpus and error paths |
 | `FilterSheetController` | yes | same bracketed CQL against the same corpus - completion in one field but not the other would just look broken. Needed only a `corpusName` pass-through from its presenter |
-| `NewSubcorpusPopoverController` | **no** | it edits an *unbracketed* structure-attribute expression (`author="Twain"` - see `Corpus.createSubcorpus`), so attribute-name completion there needs different rules |
+| `NewSubcorpusPopoverController` | **no** | it edits an *unbracketed* structure-attribute expression (`author="Twain"` - see `Corpus.createSubcorpus`), so attribute-name completion there needs different rules. Auto-pairing works there already, since that's field-wide |
 
-The parser does handle the unbracketed **value** case (it recognizes a
-value by an unclosed quote, not by being inside brackets, and there's a
-test for it), so wiring that last field would give working value
-completion and keyword-only name completion. Left unwired rather than
-half-wired; finishing it means teaching `CQLCompletionContext` that a bare
-identifier before `=` outside brackets is a structural attribute name.
-
-Note the query bar deliberately completes against the **corpus**, not the
+The query bar deliberately completes against the **corpus**, not the
 subcorpus: a subcorpus restricts which *hits* come back, not which
-attributes or values exist, and it shares the parent's lexicon anyway.
+attributes exist, and it shares the parent's schema anyway.
 
-New tests, `KorporaTests` (20): `CQLCompletionContextTests` (16) covers
-keyword vs. name vs. value at every position that behaves differently -
-inside an open bracket, after a closed one, a second attribute after a
-completed `="…"` pair in the same bracket, empty prefixes right after `[`
-and `"` (which must still offer the full list), all four
-operator/whitespace spellings of `word = "`, dotted structural names kept
-whole, the unbracketed form, an **escaped quote inside a value not closing
-it**, a bare quoted string yielding an empty attribute, and an
+New tests, `KorporaTests` (38): `CQLCompletionContextTests` (18) covers
+every position that behaves differently - inside an open bracket, after a
+closed one, a second attribute after a completed `="…"` pair, after a
+boolean `&`, empty prefixes right after `[` (full attribute list) and after
+a name (operators), operator position with and without a space and after a
+dotted name, `[word=` *not* being operator position, all four quoted-value
+situations including an **escaped quote not closing the string**, and an
 out-of-bounds range (which a stale completion request after an edit can
-produce) clamping rather than trapping. `CQLCompletionRegexEscapingTests`
-(4) covers the escaping.
-
-Untested by design: the provider's async cache/re-trigger, which needs a
-real `NSTextView` completion session to exercise meaningfully.
+produce) clamping rather than trapping. `CQLCompletionCandidateTests` (5)
+covers the dotted structural form, a structure with no attributes of its
+own contributing nothing, empty-prefix-offers-everything, case-insensitive
+matching, and nil-for-no-matches. `CQLAutoPairingTests` (15) covers each
+pair, both step-over cases, selection wrapping, pass-through for ordinary
+and multi-character input, and all five backspace situations.
 
 Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
-`RunAllTests` → **61/61 KorporaTests** (20 new); `cd ManateeKit && swift
-test` → 59/59 unchanged; app launches with no exception/constraint output.
-**Not yet manually click-tested** - next steps: in the query bar type `[`
-then Escape (or F5) and confirm the attribute list appears; type `[word="`
-and confirm *values* appear after a beat (this is the async re-trigger -
-the first keystroke may show nothing, the popup should fill in); keep
-typing to confirm the list narrows; check a high-cardinality attribute
-(`lemma` on a real corpus) stays responsive and caps at 50; confirm the
-same works in the New Concordance sheet and the Filter sheet, that
-switching corpus in the sheet switches the candidates, and that CQL
-keywords (`within`) still complete outside brackets.
+`RunAllTests` → **79/79 KorporaTests**; `cd ManateeKit && swift test` →
+59/59; app launches with no exception/constraint output. **Not yet
+manually click-tested** - next steps: type `[` and confirm it becomes `[]`
+with the caret inside and the attribute list appears (Escape/F5 if the
+popup needs asking); confirm both `word`-style and `doc.author`-style names
+are listed; space after a name and confirm `=`/`!=`/`<`/`>` are offered;
+type `"` and confirm the pair, then type `"` again at the closing quote and
+confirm the caret steps over rather than doubling; backspace inside a fresh
+`[]` and confirm both halves go; select a word and type `"` to wrap it;
+confirm nothing is offered inside a quoted value; confirm `within` still
+completes outside brackets; and confirm the same in the New Concordance and
+Filter sheets, including that switching corpus swaps the attribute names.
 
 ### 6.9 — Text-Types-style subcorpus creation (not started)
 
