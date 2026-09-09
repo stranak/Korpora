@@ -149,6 +149,15 @@ final class CQLQueryField: NSView {
     final class InternalTextView: NSTextView {
         var onSubmit: (() -> Void)?
 
+        /// Whether the last edit was text going *in*. Completion pops up
+        /// only on insertion: firing it on backspace fights the user, who
+        /// is deleting precisely because they don't want the suggestion.
+        private var lastEditWasInsertion = false
+        /// Set while AppKit is inserting a chosen completion. That edit
+        /// also lands in `textDidChange`, so without this the popup would
+        /// immediately reopen on top of the completion it just accepted.
+        private var isInsertingCompletion = false
+
         override func insertNewline(_ sender: Any?) {
             if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
                 super.insertNewline(sender)
@@ -158,6 +167,13 @@ final class CQLQueryField: NSView {
         }
 
         override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String]? {
+            candidates(forPartialWordRange: charRange)
+        }
+
+        /// The single source of candidates, shared by AppKit's completion
+        /// callback and the auto-trigger below - so "would a popup show
+        /// anything?" and "what does it show?" can never disagree.
+        func candidates(forPartialWordRange charRange: NSRange) -> [String]? {
             let context = CQLCompletionContext.at(text: string, partialWordRange: charRange)
             if let provider = (delegate as? CQLQueryField)?.completionProvider {
                 return provider.candidates(for: context)
@@ -170,9 +186,42 @@ final class CQLQueryField: NSView {
             case .comparisonOperator(let prefix):
                 return CQLCompletionProvider.matching(
                     CQLCompletionProvider.comparisonOperators, prefix: prefix)
-            case .attributeName, .quotedValue:
+            case .attributeName, .value:
                 return nil
             }
+        }
+
+        /// Shows the completion popup if the caret is somewhere with
+        /// something to offer.
+        ///
+        /// `NSTextView.complete(_:)` is an action method - AppKit binds it
+        /// to Escape/F5 and otherwise never calls it, so before this the
+        /// feature was effectively invisible: in the New Concordance and
+        /// Filter sheets Escape is the Cancel button's key equivalent, so
+        /// it dismissed the sheet instead of completing. Driving it from
+        /// the text-did-change hook makes it behave like a code editor,
+        /// and Escape still works where it isn't taken.
+        ///
+        /// Only fires when there are candidates, so it can't flicker an
+        /// empty popup, and never on deletion or while accepting a
+        /// completion.
+        func autoCompleteIfUseful() {
+            guard lastEditWasInsertion, !isInsertingCompletion else { return }
+            let range = rangeForUserCompletion
+            guard range.location != NSNotFound else { return }
+            guard let candidates = candidates(forPartialWordRange: range), !candidates.isEmpty else {
+                return
+            }
+            complete(nil)
+        }
+
+        override func insertCompletion(
+            _ word: String, forPartialWordRange charRange: NSRange, movement: Int, isFinal flag: Bool
+        ) {
+            isInsertingCompletion = true
+            defer { isInsertingCompletion = false }
+            super.insertCompletion(
+                word, forPartialWordRange: charRange, movement: movement, isFinal: flag)
         }
 
         /// Auto-closes brackets and quotes, and steps over a closer that's
@@ -183,6 +232,7 @@ final class CQLQueryField: NSView {
         /// (including a dead-key sequence or the character palette) and so
         /// it composes with `NSTextView`'s own undo grouping.
         override func insertText(_ string: Any, replacementRange: NSRange) {
+            lastEditWasInsertion = true
             let input = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
             switch CQLAutoPairing.action(
                 forTyping: input, text: self.string, selectedRange: selectedRange()) {
@@ -201,6 +251,7 @@ final class CQLQueryField: NSView {
         /// halves - otherwise auto-pairing leaves litter behind every time
         /// someone changes their mind.
         override func deleteBackward(_ sender: Any?) {
+            lastEditWasInsertion = false
             guard CQLAutoPairing.deletesEmptyPair(text: string, selectedRange: selectedRange()) else {
                 super.deleteBackward(sender)
                 return
@@ -217,5 +268,8 @@ extension CQLQueryField: NSTextViewDelegate {
         recolor()
         invalidateHeight()
         onChange?()
+        // Last, so the popup is positioned against the already-relaid-out
+        // text rather than the pre-edit layout.
+        textView.autoCompleteIfUseful()
     }
 }

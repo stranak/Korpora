@@ -291,7 +291,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8 done, builds cleanly, 79/79 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); **6.8 rescoped by the user and rebuilt, not yet click-tested**; 6.9-6.11 not started |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8a done, builds cleanly, 86/86 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); 6.8 click-tested and **found broken (completion never appeared) — fixed in 6.8a, awaiting re-test**; 6.9-6.11 not started |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -3208,9 +3208,11 @@ That's a better feature boundary, not just a smaller one:
   + `at(text:partialWordRange:)`, no `Corpus`, no actor, no I/O. Cases:
   `.keyword` (outside brackets), `.attributeName` (inside `[…]`),
   `.comparisonOperator` (inside `[…]` right after a name), and
-  `.quotedValue` (inside `"…"` - **offers nothing**, since the contents are
+  `.value` (a value position - **offers nothing**, since the contents are
   corpus data or a regex over it, and completing language keywords inside a
-  string would be actively wrong). It scans *backwards* from the partial
+  string would be actively wrong; renamed from `.quotedValue` in 6.8a, when
+  it grew to cover the caret sitting right after `=` too). It scans
+  *backwards* from the partial
   word deliberately: a query mid-typing (`[word=`) isn't valid CQL, so
   there's nothing to parse forwards and a real parser would reject it.
 - **`CQLCompletionProvider`** - the candidate lists. `keywords` and
@@ -3281,19 +3283,81 @@ matching, and nil-for-no-matches. `CQLAutoPairingTests` (15) covers each
 pair, both step-over cases, selection wrapping, pass-through for ordinary
 and multi-character input, and all five backspace situations.
 
+#### 6.8a — completion never actually appeared (fixed 2026-09-09)
+
+The user click-tested 6.8 and reported that **nothing completed** except
+the bracket/quote auto-pairing. Two separate causes, both real:
+
+**1. Nothing ever triggered it.** `NSTextView.complete(_:)` is an *action
+method* - AppKit binds it to Escape/F5 and otherwise never calls it, and
+6.8 never called it either. Worse, in two of the three wired fields Escape
+is taken: `NewConcordanceSheetController` and `FilterSheetController` both
+set `cancelButton.keyEquivalent = "\u{1b}"`, so Escape dismissed the sheet
+instead of completing. Only the query bar could show a popup at all, and
+only if you knew to press Escape.
+
+Fixed by driving it from `CQLQueryField.textDidChange` →
+`InternalTextView.autoCompleteIfUseful()`, so it behaves like a code
+editor. Guards: only after an *insertion* (not backspace - deleting means
+you don't want the suggestion, tracked by `lastEditWasInsertion`), never
+while AppKit is inserting a chosen completion (`isInsertingCompletion`,
+set in an `insertCompletion` override, or the popup would reopen on top of
+the completion it just accepted), and only when there are candidates, so
+it can't flicker an empty popup. Escape still works where it isn't taken.
+
+**2. The prefix was wrong in the two most useful positions.**
+`rangeForUserCompletion` is *not* just the identifier being typed. Measured
+on macOS 27:
+
+| Text | AppKit's "partial word" | 6.8 did | Now |
+| --- | --- | --- | --- |
+| `wit` | `"wit"` | keywords ✓ | keywords |
+| `[lem` | `"lem"` | names ✓ | names |
+| `[word ` | `""` | operators ✓ | operators |
+| **`[`** | **`"["`** | **nothing** | every attribute name |
+| **`[word=`** | **`"="`** | **nothing** | nothing, deliberately |
+
+When the caret sits right after punctuation, AppKit hands back the
+*punctuation* as the partial word. So `[` became `.keyword(prefix: "[")`,
+no keyword starts with `[`, no popup - in the one position where the full
+attribute list is most valuable. `CQLCompletionContext.at` now trims
+leading non-identifier characters off the range before classifying.
+
+While there: `[word=` used to fall through to `.attributeName(prefix: "=")`
+(nothing, by accident). It's now an explicit `.value` case - the same case
+as inside `"…"` - since a value comes next and 6.8 doesn't complete values.
+`.quotedValue` was renamed `.value` to cover both. `matching` also returns
+nil when the only candidate *is* the prefix, so auto-trigger doesn't put a
+popup offering `word` in front of you while you type `[word`.
+
+**Why 18 green tests didn't catch it — worth remembering.** The 6.8 tests
+computed the partial-word range themselves, as
+`length - prefix.length`. They asserted the parser against ranges
+*invented to match the parser's own assumptions*, so they could never
+disagree with it. The pure-function split was right; validating it against
+fabricated inputs was not.
+
+`CQLCompletionContextTests` now builds a real `NSTextView` and reads its
+`rangeForUserCompletion`, and a new `CQLQueryFieldCompletionTests` drives
+the actual field end to end, asserting exact candidate lists
+(`typingAnOpenBracketOffersEveryAttributeName` is the regression itself).
+Anything that takes a range from AppKit should be tested with a range
+*from AppKit*.
+
+Note honestly: of the new assertions, the `[` one genuinely fails without
+the fix; the `[word=` one passed before too, for the wrong reason.
+
 Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
-`RunAllTests` → **79/79 KorporaTests**; `cd ManateeKit && swift test` →
-59/59; app launches with no exception/constraint output. **Not yet
-manually click-tested** - next steps: type `[` and confirm it becomes `[]`
-with the caret inside and the attribute list appears (Escape/F5 if the
-popup needs asking); confirm both `word`-style and `doc.author`-style names
-are listed; space after a name and confirm `=`/`!=`/`<`/`>` are offered;
-type `"` and confirm the pair, then type `"` again at the closing quote and
-confirm the caret steps over rather than doubling; backspace inside a fresh
-`[]` and confirm both halves go; select a word and type `"` to wrap it;
-confirm nothing is offered inside a quoted value; confirm `within` still
-completes outside brackets; and confirm the same in the New Concordance and
-Filter sheets, including that switching corpus swaps the attribute names.
+`RunAllTests` → **86/86 KorporaTests** (7 net new); `cd ManateeKit &&
+swift test` → 59/59 unchanged; app launches with no
+exception/recursion/constraint output. **Not yet re-click-tested** - next
+steps: type `[` and confirm the pair appears *and* the attribute list pops
+up unprompted; keep typing to watch it narrow; space after a name for
+`=`/`!=`/`<`/`>`; confirm nothing pops up after `=` or inside `"…"`;
+confirm backspace does not summon a popup; accept a completion with Return
+and confirm the popup doesn't immediately reopen; and confirm all of it in
+the New Concordance and Filter sheets, where Escape previously made this
+unreachable.
 
 ### 6.9 — Text-Types-style subcorpus creation (not started)
 

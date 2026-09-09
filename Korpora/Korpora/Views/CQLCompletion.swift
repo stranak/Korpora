@@ -25,14 +25,17 @@ enum CQLCompletionContext: Equatable {
     /// Inside `[…]`, right after an attribute name, where a comparison
     /// operator goes: the caret in `[word ` or `[doc.author `.
     case comparisonOperator(prefix: String)
-    /// Inside a quoted string. Nothing is offered: the contents are corpus
-    /// data (or a regex over it), not language, and completing language
-    /// keywords in the middle of a `"…"` would be actively wrong.
-    case quotedValue
+    /// The caret is where a *value* goes - either inside a quoted string,
+    /// or just after a comparison operator with the quote not yet typed.
+    /// Nothing is offered either way: values are corpus data (or a regex
+    /// over it), not language, so 6.8 deliberately doesn't complete them,
+    /// and offering keywords or attribute names here would be actively
+    /// wrong.
+    case value
 
     /// Classifies the caret at `partialWordRange` (exactly what
-    /// `NSTextView.completions(forPartialWordRange:…)` is handed) within
-    /// `text`.
+    /// `NSTextView.completions(forPartialWordRange:…)` is handed, i.e.
+    /// `rangeForUserCompletion`) within `text`.
     ///
     /// Everything is decided by scanning *backwards* from the start of the
     /// partial word rather than by parsing the query as a whole: a query
@@ -41,21 +44,44 @@ enum CQLCompletionContext: Equatable {
     /// parser would simply reject it.
     static func at(text: String, partialWordRange: NSRange) -> CQLCompletionContext {
         let ns = text as NSString
-        let start = max(0, min(partialWordRange.location, ns.length))
-        let length = max(0, min(partialWordRange.length, ns.length - start))
+        var start = max(0, min(partialWordRange.location, ns.length))
+        var length = max(0, min(partialWordRange.length, ns.length - start))
+
+        // AppKit's `rangeForUserCompletion` is *not* just the identifier
+        // being typed: when the caret sits right after punctuation it
+        // returns that punctuation as the "partial word" - measured on
+        // macOS 27, `"["` gives `"["` and `"[word="` gives `"="`. Trimming
+        // leading non-identifier characters turns those into an empty
+        // prefix at the position after them, which is what the rules below
+        // expect.
+        //
+        // Getting this wrong is what made 6.8 look broken on first
+        // click-test: `[` produced prefix `"["`, no keyword starts with
+        // `[`, so no popup appeared in the one position where the full
+        // attribute list is most useful.
+        while length > 0, !isIdentifierCharacter(ns.character(at: start)) {
+            start += 1
+            length -= 1
+        }
+
         let prefix = ns.substring(with: NSRange(location: start, length: length))
         let before = ns.substring(to: start)
 
         if hasUnclosedQuote(in: before) {
-            return .quotedValue
+            return .value
         }
         guard isInsideBrackets(before) else {
             return .keyword(prefix: prefix)
         }
-        // Inside brackets the position is decided by what the last
-        // non-space character is: an identifier character means a name was
-        // just finished, so an operator comes next.
+        // Inside brackets, position is decided by the last non-space
+        // character before the caret.
+        if endsWithComparisonOperator(before) {
+            // `[word=` - the value comes next, so offer nothing rather
+            // than a list of attribute names the user can't use here.
+            return .value
+        }
         if prefix.isEmpty, endsWithIdentifier(before) {
+            // `[word ` - a name was just finished, an operator comes next.
             return .comparisonOperator(prefix: prefix)
         }
         return .attributeName(prefix: prefix)
@@ -103,6 +129,19 @@ enum CQLCompletionContext: Equatable {
         }
         guard index >= 0 else { return false }
         return isIdentifierCharacter(ns.character(at: index))
+    }
+
+    /// True when `before`, ignoring trailing spaces/tabs, ends in one of
+    /// the comparison-operator characters - so `[word=`, `[word !=` and
+    /// `[word <` all qualify.
+    private static func endsWithComparisonOperator(_ before: String) -> Bool {
+        let ns = before as NSString
+        var index = ns.length - 1
+        while index >= 0, " \t".utf16.contains(ns.character(at: index)) {
+            index -= 1
+        }
+        guard index >= 0 else { return false }
+        return "=!<>".utf16.contains(ns.character(at: index))
     }
 
     private static func isIdentifierCharacter(_ ch: unichar) -> Bool {
@@ -177,7 +216,7 @@ final class CQLCompletionProvider {
             return Self.matching(attributeNames, prefix: prefix)
         case .comparisonOperator(let prefix):
             return Self.matching(Self.comparisonOperators, prefix: prefix)
-        case .quotedValue:
+        case .value:
             return nil
         }
     }
@@ -185,10 +224,16 @@ final class CQLCompletionProvider {
     /// Prefix-matched case-insensitively; an empty prefix offers
     /// everything, which is what makes the caret right after `[` (or after
     /// an attribute name) useful rather than dead.
+    ///
+    /// Returns nil when the only match is the prefix itself: there is
+    /// nothing left to complete, and since completion now fires
+    /// automatically as you type (see `CQLQueryField.textDidChange`), a
+    /// popup offering `word` for `[word` would just be in the way.
     nonisolated static func matching(_ candidates: [String], prefix: String) -> [String]? {
         guard !prefix.isEmpty else { return candidates.isEmpty ? nil : candidates }
         let lowered = prefix.lowercased()
         let matches = candidates.filter { $0.lowercased().hasPrefix(lowered) }
+        if matches.count == 1, matches[0].lowercased() == lowered { return nil }
         return matches.isEmpty ? nil : matches
     }
 
