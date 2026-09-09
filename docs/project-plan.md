@@ -161,6 +161,27 @@ git clone -b macos-arm64-portability https://github.com/stranak/manatee-open.git
 Otherwise the build silently uses unpatched upstream `manatee-open`,
 including the reverted `delete_linegroups` heap corruption.
 
+**Keep `ManateeKit/Package.swift`'s flag arrays as separate statements**
+(2026-09-09). The `.unsafeFlags(...)` values used to be built inline as one
+expression each — `["-DHAVE_CONFIG_H"] + manateeIncludeDirs.flatMap {
+["-I", $0] } + pcre2CFlags` — nested inside the `Package(...)` literal.
+Chained `+` over array literals plus a closure gave Swift's type checker
+enough overload combinations to blow its budget on *some* toolchains but
+not others, so the package built here and failed for someone else with:
+
+```
+Package.swift:64:5: error: the compiler is unable to type-check this
+expression in reasonable time; try breaking up the expression into
+distinct sub-expressions
+```
+
+Note the error is reported against `let package = Package(` — line 64,
+nowhere near the actual cause, which is what makes it confusing. The flags
+are now appended statement by statement with explicit `[String]` types
+(verified flag-for-flag identical to the old expression). Anything added
+there later should follow the same shape rather than growing a new chained
+expression.
+
 ## Context
 
 `ManateeKit` wraps `manatee-open` (the C++ corpus-query engine that also

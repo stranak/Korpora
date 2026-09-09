@@ -51,7 +51,7 @@ func pkgConfig(_ args: String...) -> [String] {
 let pcre2CFlags = pkgConfig("--cflags", "libpcre2-8")
 let pcre2LibFlags = pkgConfig("--libs", "libpcre2-8")
 
-let manateeIncludeDirs = [
+let manateeIncludeDirs: [String] = [
     manateeRoot,
     "\(manateeRoot)/corp",
     "\(manateeRoot)/finlib",
@@ -60,6 +60,31 @@ let manateeIncludeDirs = [
     "\(manateeRoot)/concord",
     "\(manateeRoot)/query",
 ]
+
+// Built up statement by statement, with explicit types and no chained `+`
+// on array literals, rather than inline in the `.unsafeFlags(...)` calls
+// below.
+//
+// That isn't style: as one expression each (`["-DHAVE_CONFIG_H"] +
+// manateeIncludeDirs.flatMap { ["-I", $0] } + pcre2CFlags`) nested inside
+// the big `Package(...)` literal, they gave the type checker enough
+// overload combinations to blow its budget - "the compiler is unable to
+// type-check this expression in reasonable time", reported against
+// `Package(` itself, which points nowhere near the actual cause. It
+// happened to stay under the limit on some toolchains and not others, so
+// the manifest built for some people and not others (reported 2026-09-09).
+// Keep these as separate statements.
+
+var cManateeCxxFlags: [String] = ["-DHAVE_CONFIG_H"]
+for includeDir in manateeIncludeDirs {
+    cManateeCxxFlags.append("-I")
+    cManateeCxxFlags.append(includeDir)
+}
+cManateeCxxFlags.append(contentsOf: pcre2CFlags)
+
+var cManateeLinkerFlags: [String] = ["-L\(manateeRoot)/src/.libs", "-lbuiltinmanatee"]
+cManateeLinkerFlags.append(contentsOf: pcre2LibFlags)
+cManateeLinkerFlags.append(contentsOf: ["-liconv", "-ldl"])
 
 let package = Package(
     name: "ManateeKit",
@@ -71,20 +96,8 @@ let package = Package(
     targets: [
         .target(
             name: "CManatee",
-            cxxSettings: [
-                .unsafeFlags(
-                    ["-DHAVE_CONFIG_H"]
-                        + manateeIncludeDirs.flatMap { ["-I", $0] }
-                        + pcre2CFlags
-                )
-            ],
-            linkerSettings: [
-                .unsafeFlags(
-                    ["-L\(manateeRoot)/src/.libs", "-lbuiltinmanatee"]
-                        + pcre2LibFlags
-                        + ["-liconv", "-ldl"]
-                )
-            ]
+            cxxSettings: [.unsafeFlags(cManateeCxxFlags)],
+            linkerSettings: [.unsafeFlags(cManateeLinkerFlags)]
         ),
         .target(
             name: "ManateeKit",
