@@ -1,8 +1,21 @@
 name: Korpora
 options:
   bundleIdPrefix: cz.cuni.mff.ufal
+  # Matches ManateeKit/Package.swift's own `.macOS(.v13)`, and is the
+  # oldest macOS the code actually needs (NSTableViewDiffableDataSource is
+  # the real floor, at macOS 11).
+  #
+  # Deliberately NOT the local macOS version. This was "27.0" for a while,
+  # purely to silence ~35 cosmetic linker warnings ("object file was built
+  # for newer macOS version than being linked") coming from the locally
+  # built manatee-open static library - see docs/project-plan.md. That made
+  # the project unbuildable by anyone not on the very newest Xcode, since a
+  # deployment target can't exceed the SDK. Those warnings are worth less
+  # than the project being buildable at all; they also come back on any
+  # machine whose macOS differs from this number, so chasing them is
+  # pointless in a project that builds manatee-open locally.
   deploymentTarget:
-    macOS: "27.0"
+    macOS: "13.0"
   createIntermediateGroups: true
 
 packages:
@@ -21,7 +34,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
-        MACOSX_DEPLOYMENT_TARGET: "27.0"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
         ENABLE_HARDENED_RUNTIME: NO

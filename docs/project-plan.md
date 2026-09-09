@@ -161,6 +161,40 @@ git clone -b macos-arm64-portability https://github.com/stranak/manatee-open.git
 Otherwise the build silently uses unpatched upstream `manatee-open`,
 including the reverted `delete_linegroups` heap corruption.
 
+### Deployment target / minimum toolchain (2026-09-09)
+
+| | Minimum |
+| --- | --- |
+| macOS to **run** | 13.0 (`Korpora/project.yml`, matching `Package.swift`'s `.macOS(.v13)`) |
+| Xcode to **build the app** | 15+ (`swift-tools-version:5.9`) |
+| Xcode to **build the tests too** | **16+** — `KorporaTests` uses Swift Testing (`import Testing`) |
+| C++ | `cxx14`, plus a locally built `manatee-open` |
+
+Prompted by someone else failing to build the project. The app target had
+declared **27.0** since 2026-09-05, purely to silence linker warnings (see
+the build-warning cleanup entry above). Because a deployment target can't
+exceed the SDK, that made the project **unbuildable on anything but the
+very newest Xcode** - a real cost, paid by everyone else, for a cosmetic
+gain on one machine.
+
+Measured before changing it: forcing `MACOSX_DEPLOYMENT_TARGET=13.0`
+against the then-current source gave **BUILD SUCCEEDED**, so no API in the
+codebase needs anything newer. `NSTableViewDiffableDataSource` (macOS 11)
+is the real AppKit floor; 13.0 just matches the package.
+
+The cost of going back to 13.0, measured on a clean build: **51 warnings,
+41 of them the "object file was built for newer macOS version" linker
+mismatch**, 10 pre-existing (upstream C++ narrowing plus Xcode log lines).
+Note those 41 can't be fixed by *any* fixed number, because they come from
+a `manatee-open` static library each developer builds locally - the object
+files state whichever macOS *that* machine runs. Chasing them in a project
+that builds its engine from source is pointless; only the machine whose
+macOS happens to equal the setting ever sees zero.
+
+Watch for incremental builds reporting 0 of them: linker warnings only
+appear when linking actually happens, so an up-to-date build shows none
+and a clean build shows all 41.
+
 **Keep `ManateeKit/Package.swift`'s flag arrays as separate statements**
 (2026-09-09). The `.unsafeFlags(...)` values used to be built inline as one
 expression each — `["-DHAVE_CONFIG_H"] + manateeIncludeDirs.flatMap {
@@ -1274,6 +1308,9 @@ screenshots, plus revisited the 41 Xcode build warnings (user):**
   since matching 26.0/27.0 there needs either a `swift-tools-version` bump
   or a custom version-string API, and it doesn't affect what the user
   actually sees in Xcode.
+  - **Reverted 2026-09-09 — see "Deployment target" below.** The "27.0"
+    figure made the project unbuildable by anyone not on the newest Xcode,
+    which cost more than 35 cosmetic warnings were worth.
 
 Verified: `cd ManateeKit && swift build` (compiles; still shows the
 Package.swift-side linker warnings, expected) + `swift test` → 34/34
