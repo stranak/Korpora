@@ -228,7 +228,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6a done (6.6a is AppKit-only, no engine change), 47/47 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6a done, builds cleanly, 41/41 KorporaTests passing; 6.7-6.11 not started | **yes for everything built — 6.1-6.6 and 6.6a all confirmed working by user**; 6.7-6.11 not started |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.7 done, 59/59 ManateeKit tests passing; 6.8-6.11 not started | 6.1-6.6a done, builds cleanly, 41/41 KorporaTests passing; 6.7 has no AppKit surface (it is the engine primitive 6.8/6.9 build on); 6.8-6.11 not started | **yes for everything with a UI — 6.1-6.6a all confirmed working by user**; 6.7 is engine-only, covered by tests, nothing to click; 6.8-6.11 not started |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -3015,9 +3015,9 @@ the opt-in default really is indistinguishable from 6.6, and insetting the
 paragraph past the metadata columns didn't reintroduce the "chopped into
 three pieces" look that got the original inline version rejected.
 
-### 6.7 — New engine primitive: attribute value enumeration (not started)
+### 6.7 — New engine primitive: attribute value enumeration (done)
 
-Shared foundation for 6.8 and 6.9, so land it once, on its own.
+Shared foundation for 6.8 and 6.9, so landed once, on its own.
 
 **Confirmed via Explore agent** (`manatee-open/corp/wordlist.hh:43-51`,
 `corp/posattr.hh:71`, `corp/struct.cc:117-119,158`): `PosAttr` (and
@@ -3030,8 +3030,8 @@ deduplicated, no manual struct-instance iteration needed) already expose:
 - `regexp2strids(pattern, ignoreCase)` - lazy, filtered (id, string) pairs
   for a search-as-you-type box (needed for high-cardinality attributes
   like `lemma`)
-- `dump_str()` - the whole lexicon, for low-cardinality attributes like
-  `doc.author` where showing everything at once is reasonable
+- `dump_str()` - the whole lexicon, for attributes small enough to show
+  all at once
 
 None of this is exposed in `mtcbridge.h`/`.cc` today - 100% new bridge
 surface, but a thin wrapper (same shape as the existing attribute-name
@@ -3047,6 +3047,64 @@ search-as-you-type on high-cardinality attributes).
 **Key files**: `mtcbridge.h`/`.cc`, `ManateeKit.swift` (new `Corpus`
 methods), new `ManateeKitTests` (fixture corpus already has `doc.id`,
 small `tag`/`lemma` lexicons - assert exact value lists and counts).
+
+**Implemented as planned**, with these notes:
+
+- `join_id_str_values(IdStrGenerator*, max_values)` is a new file-local
+  helper next to `join_attr_range`, and both bridge value functions go
+  through it, so the two share one encoding. That encoding is the existing
+  **leading-`\x1F`-delimiter** convention (`mtc_kwic_get_left_attr`'s), not
+  a plain separator - an attribute value can legitimately be the empty
+  string, and leading delimiters keep "zero values" and "one empty value"
+  distinguishable. The Swift side decodes with the same
+  `dropFirst().components(separatedBy:)` shape `LiveConcordance` uses.
+- `IdStrGenerator`'s constructor calls `next()` itself, so it arrives
+  *already positioned* at its first item - the same "already started"
+  convention `CollocItems` has (see `MTCCollocItems.started`) and the
+  opposite of `KWICLines`. So the drain loop checks `end()` before the
+  first read. Getting this backwards would silently drop the first value.
+- `mtc_corpus_attr_values_matching` takes a `max_values` cap the plan
+  didn't specify. It's the whole reason to prefer `regexp2strids` over
+  filtering a full `dump_str`: the generator is lazy, so a cap genuinely
+  stops the lexicon scan.
+- Swift API: `attributeValueCount(attribute:)`,
+  `attributeValues(attribute:)`, and
+  `attributeValues(attribute:matching:ignoreCase:limit:)` (overloaded on
+  the same base name, `ignoreCase: true`/`limit: 0` defaulted).
+
+**Correction to this section's own premise, measured on syn2025 (122M
+tokens) rather than assumed:** `doc.author` has **1,058** distinct values,
+`tag` has **3,967**, `lemma` has **708,671**. So the sketch above was wrong
+to call `doc.author` a low-cardinality "show everything" case - on a real
+corpus even a structural attribute is well past checkbox-list territory,
+and a real positional tagset is nothing like the 4 tags the fixture has.
+6.8/6.9 must branch on the *measured* count, never on whether an attribute
+is structural or positional. This is exactly why
+`mtc_corpus_attr_value_count` exists as a separate O(1) call.
+
+Same probe confirmed the laziness claim end to end: `matching: "pra.*"` on
+`lemma` returned 1,515 values in 47ms unlimited vs 25ms with `limit: 10`,
+and the limited result is a prefix of the unlimited one (so a cap takes a
+prefix of a stable order, not an arbitrary subset - what
+`testLimitCapsTheNumberOfMatches` asserts on the fixture).
+
+New tests, `AttributeValuesTests.swift` (12): exact value list and count
+for a small positional lexicon; count is distinct values not tokens, and
+agrees with what `attributeValues` returns; a structural attribute
+(`doc.id`) comes back already deduplicated; `word` vs `lemma` return their
+own lexicons (the fixture inflects jumps/jump, so a mix-up is visible);
+pattern filtering; **whole-value not substring matching** (`"N"` doesn't
+match `"NN"`, `"N.*"` does - the reason the API doc tells callers a prefix
+search needs a trailing `.*`); `ignoreCase` both ways; the limit caps and
+takes a prefix; `limit: 0` means no limit; an over-large limit doesn't pad;
+a pattern matching nothing is an empty list rather than an error (a search
+box mid-typing hits this constantly); and all three entry points throw for
+an unknown attribute.
+
+Verified: `cd ManateeKit && swift test` → **59/59 passing** (12 new);
+`BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**; `RunAllTests`
+→ 41/41 `KorporaTests` unaffected. No AppKit surface yet - that's 6.8/6.9 -
+so there is nothing to click-test for this item.
 
 ### 6.8 — CQL attribute-name/value autocomplete (not started)
 

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <memory>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -117,6 +118,30 @@ char *join_attr_range(PosAttr *attr, Position from, Position to) {
         delete it;
     }
     return strdup(out.str().c_str());
+}
+
+/* Drains an IdStrGenerator into the same leading-'\x1F'-delimiter encoding
+ * join_attr_range produces (see its comment for why the delimiter leads
+ * rather than separates - an attribute value can legitimately be the empty
+ * string, and this keeps that unambiguous). `max_values` > 0 stops early;
+ * 0 means "all of them".
+ *
+ * Note the iteration protocol: IdStrGenerator's constructor calls next()
+ * itself, so it arrives already positioned at its first item - the same
+ * "already started" convention CollocItems has, and the opposite of
+ * KWICLines. Hence check end() *before* the first read, and advance at the
+ * bottom of the loop. */
+std::string join_id_str_values(IdStrGenerator *values, int max_values) {
+    std::string result;
+    int taken = 0;
+    for (; !values->end(); values->next()) {
+        if (max_values > 0 && taken >= max_values)
+            break;
+        result += '\x1F';
+        result += values->getStr();
+        ++taken;
+    }
+    return result;
 }
 
 char *kwic_get_attr_range(MTCKwic *kwic, const char *attr_name, Position from, Position to, char **error) {
@@ -672,6 +697,65 @@ char *mtc_corpus_positional_attr_range(MTCCorpus *corp, long long from_position,
         return nullptr;
     } catch (...) {
         set_error(error, "unknown error reading positional attribute range");
+        return nullptr;
+    }
+}
+
+int mtc_corpus_attr_value_count(MTCCorpus *corp, const char *attr_name, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return -1;
+    }
+    try {
+        // get_attr, not get_struct_attr, even for a "doc.author"-style name:
+        // the StructPosAttr wrapper it returns forwards WordList straight
+        // through, so the lexicon reached here is the same one either way -
+        // and already deduplicated (see mtcbridge.h's section comment).
+        return corp->corp->get_attr(attr_name)->id_range();
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return -1;
+    } catch (...) {
+        set_error(error, "unknown error counting attribute values");
+        return -1;
+    }
+}
+
+char *mtc_corpus_attr_values(MTCCorpus *corp, const char *attr_name, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        std::unique_ptr<IdStrGenerator> values(corp->corp->get_attr(attr_name)->dump_str());
+        return strdup(join_id_str_values(values.get(), 0).c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading attribute values");
+        return nullptr;
+    }
+}
+
+char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
+                                       int ignore_case, int max_values, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        // regexp2strids is lazy, so with max_values set this stops reading
+        // the lexicon once it has enough - the whole reason to prefer it
+        // over filtering a full dump_str for a high-cardinality attribute.
+        std::unique_ptr<IdStrGenerator> values(
+            corp->corp->get_attr(attr_name)->regexp2strids(pattern, ignore_case != 0));
+        return strdup(join_id_str_values(values.get(), max_values).c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error matching attribute values");
         return nullptr;
     }
 }

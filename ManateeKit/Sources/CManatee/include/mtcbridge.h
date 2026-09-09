@@ -227,6 +227,58 @@ char *mtc_corpus_get_struct_attr(MTCCorpus *corp, long long position, const char
 char *mtc_corpus_positional_attr_range(MTCCorpus *corp, long long from_position, long long to_position,
                                        const char *attr_name, char **error);
 
+/* -------------------- attribute value enumeration --------------------
+ * The *distinct values* an attribute takes across the corpus - its lexicon -
+ * as opposed to the introspection above, which only reports attribute
+ * *names*. Phase 6.7: the shared foundation for CQL value autocomplete
+ * (6.8) and Text-Types-style subcorpus building (6.9).
+ *
+ * "attr_name" is anything Corpus::get_attr accepts, so a structural
+ * attribute ("doc.author") works exactly like a positional one ("lemma"):
+ * StructPosAttr forwards the WordList interface straight through, and its
+ * lexicon is already deduplicated - there's no need to walk structure
+ * instances and uniq them by hand.
+ *
+ * NULL and *error set only for an attr_name that doesn't exist in this
+ * corpus (-1 for the count). */
+
+/* How many distinct values the attribute has (WordList::id_range), without
+ * fetching any of them. O(1) - it's a lexicon header read - so a caller can
+ * use it to decide *how* to present the attribute (a full checkbox list, or
+ * a search-as-you-type box) before committing to either.
+ *
+ * Do not assume which attributes are small. Measured on syn2025 (122M
+ * tokens): lemma 708671 distinct, tag 3967, doc.author 1058. Even the
+ * structural attribute is well past checkbox-list territory, and the
+ * positional tagset is nothing like the 4 tags a toy corpus has - which is
+ * exactly why this function exists instead of a hardcoded threshold per
+ * attribute kind. */
+int mtc_corpus_attr_value_count(MTCCorpus *corp, const char *attr_name, char **error);
+
+/* Every distinct value, '\x1F'-delimited with the delimiter *before* each
+ * value including the first - the same leading-delimiter encoding, for the
+ * same reason, as mtc_kwic_get_left_attr above (a value may legitimately be
+ * the empty string, and this keeps that unambiguous). Empty string, not
+ * NULL, for an attribute with an empty lexicon.
+ *
+ * Wraps WordList::dump_str. Materializes the whole lexicon, so it's for
+ * attributes already known to be small - check mtc_corpus_attr_value_count
+ * first. */
+char *mtc_corpus_attr_values(MTCCorpus *corp, const char *attr_name, char **error);
+
+/* Only the values matching regex "pattern" (WordList::regexp2strids),
+ * encoded exactly as mtc_corpus_attr_values. `ignore_case` non-zero folds
+ * case. `max_values` > 0 stops after that many matches - the point of this
+ * function over the full dump: a search-as-you-type box over `lemma` wants
+ * the first N hits for the prefix typed so far, not all of them. Pass 0 for
+ * no limit.
+ *
+ * The pattern is Manatee's own regex dialect (the one CQL's `=` uses), and
+ * it is matched against the *whole* value, not searched within it - so a
+ * prefix box wants "foo.*", not "foo". */
+char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
+                                      int ignore_case, int max_values, char **error);
+
 /* -------------------- subcorpora --------------------
  * A subcorpus is a Manatee-native concept: a saved range file restricting a
  * parent corpus to the hits of one CQL query scoped to a structure (e.g. one

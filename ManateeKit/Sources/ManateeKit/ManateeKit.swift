@@ -220,6 +220,82 @@ public actor Corpus {
         return String(cString: cstr)
     }
 
+    /// How many *distinct values* `attribute` takes across the corpus,
+    /// without fetching any of them (Phase 6.7). O(1) - a lexicon header
+    /// read - so it's the right way to decide *how* to present an
+    /// attribute before committing: a full checkbox list, or a search box.
+    ///
+    /// **Don't assume which attributes are small.** Measured on syn2025
+    /// (122M tokens): `lemma` 708,671 distinct values, `tag` 3,967,
+    /// `doc.author` 1,058. Even a structural attribute is well past
+    /// checkbox-list territory on a real corpus, and a real tagset is
+    /// nothing like the 4 tags a toy corpus has - hence measuring rather
+    /// than assuming per attribute kind.
+    ///
+    /// Works the same for structural (`"doc.author"`) and positional
+    /// (`"lemma"`) attributes, and the values are already deduplicated -
+    /// see `mtc_corpus_attr_value_count`'s doc comment for why no
+    /// structure-instance walking is needed.
+    public func attributeValueCount(attribute: String) throws -> Int {
+        var error: UnsafeMutablePointer<CChar>?
+        let count = mtc_corpus_attr_value_count(handle, attribute, &error)
+        guard count >= 0 else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        return Int(count)
+    }
+
+    /// Every distinct value of `attribute`, in lexicon order.
+    ///
+    /// Materializes the whole lexicon, so it's for attributes already known
+    /// to be small - check `attributeValueCount(attribute:)` first, and use
+    /// `attributeValues(attribute:matching:ignoreCase:limit:)` for anything
+    /// high-cardinality.
+    public func attributeValues(attribute: String) throws -> [String] {
+        var error: UnsafeMutablePointer<CChar>?
+        return try Self.decodeValues(
+            mtc_corpus_attr_values(handle, attribute, &error), error: &error)
+    }
+
+    /// The distinct values of `attribute` matching regex `pattern`, at most
+    /// `limit` of them (`limit: 0` for no cap).
+    ///
+    /// Lazily evaluated in the engine, so a `limit` genuinely stops the
+    /// lexicon scan early rather than filtering a full dump - that's the
+    /// point of this over `attributeValues(attribute:)` for a
+    /// search-as-you-type box.
+    ///
+    /// `pattern` is Manatee's own regex dialect (what CQL's `=` uses) and
+    /// is matched against the *whole* value rather than searched within it,
+    /// so a prefix search wants `"foo.*"`, not `"foo"`.
+    public func attributeValues(
+        attribute: String, matching pattern: String, ignoreCase: Bool = true, limit: Int = 0
+    ) throws -> [String] {
+        var error: UnsafeMutablePointer<CChar>?
+        return try Self.decodeValues(
+            mtc_corpus_attr_values_matching(
+                handle, attribute, pattern, ignoreCase ? 1 : 0, Int32(limit), &error),
+            error: &error)
+    }
+
+    /// Splits the bridge's leading-`\u{1F}`-delimiter encoding back into one
+    /// entry per value - the same decoding `LiveConcordance.kwicLines` does
+    /// for KWIC segments, and not a plain split for the same reason: a
+    /// value may legitimately be the empty string, so the delimiter leads
+    /// every entry instead of separating them. An entirely empty result
+    /// means zero values, not one empty-valued one.
+    private static func decodeValues(
+        _ cstr: UnsafeMutablePointer<CChar>?, error: inout UnsafeMutablePointer<CChar>?
+    ) throws -> [String] {
+        guard let cstr else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        defer { mtc_free_string(cstr) }
+        let joined = String(cString: cstr)
+        guard !joined.isEmpty else { return [] }
+        return joined.dropFirst().components(separatedBy: "\u{1F}")
+    }
+
     /// Opens a previously created subcorpus (see `createSubcorpus`) as its
     /// own `Corpus` - queries against it are automatically restricted to the
     /// subcorpus's range, since `SubCorpus` overrides `filter_query` in C++
