@@ -1,21 +1,27 @@
 name: Korpora
 options:
   bundleIdPrefix: cz.cuni.mff.ufal
-  # Matches ManateeKit/Package.swift's own `.macOS(.v13)`, and is the
-  # oldest macOS the code actually needs (NSTableViewDiffableDataSource is
-  # the real floor, at macOS 11).
+  # Deliberately the local macOS version, not the oldest the code could
+  # support (it builds fine at 13.0 - verified 2026-09-09 - since nothing
+  # here needs newer API; NSTableViewDiffableDataSource at macOS 11 is the
+  # real floor). Matching the local OS is what keeps the ~41 "object file
+  # was built for newer macOS version than being linked" linker warnings
+  # silent, and this app is dev-only on a single machine, so that trade is
+  # worth it here.
   #
-  # Deliberately NOT the local macOS version. This was "27.0" for a while,
-  # purely to silence ~35 cosmetic linker warnings ("object file was built
-  # for newer macOS version than being linked") coming from the locally
-  # built manatee-open static library - see docs/project-plan.md. That made
-  # the project unbuildable by anyone not on the very newest Xcode, since a
-  # deployment target can't exceed the SDK. Those warnings are worth less
-  # than the project being buildable at all; they also come back on any
-  # machine whose macOS differs from this number, so chasing them is
-  # pointless in a project that builds manatee-open locally.
+  # Consequence to be aware of: a deployment target can't exceed the SDK,
+  # so this pins *building the app* to the newest Xcode. It doesn't
+  # restrict the engine - `ManateeKit` declares `.macOS(.v13)` and builds
+  # and tests standalone (`swift build`/`swift test`) on older systems,
+  # which is where cross-version portability actually matters (see
+  # `manatee-open`'s `macos-arm64-portability` branch). Anyone on an older
+  # Xcode who needs the app can override per build:
+  #
+  #   xcodebuild ... MACOSX_DEPLOYMENT_TARGET=13.0
+  #
+  # See docs/project-plan.md's "Deployment target / minimum toolchain".
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "27.0"
   createIntermediateGroups: true
 
 packages:
@@ -34,7 +40,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
-        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        MACOSX_DEPLOYMENT_TARGET: "27.0"
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
         ENABLE_HARDENED_RUNTIME: NO
