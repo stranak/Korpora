@@ -210,7 +210,7 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6a done (6.6a is AppKit-only, no engine change), 47/47 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6a done, builds cleanly, 41/41 KorporaTests passing; 6.7-6.11 not started | partial — 6.1-6.6 all confirmed by user; **6.6a (four refinements from that click-test) built but not yet click-tested** |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.6a done (6.6a is AppKit-only, no engine change), 47/47 ManateeKit tests passing; 6.7-6.11 not started | 6.1-6.6a done, builds cleanly, 41/41 KorporaTests passing; 6.7-6.11 not started | **yes for everything built — 6.1-6.6 and 6.6a all confirmed working by user**; 6.7-6.11 not started |
 
 All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
 test` → 17/17).
@@ -2978,17 +2978,24 @@ in a comment.
 Verified: `BuildProject(buildForTesting: true)` → **BUILD SUCCEEDED**;
 `RunAllTests` → **41/41 KorporaTests** (6 new); `cd ManateeKit && swift
 test` → 47/47 unchanged; app launches with no constraint/exception log
-output. **Not yet manually click-tested** - next steps: (1) with the new
-checkbox *off*, confirm nothing changed from 6.6 (no triangle column,
-one inline expansion at a time, a second Window replaces the first);
-(2) turn it on, confirm the triangle column appears, several rows expand
-at once, and each triangle collapses its own row; (3) with a structural
-attribute chosen, confirm an expanded row's paragraph starts right of the
-Doc value rather than under it, and that dragging the Doc column wider
-moves the paragraph with it and keeps the row's height correct;
-(4) double-click a line (both modes) and double-click an expanded row to
-collapse it; (5) turn the checkbox off while several rows are expanded and
-confirm they collapse.
+output.
+
+**Manually click-tested and confirmed working by the user 2026-09-09** -
+all five planned checks: (1) with the new checkbox *off*, nothing changed
+from 6.6 (no triangle column, one inline expansion at a time, a second
+Window replaces the first); (2) turned on, the triangle column appears,
+several rows expand at once, and each triangle collapses its own row;
+(3) with a structural attribute chosen, an expanded row's paragraph starts
+right of the Doc value rather than under it, and dragging the Doc column
+wider moves the paragraph with it and keeps the row's height correct;
+(4) double-click works in both modes, and double-clicking an expanded row
+collapses it; (5) turning the checkbox off while several rows are expanded
+collapses them.
+
+So the two decisions 6.6a deliberately revisited both hold up in practice:
+the opt-in default really is indistinguishable from 6.6, and insetting the
+paragraph past the metadata columns didn't reintroduce the "chopped into
+three pieces" look that got the original inline version rejected.
 
 ### 6.7 — New engine primitive: attribute value enumeration (not started)
 
