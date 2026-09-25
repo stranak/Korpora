@@ -1,5 +1,9 @@
 import Cocoa
 
+// Before anything reads UserDefaults: carry settings over from the
+// pre-release bundle id (see LegacyDefaultsMigration).
+LegacyDefaultsMigration.runIfNeeded()
+
 // Must run before any corpus/document lookup - the automatic untitled-
 // document-at-launch path fires very early (before applicationDidFinishLaunching).
 AppSettings.shared.applyEnvironment()

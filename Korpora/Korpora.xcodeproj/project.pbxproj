@@ -14,12 +14,14 @@
 		1938B1A7AFC746B80688FF6E /* CorporaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */; };
 		1C1033F37ED198EBDCED9FED /* FilterSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */; };
 		2361BEBD2F8EC06105F54B5F /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5BD468A9C191CD0CB9A323 /* ConcordanceOperation.swift */; };
+		247ED6676A2FED188F50DAF6 /* LegacyDefaultsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70108D2D157AC3924026A527 /* LegacyDefaultsMigrationTests.swift */; };
 		29B81AF1A74883E0E7A12393 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1CEB379EAD1C7D1F10F792C /* AppSettings.swift */; };
 		2A3E4066F2F30C0CF2347756 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */; };
 		2B2B70AE01B0E3943F49F804 /* QueryHistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */; };
 		2C2DBAEE4CA8A8AA5B831246 /* KorporaDocumentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC667DAE0261FA8BD9966E36 /* KorporaDocumentController.swift */; };
 		332D394CACC2683A315A91C0 /* ConcordanceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */; };
 		45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */; };
+		470EB5A8AA5C7EB0446D755D /* LegacyDefaultsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */; };
 		4AB1276625BB1338E6EEFCA0 /* UnicodeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */; };
 		4B12DE00ECB62CF1B94A5E85 /* ExtendedContextWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */; };
 		52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */; };
@@ -90,6 +92,7 @@
 		6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
 		6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveImportTracker.swift; sourceTree = "<group>"; };
 		6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporter.swift; sourceTree = "<group>"; };
+		70108D2D157AC3924026A527 /* LegacyDefaultsMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDefaultsMigrationTests.swift; sourceTree = "<group>"; };
 		73CC906E25B06673D997CBD4 /* CorpusImportSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusImportSheetController.swift; sourceTree = "<group>"; };
 		75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSheetController.swift; sourceTree = "<group>"; };
 		7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLCompletionContextTests.swift; sourceTree = "<group>"; };
@@ -116,6 +119,7 @@
 		DA90C45CF4B5BD7C43B5398D /* CQLCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLCompletion.swift; sourceTree = "<group>"; };
 		EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedContextOverlayInsetTests.swift; sourceTree = "<group>"; };
 		EC667DAE0261FA8BD9966E36 /* KorporaDocumentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KorporaDocumentController.swift; sourceTree = "<group>"; };
+		EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDefaultsMigration.swift; sourceTree = "<group>"; };
 		F498141E2902F7FE889DE76F /* NewConcordanceSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConcordanceSheetController.swift; sourceTree = "<group>"; };
 		F564FB37D52D1AD65CC90F09 /* Korpora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Korpora.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -194,6 +198,7 @@
 				7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */,
 				EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */,
 				0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */,
+				70108D2D157AC3924026A527 /* LegacyDefaultsMigrationTests.swift */,
 				D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */,
 				50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */,
 			);
@@ -235,6 +240,7 @@
 				27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */,
 				AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */,
 				C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */,
+				EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */,
 				16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */,
 				5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */,
 			);
@@ -360,6 +366,7 @@
 				6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */,
 				753C61BDF55CC67A1C13E23A /* ExtendedContextOverlayInsetTests.swift in Sources */,
 				45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */,
+				247ED6676A2FED188F50DAF6 /* LegacyDefaultsMigrationTests.swift in Sources */,
 				2B2B70AE01B0E3943F49F804 /* QueryHistoryStoreTests.swift in Sources */,
 				DA2EEF3E76DF1BE3F5518902 /* UnicodeScriptTests.swift in Sources */,
 			);
@@ -397,6 +404,7 @@
 				8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */,
 				6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */,
 				2C2DBAEE4CA8A8AA5B831246 /* KorporaDocumentController.swift in Sources */,
+				470EB5A8AA5C7EB0446D755D /* LegacyDefaultsMigration.swift in Sources */,
 				DF41E0A7E0BECE4B5D74495C /* NewConcordanceSheetController.swift in Sources */,
 				F36D175CD48D51F2E3C45511 /* NewSubcorpusPopoverController.swift in Sources */,
 				93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */,
@@ -436,7 +444,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "cz.cuni.mff.ufal.mac-corpora.dev";
+				PRODUCT_BUNDLE_IDENTIFIER = cz.cuni.mff.ufal.korpora;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
 			};
@@ -449,6 +457,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 8YW3ZU8MFU;
@@ -461,7 +470,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
-				PRODUCT_BUNDLE_IDENTIFIER = "cz.cuni.mff.ufal.mac-corpora.dev";
+				PRODUCT_BUNDLE_IDENTIFIER = cz.cuni.mff.ufal.korpora;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
 			};
