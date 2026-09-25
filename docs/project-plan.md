@@ -3503,7 +3503,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling landed and verified 2026-09-26; signing/notarization pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, Developer ID Release signing verified 2026-09-26; notarization pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3759,6 +3759,49 @@ can be verified on its own.
    floor deployment target. **Verify**: `codesign -dvv` shows the
    Developer ID, TeamIdentifier, `flags=0x10000(runtime)`;
    `codesign --verify --deep --strict` passes.
+   **Status (2026-09-26): done — verified with the real Developer ID
+   identity (see below).**
+   `project.yml` gained a `configs: Release:` block on the app target
+   (`MACOSX_DEPLOYMENT_TARGET 15.0`, `ARCHS arm64`, `CODE_SIGN_STYLE
+   Manual`, `CODE_SIGN_IDENTITY Developer ID Application`,
+   `DEVELOPMENT_TEAM 8YW3ZU8MFU`, `ENABLE_HARDENED_RUNTIME YES`,
+   `OTHER_CODE_SIGN_FLAGS --timestamp`); Debug is untouched (Automatic
+   signing, 27.0, no hardened runtime). The "Bundle manatee import tools"
+   phase now also signs each helper right after copying it, with
+   `$EXPANDED_CODE_SIGN_IDENTITY`, `--options runtime` and `--timestamp`
+   — Xcode's own CodeSign step signs only the app, so without this the
+   helpers would be unsigned nested code (strict verify and notarization
+   both reject that). Measured on a clean Release build with the release
+   deps env vars and `CODE_SIGN_IDENTITY="Apple Development"` as the only
+   override: **BUILD SUCCEEDED**; app and both helpers show
+   `flags=0x10000(runtime)`, `TeamIdentifier=8YW3ZU8MFU` and a secure
+   timestamp, helpers timestamped before the app (inside-out holds);
+   `codesign --verify --deep --strict` → valid, satisfies its Designated
+   Requirement; `lipo -archs` = arm64; `LSMinimumSystemVersion` 15.0;
+   zero `/opt/homebrew` load commands.
+   **Developer ID identity (2026-09-26):** it was briefly missing from
+   this machine's keychains (only `Apple Development` and `Apple
+   Distribution` — the latter a Mac App Store identity, no substitute) and
+   was then installed: `Developer ID Application: UFAL, MFF, Charles
+   University in Prague (8YW3ZU8MFU)`, expires 2027-02-01. **Verified with
+   the real identity** (clean Release build, release deps env vars, no
+   signing overrides): **BUILD SUCCEEDED**; app, `encodevert` and
+   `mkregexattr` all show `Authority=Developer ID Application … (8YW3ZU8MFU)`,
+   `flags=0x10000(runtime)`, a secure timestamp; `codesign --verify --deep
+   --strict` → valid; `spctl --assess --type execute` → accepted,
+   `source=Developer ID` (a local, un-quarantined assessment — not a
+   substitute for step 5's notarization + staple check).
+   The first real-identity attempt failed on one helper with codesign's
+   "timestamps differ by 188 seconds - check your system clock", although
+   the Mac's clock was 5 ms off `time.apple.com` — a transient bad
+   timestamp-server response; the identical rebuild passed. The helper
+   signing loop now retries up to 3 times so one such blip doesn't fail a
+   release build. (Xcode's own app-signing step has no retry; if it hits
+   the same blip, just rebuild.)
+   Minor finding: the SwiftPM `ManateeKit`/`CManatee` targets ignore the
+   app target's `ARCHS` and still compile an unused x86_64 slice at their
+   own `.macOS(.v13)` floor — wasted compile time only; the app links
+   arm64 alone.
 5. `scripts/make-release.sh`: archive → sign inside-out → DMG (with an
    Applications symlink) → `notarytool submit` → `stapler staple` →
    `spctl --assess --type execute`. **Verify**: `spctl` accepts, and the
@@ -3781,8 +3824,10 @@ The branch `feat/signed-release-deps` carried blockers 1-3; its handoff
 checklist (regenerate `Korpora.xcodeproj` with `xcodegen generate`, first
 real run of `scripts/build-release-deps.sh`, release-style build +
 acceptance check) is done — results recorded under steps 2 and 3 above.
-Next up is step 4 (release signing config, including `ARCHS: arm64`),
-then 5-7; step 1's arch-scope/bundle-id/API-key choices are still open.
+Step 4's config followed on `feat/release-signing` (2026-09-26) — see
+its status (verified with the real Developer ID identity). Next is
+step 5, which additionally needs the App Store Connect API key. Step 1's bundle-id and API-key choices are still open; arch
+scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
 repo's script bodies, comments, and commit messages is a live workaround

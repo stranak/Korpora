@@ -53,9 +53,31 @@ targets:
           fi
           helpers="${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Helpers"
           mkdir -p "$helpers"
+          # Nested code must be signed before the enclosing app (inside-out),
+          # with the same identity and hardened runtime - Xcode's own CodeSign
+          # step only signs the app itself, not stray executables in Helpers/.
+          # Never `codesign --deep` to sign; it's for verification only.
+          sign_flags="--force --options runtime"
+          if [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+            sign_flags="$sign_flags --timestamp"
+          fi
           for tool in encodevert mkregexattr; do
             cp "${MANATEE_TOOLS_DIR}/${tool}" "${helpers}/${tool}" || exit 1
             chmod +x "${helpers}/${tool}"
+            if [ "${CODE_SIGNING_ALLOWED:-YES}" = "YES" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
+              # Retried: --timestamp depends on Apple's timestamp server, and
+              # one transient bad response ("timestamps differ by N seconds")
+              # shouldn't fail a release build.
+              signed=no
+              for attempt in 1 2 3; do
+                if codesign $sign_flags --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "${helpers}/${tool}"; then
+                  signed=yes; break
+                fi
+                echo "codesign ${tool} failed (attempt ${attempt}/3)"
+                sleep 5
+              done
+              [ "$signed" = yes ] || exit 1
+            fi
           done
           echo "Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}"
     settings:
@@ -68,6 +90,23 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Korpora/Info.plist
         CODE_SIGN_ENTITLEMENTS: Korpora/Korpora.entitlements
+      # Distribution build: notarizable Developer ID signing (docs/
+      # project-plan.md, "Goal - Ship a signed GitHub release", step 4).
+      # Debug keeps Automatic signing and the 27.0 dev target above.
+      #  - macOS 15 is the release floor (blocker-3 decision); the release
+      #    deps script builds manatee-open and pcre2 at the same floor.
+      #  - arm64 only: the static pcre2/manatee libs are arm64-only, and
+      #    Release would otherwise build universal and fail linking x86_64.
+      #  - Hardened runtime on; sandbox stays off (entitlements file).
+      configs:
+        Release:
+          MACOSX_DEPLOYMENT_TARGET: "15.0"
+          ARCHS: arm64
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          DEVELOPMENT_TEAM: 8YW3ZU8MFU
+          ENABLE_HARDENED_RUNTIME: YES
+          OTHER_CODE_SIGN_FLAGS: --timestamp
 
   KorporaTests:
     type: bundle.unit-test

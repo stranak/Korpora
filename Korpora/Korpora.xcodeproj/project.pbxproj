@@ -303,9 +303,6 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					2B917CA4AF4211A86396CC11 = {
-						ProvisioningStyle = Automatic;
-					};
 				};
 			};
 			buildConfigurationList = 13B3B70DE762F0628F87648F /* Build configuration list for PBXProject "Korpora" */;
@@ -348,7 +345,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -z \"${MANATEE_TOOLS_DIR:-}\" ]; then\n  echo \"MANATEE_TOOLS_DIR unset - not bundling manatee tools (dev build uses the checkout at runtime)\"\n  exit 0\nfi\nhelpers=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Helpers\"\nmkdir -p \"$helpers\"\nfor tool in encodevert mkregexattr; do\n  cp \"${MANATEE_TOOLS_DIR}/${tool}\" \"${helpers}/${tool}\" || exit 1\n  chmod +x \"${helpers}/${tool}\"\ndone\necho \"Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}\"\n";
+			shellScript = "if [ -z \"${MANATEE_TOOLS_DIR:-}\" ]; then\n  echo \"MANATEE_TOOLS_DIR unset - not bundling manatee tools (dev build uses the checkout at runtime)\"\n  exit 0\nfi\nhelpers=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Helpers\"\nmkdir -p \"$helpers\"\n# Nested code must be signed before the enclosing app (inside-out),\n# with the same identity and hardened runtime - Xcode's own CodeSign\n# step only signs the app itself, not stray executables in Helpers/.\n# Never `codesign --deep` to sign; it's for verification only.\nsign_flags=\"--force --options runtime\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n  sign_flags=\"$sign_flags --timestamp\"\nfi\nfor tool in encodevert mkregexattr; do\n  cp \"${MANATEE_TOOLS_DIR}/${tool}\" \"${helpers}/${tool}\" || exit 1\n  chmod +x \"${helpers}/${tool}\"\n  if [ \"${CODE_SIGNING_ALLOWED:-YES}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n    # Retried: --timestamp depends on Apple's timestamp server, and\n    # one transient bad response (\"timestamps differ by N seconds\")\n    # shouldn't fail a release build.\n    signed=no\n    for attempt in 1 2 3; do\n      if codesign $sign_flags --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \"${helpers}/${tool}\"; then\n        signed=yes; break\n      fi\n      echo \"codesign ${tool} failed (attempt ${attempt}/3)\"\n      sleep 5\n    done\n    [ \"$signed\" = yes ] || exit 1\n  fi\ndone\necho \"Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -448,18 +445,22 @@
 		5124E1E918813FA8D76E6DA0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = NO;
+				DEVELOPMENT_TEAM = 8YW3ZU8MFU;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Korpora/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "cz.cuni.mff.ufal.mac-corpora.dev";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
