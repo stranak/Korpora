@@ -3503,7 +3503,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, Developer ID Release signing verified 2026-09-26; notarization pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, signed + notarized DMG pipeline verified 2026-09-26; floor-OS smoke test and release pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3647,7 +3647,8 @@ can be verified on its own.
 
 ### Decisions this goal forces (not blockers — but must be made and recorded here)
 
-5. **Bundle identifier.** `cz.cuni.mff.ufal.mac-corpora.dev` carries a
+5. **Bundle identifier.** *(Decided 2026-09-26: `cz.cuni.mff.ufal.korpora`
+   with migration — see step 1.)* `cz.cuni.mff.ufal.mac-corpora.dev` carries a
    `.dev` suffix that this doc itself already called "never meant to be
    the shipping one"; CLAUDE.md's "must stay" protects *installed users'*
    UserDefaults, not the choice of a shipping id. A Developer ID cert
@@ -3694,8 +3695,21 @@ can be verified on its own.
    Developer Program account holder and create an App Store Connect API
    key for `notarytool`.
    **Status (2026-09-25): floor decided — macOS 15, superseding the 13.0
-   recommendation (blocker-3 decision above). Arch scope, bundle id, and
-   the account-holder/API-key confirmation are still open.**
+   recommendation (blocker-3 decision above).**
+   **Status (2026-09-26): all decided.** Arch scope: arm64-only v1 (pinned
+   by step 4). Bundle id: **`cz.cuni.mff.ufal.korpora`**, with the
+   recommended migration — `LegacyDefaultsMigration`
+   (`Korpora/Korpora/Settings/`), called first in `main.swift`, copies every
+   key from the legacy `cz.cuni.mff.ufal.mac-corpora.dev` domain that the
+   new domain lacks, once (marker key `migratedFromLegacyBundleID`); the
+   legacy plist is left in place. Four unit tests; on this machine the
+   first launch under the new id carried all 25 legacy keys over
+   (`defaults read cz.cuni.mff.ufal.korpora`). CLAUDE.md updated to name
+   the new id as the one that must not change again. Version for the
+   first tag: `0.1` (build 1), as is. Notary credentials: an app-specific
+   password stored as keychain profile `korpora-notary`
+   (`notarytool store-credentials`); an App Store Connect API key is only
+   needed later, for CI.
 2. `scripts/build-release-deps.sh` — builds pcre2 from source static,
    rebuilds manatee-open against it with `-mmacosx-version-min=$FLOOR`
    (and `$ARCHS`), producing `libbuiltinmanatee.a`, `encodevert`,
@@ -3807,6 +3821,28 @@ can be verified on its own.
    `spctl --assess --type execute`. **Verify**: `spctl` accepts, and the
    staple survives download simulation (`cp -c`/browser, quarantine xattr
    present).
+   **Status (2026-09-26): done and verified — first notarized DMG.** The
+   script does a clean Release `build` (not `archive`; signing comes from
+   project.yml's Release config), checks all three binaries for the
+   Developer ID authority, runtime flag, timestamp, no `get-task-allow`,
+   no `/opt/homebrew` load commands, then notarizes **twice**: the app
+   (zipped) is notarized and stapled first, then the DMG is built around
+   the stapled app, signed, notarized and stapled — so the app carries its
+   own ticket after being dragged out to /Applications, not only the DMG.
+   Finally it assesses a quarantined copy of the DMG and the app mounted
+   from it. `--skip-notarize` does a local dry run. Output:
+   `release/Korpora-<version>.dmg` + `.sha256` + build/notary logs
+   (`release/` is gitignored). The first submission came back **Invalid**:
+   *"The executable requests the com.apple.security.get-task-allow
+   entitlement"* — Xcode injects it on a plain `build` unless
+   `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`, now set in the Release config
+   and checked by the script before uploading. Measured result with the new bundle id:
+   both submissions **Accepted** (app `41e4b9c4-…`, DMG `45107b8a-…`),
+   both staples validate, `spctl` on the quarantined copy →
+   `accepted, source=Notarized Developer ID` for the DMG and the app
+   inside; about 1¼ minutes end to end. `Korpora-0.1.dmg` SHA-256
+   `a4f67cc1…c366f436`. Cosmetic: `hdiutil create` prints a deprecation
+   warning on macOS 27 (pointing at `diskutil image create`) but works.
 6. **Smoke matrix — the actual "works as expected" test**: the DMG on a
    clean user account or VM running the floor macOS, Homebrew absent.
    First launch passes Gatekeeper with the plain prompt; corpus query
@@ -3825,8 +3861,9 @@ checklist (regenerate `Korpora.xcodeproj` with `xcodegen generate`, first
 real run of `scripts/build-release-deps.sh`, release-style build +
 acceptance check) is done — results recorded under steps 2 and 3 above.
 Step 4's config followed on `feat/release-signing` (2026-09-26) — see
-its status (verified with the real Developer ID identity). Next is
-step 5, which additionally needs the App Store Connect API key. Step 1's bundle-id and API-key choices are still open; arch
+its status (verified with the real Developer ID identity), then step 5
+(first notarized DMG) and step 1's remaining decisions. Next is step 6,
+the smoke test on a clean macOS 15 VM — nothing is tagged before it. Step 1's bundle-id and API-key choices are still open; arch
 scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this

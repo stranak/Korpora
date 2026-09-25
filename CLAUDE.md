@@ -36,11 +36,13 @@ them by repo-relative path.
 - `ManateeKit/`, `Korpora/`, `scripts/` — this repo
   (`github.com/stranak/Korpora`, renamed from `mac-corpora` along with the
   app). The local checkout directory is `korpora/`.
-  - **The bundle identifier is deliberately still
-    `cz.cuni.mff.ufal.mac-corpora.dev`** and must stay that way: it's a
-    live identifier, not a name, and `UserDefaults` is keyed by it.
-    Changing it would orphan every stored setting (fonts, colors, query
-    history, context widths) and silently reset the app to defaults.
+  - **The bundle identifier is `cz.cuni.mff.ufal.korpora`** (since the
+    first release; it was `cz.cuni.mff.ufal.mac-corpora.dev` before).
+    Don't change it again: it's a live identifier, not a name —
+    `UserDefaults` is keyed by it, and so are notarization and
+    Gatekeeper's view of the app. Settings from the old id are carried
+    over once at launch by `LegacyDefaultsMigration` (called first in
+    `main.swift`); keep that in place so older installs don't reset.
 - `manatee-open/` — a separate git checkout, sibling to this repo, not
   nested/submoduled. Must be `stranak/manatee-open`'s
   `macos-arm64-portability` branch, not upstream `czcorpus/manatee-open` —

@@ -28,3 +28,6 @@ Korpora/DevCorpus/
 
 # Finder metadata
 .DS_Store
+
+# Output of scripts/make-release.sh (DMG, checksum, build + notary logs)
+/release/

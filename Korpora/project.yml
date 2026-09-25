@@ -82,7 +82,10 @@ targets:
           echo "Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
+        # Was cz.cuni.mff.ufal.mac-corpora.dev until the first release;
+        # settings stored under the old id are carried over once at launch
+        # by LegacyDefaultsMigration (main.swift).
+        PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.korpora
         MACOSX_DEPLOYMENT_TARGET: "27.0"
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
@@ -107,6 +110,10 @@ targets:
           DEVELOPMENT_TEAM: 8YW3ZU8MFU
           ENABLE_HARDENED_RUNTIME: YES
           OTHER_CODE_SIGN_FLAGS: --timestamp
+          # Otherwise Xcode injects com.apple.security.get-task-allow on a
+          # plain `build` (only `archive` strips it), and the notary service
+          # rejects the app outright.
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
   KorporaTests:
     type: bundle.unit-test
