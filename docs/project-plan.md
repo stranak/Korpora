@@ -3503,7 +3503,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, Release signing config landed 2026-09-26; blocked on the missing Developer ID certificate; notarization pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, Developer ID Release signing verified 2026-09-26; notarization pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3759,8 +3759,8 @@ can be verified on its own.
    floor deployment target. **Verify**: `codesign -dvv` shows the
    Developer ID, TeamIdentifier, `flags=0x10000(runtime)`;
    `codesign --verify --deep --strict` passes.
-   **Status (2026-09-26): config landed; verified with a stand-in
-   identity — the real Developer ID identity is missing (see below).**
+   **Status (2026-09-26): done — verified with the real Developer ID
+   identity (see below).**
    `project.yml` gained a `configs: Release:` block on the app target
    (`MACOSX_DEPLOYMENT_TARGET 15.0`, `ARCHS arm64`, `CODE_SIGN_STYLE
    Manual`, `CODE_SIGN_IDENTITY Developer ID Application`,
@@ -3779,21 +3779,25 @@ can be verified on its own.
    `codesign --verify --deep --strict` → valid, satisfies its Designated
    Requirement; `lipo -archs` = arm64; `LSMinimumSystemVersion` 15.0;
    zero `/opt/homebrew` load commands.
-   **Blocker found: the Developer ID Application certificate is not on
-   this machine.** `security find-identity -p codesigning` (all keychains
-   in the search list, valid or not) lists only `Apple Development: Pavel
-   Stranak (F67HRXA3KV)` and `Apple Distribution: UFAL … (8YW3ZU8MFU)`;
-   `find-certificate -c "Developer ID Application"` finds nothing — only
-   the Developer ID *intermediate CA* is present. This contradicts "What's
-   already in place" above (measured 2026-09-25): either that was measured
-   on another Mac or the identity was removed since. `Apple Distribution`
-   is a Mac App Store identity and cannot be notarized for direct
-   distribution, so it is no substitute. Unblocking: export the Developer
-   ID identity (cert + private key, `.p12`) from wherever it lives, or
-   have the team's Account Holder/Admin issue a new one (Developer ID
-   certs can only be created by the Account Holder role). Once installed,
-   re-run the same build without the identity override and the step's
-   `codesign -dvv` check should show `Authority=Developer ID Application`.
+   **Developer ID identity (2026-09-26):** it was briefly missing from
+   this machine's keychains (only `Apple Development` and `Apple
+   Distribution` — the latter a Mac App Store identity, no substitute) and
+   was then installed: `Developer ID Application: UFAL, MFF, Charles
+   University in Prague (8YW3ZU8MFU)`, expires 2027-02-01. **Verified with
+   the real identity** (clean Release build, release deps env vars, no
+   signing overrides): **BUILD SUCCEEDED**; app, `encodevert` and
+   `mkregexattr` all show `Authority=Developer ID Application … (8YW3ZU8MFU)`,
+   `flags=0x10000(runtime)`, a secure timestamp; `codesign --verify --deep
+   --strict` → valid; `spctl --assess --type execute` → accepted,
+   `source=Developer ID` (a local, un-quarantined assessment — not a
+   substitute for step 5's notarization + staple check).
+   The first real-identity attempt failed on one helper with codesign's
+   "timestamps differ by 188 seconds - check your system clock", although
+   the Mac's clock was 5 ms off `time.apple.com` — a transient bad
+   timestamp-server response; the identical rebuild passed. The helper
+   signing loop now retries up to 3 times so one such blip doesn't fail a
+   release build. (Xcode's own app-signing step has no retry; if it hits
+   the same blip, just rebuild.)
    Minor finding: the SwiftPM `ManateeKit`/`CManatee` targets ignore the
    app target's `ARCHS` and still compile an unused x86_64 slice at their
    own `.macOS(.v13)` floor — wasted compile time only; the app links
@@ -3821,9 +3825,8 @@ checklist (regenerate `Korpora.xcodeproj` with `xcodegen generate`, first
 real run of `scripts/build-release-deps.sh`, release-style build +
 acceptance check) is done — results recorded under steps 2 and 3 above.
 Step 4's config followed on `feat/release-signing` (2026-09-26) — see
-its status; the real Developer ID signature is blocked on the missing
-certificate. Step 5 can be written against the stand-in identity in the
-meantime. Step 1's bundle-id and API-key choices are still open; arch
+its status (verified with the real Developer ID identity). Next is
+step 5, which additionally needs the App Store Connect API key. Step 1's bundle-id and API-key choices are still open; arch
 scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this

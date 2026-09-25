@@ -65,7 +65,18 @@ targets:
             cp "${MANATEE_TOOLS_DIR}/${tool}" "${helpers}/${tool}" || exit 1
             chmod +x "${helpers}/${tool}"
             if [ "${CODE_SIGNING_ALLOWED:-YES}" = "YES" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
-              codesign $sign_flags --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "${helpers}/${tool}" || exit 1
+              # Retried: --timestamp depends on Apple's timestamp server, and
+              # one transient bad response ("timestamps differ by N seconds")
+              # shouldn't fail a release build.
+              signed=no
+              for attempt in 1 2 3; do
+                if codesign $sign_flags --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "${helpers}/${tool}"; then
+                  signed=yes; break
+                fi
+                echo "codesign ${tool} failed (attempt ${attempt}/3)"
+                sleep 5
+              done
+              [ "$signed" = yes ] || exit 1
             fi
           done
           echo "Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}"
