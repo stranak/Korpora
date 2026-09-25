@@ -3503,7 +3503,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling landed and verified 2026-09-26; signing/notarization pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, Release signing config landed 2026-09-26; blocked on the missing Developer ID certificate; notarization pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3759,6 +3759,45 @@ can be verified on its own.
    floor deployment target. **Verify**: `codesign -dvv` shows the
    Developer ID, TeamIdentifier, `flags=0x10000(runtime)`;
    `codesign --verify --deep --strict` passes.
+   **Status (2026-09-26): config landed; verified with a stand-in
+   identity — the real Developer ID identity is missing (see below).**
+   `project.yml` gained a `configs: Release:` block on the app target
+   (`MACOSX_DEPLOYMENT_TARGET 15.0`, `ARCHS arm64`, `CODE_SIGN_STYLE
+   Manual`, `CODE_SIGN_IDENTITY Developer ID Application`,
+   `DEVELOPMENT_TEAM 8YW3ZU8MFU`, `ENABLE_HARDENED_RUNTIME YES`,
+   `OTHER_CODE_SIGN_FLAGS --timestamp`); Debug is untouched (Automatic
+   signing, 27.0, no hardened runtime). The "Bundle manatee import tools"
+   phase now also signs each helper right after copying it, with
+   `$EXPANDED_CODE_SIGN_IDENTITY`, `--options runtime` and `--timestamp`
+   — Xcode's own CodeSign step signs only the app, so without this the
+   helpers would be unsigned nested code (strict verify and notarization
+   both reject that). Measured on a clean Release build with the release
+   deps env vars and `CODE_SIGN_IDENTITY="Apple Development"` as the only
+   override: **BUILD SUCCEEDED**; app and both helpers show
+   `flags=0x10000(runtime)`, `TeamIdentifier=8YW3ZU8MFU` and a secure
+   timestamp, helpers timestamped before the app (inside-out holds);
+   `codesign --verify --deep --strict` → valid, satisfies its Designated
+   Requirement; `lipo -archs` = arm64; `LSMinimumSystemVersion` 15.0;
+   zero `/opt/homebrew` load commands.
+   **Blocker found: the Developer ID Application certificate is not on
+   this machine.** `security find-identity -p codesigning` (all keychains
+   in the search list, valid or not) lists only `Apple Development: Pavel
+   Stranak (F67HRXA3KV)` and `Apple Distribution: UFAL … (8YW3ZU8MFU)`;
+   `find-certificate -c "Developer ID Application"` finds nothing — only
+   the Developer ID *intermediate CA* is present. This contradicts "What's
+   already in place" above (measured 2026-09-25): either that was measured
+   on another Mac or the identity was removed since. `Apple Distribution`
+   is a Mac App Store identity and cannot be notarized for direct
+   distribution, so it is no substitute. Unblocking: export the Developer
+   ID identity (cert + private key, `.p12`) from wherever it lives, or
+   have the team's Account Holder/Admin issue a new one (Developer ID
+   certs can only be created by the Account Holder role). Once installed,
+   re-run the same build without the identity override and the step's
+   `codesign -dvv` check should show `Authority=Developer ID Application`.
+   Minor finding: the SwiftPM `ManateeKit`/`CManatee` targets ignore the
+   app target's `ARCHS` and still compile an unused x86_64 slice at their
+   own `.macOS(.v13)` floor — wasted compile time only; the app links
+   arm64 alone.
 5. `scripts/make-release.sh`: archive → sign inside-out → DMG (with an
    Applications symlink) → `notarytool submit` → `stapler staple` →
    `spctl --assess --type execute`. **Verify**: `spctl` accepts, and the
@@ -3781,8 +3820,11 @@ The branch `feat/signed-release-deps` carried blockers 1-3; its handoff
 checklist (regenerate `Korpora.xcodeproj` with `xcodegen generate`, first
 real run of `scripts/build-release-deps.sh`, release-style build +
 acceptance check) is done — results recorded under steps 2 and 3 above.
-Next up is step 4 (release signing config, including `ARCHS: arm64`),
-then 5-7; step 1's arch-scope/bundle-id/API-key choices are still open.
+Step 4's config followed on `feat/release-signing` (2026-09-26) — see
+its status; the real Developer ID signature is blocked on the missing
+certificate. Step 5 can be written against the stand-in identity in the
+meantime. Step 1's bundle-id and API-key choices are still open; arch
+scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
 repo's script bodies, comments, and commit messages is a live workaround
