@@ -261,6 +261,7 @@
 			buildConfigurationList = 1396CF2ABAD136E067FBFBB7 /* Build configuration list for PBXNativeTarget "Korpora" */;
 			buildPhases = (
 				CE3682BFB80ACACAB34A2529 /* Sources */,
+				E1165D4408700E15BC3249A3 /* Bundle manatee import tools */,
 				344996EA9D0EC3329DFC7351 /* Frameworks */,
 			);
 			buildRules = (
@@ -329,6 +330,27 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E1165D4408700E15BC3249A3 /* Bundle manatee import tools */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle manatee import tools";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -z \"${MANATEE_TOOLS_DIR:-}\" ]; then\n  echo \"MANATEE_TOOLS_DIR unset - not bundling manatee tools (dev build uses the checkout at runtime)\"\n  exit 0\nfi\nhelpers=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Helpers\"\nmkdir -p \"$helpers\"\nfor tool in encodevert mkregexattr; do\n  cp \"${MANATEE_TOOLS_DIR}/${tool}\" \"${helpers}/${tool}\" || exit 1\n  chmod +x \"${helpers}/${tool}\"\ndone\necho \"Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		45F9E8EDBC03BEB2F0F930A2 /* Sources */ = {

@@ -4,9 +4,15 @@ import Foundation
 
 // Resolve the sibling `manatee-open` checkout relative to this package, so
 // nothing here is tied to this specific machine's absolute paths.
+//
+// KORPORA_MANATEE_ROOT overrides it for release builds, which compile/link
+// against a rebuild of manatee-open in an isolated worktree (static pcre2,
+// deployment-floor flags) rather than the dev checkout - see
+// scripts/build-release-deps.sh.
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let manateeRoot = packageRoot.deletingLastPathComponent()
-    .appendingPathComponent("manatee-open").path
+let manateeRoot = ProcessInfo.processInfo.environment["KORPORA_MANATEE_ROOT"]
+    ?? packageRoot.deletingLastPathComponent()
+        .appendingPathComponent("manatee-open").path
 
 // The manifest evaluator's PATH doesn't reliably include Homebrew's bin dir,
 // so search the common prefixes (Apple Silicon and Intel) before falling

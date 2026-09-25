@@ -165,6 +165,78 @@ final class CorpusImporterTests: XCTestCase {
         }
     }
 
+    // Tool-directory resolution is what decides whether an import finds
+    // encodevert at all; in a shipped build a wrong pick means "import is
+    // broken with no dev checkout around to blame". Exercised against
+    // temp-dir stand-ins for the three real locations, without needing a
+    // corpus (or a second app bundle to pretend to be).
+    func testToolsDirectoryEnvOverrideWinsWhenAllCandidatesExist() throws {
+        let envDir = try makeDirectory(named: "env-tools")
+        let bundleDir = try makeDirectory(named: "App.app/Contents/Helpers")
+        let devDir = try makeDirectory(named: "manatee-open/src")
+
+        let resolution = CorpusImporter.resolveToolsDirectory(
+            environment: ["KORPORA_MANATEE_TOOLS_DIR": envDir.path],
+            bundleHelpersDirectory: bundleDir,
+            devCheckoutDirectory: devDir)
+        // Compared by `.path`: `URL(fileURLWithPath:)` of an existing
+        // directory gets a trailing slash that `makeDirectory`'s URL doesn't
+        // carry, and URL equality is sensitive to that.
+        XCTAssertEqual(resolution?.url.path, envDir.path)
+        XCTAssertEqual(resolution?.source, .environment)
+    }
+
+    func testToolsDirectoryPrefersBundledHelpersOverDevCheckout() throws {
+        let bundleDir = try makeDirectory(named: "App.app/Contents/Helpers")
+        let devDir = try makeDirectory(named: "manatee-open/src")
+
+        let resolution = CorpusImporter.resolveToolsDirectory(
+            environment: [:],
+            bundleHelpersDirectory: bundleDir,
+            devCheckoutDirectory: devDir)
+        XCTAssertEqual(resolution?.url, bundleDir)
+        XCTAssertEqual(resolution?.source, .appBundle)
+    }
+
+    func testToolsDirectoryFallsBackToDevCheckoutWhenNothingElseExists() throws {
+        let devDir = try makeDirectory(named: "manatee-open/src")
+
+        let resolution = CorpusImporter.resolveToolsDirectory(
+            environment: [:],
+            bundleHelpersDirectory: tempDir.appendingPathComponent("App.app/Contents/Helpers"),
+            devCheckoutDirectory: devDir)
+        XCTAssertEqual(resolution?.url, devDir)
+        XCTAssertEqual(resolution?.source, .devCheckout)
+    }
+
+    func testToolsDirectoryIsNilWhenNoCandidateExists() throws {
+        let resolution = CorpusImporter.resolveToolsDirectory(
+            environment: [:],
+            bundleHelpersDirectory: tempDir.appendingPathComponent("App.app/Contents/Helpers"),
+            devCheckoutDirectory: tempDir.appendingPathComponent("manatee-open/src"))
+        XCTAssertNil(resolution)
+    }
+
+    func testToolsDirectoryIgnoresEnvOverridePointingAtNonexistentDirectory() throws {
+        // Stale CI config: the variable names a path that isn't there. Must
+        // skip it rather than hard-fail, so the real candidates still apply
+        // (and a later encodevertNotFound hint, if any, names the winner).
+        let devDir = try makeDirectory(named: "manatee-open/src")
+
+        let resolution = CorpusImporter.resolveToolsDirectory(
+            environment: ["KORPORA_MANATEE_TOOLS_DIR": tempDir.appendingPathComponent("gone").path],
+            bundleHelpersDirectory: tempDir.appendingPathComponent("App.app/Contents/Helpers"),
+            devCheckoutDirectory: devDir)
+        XCTAssertEqual(resolution?.url, devDir)
+        XCTAssertEqual(resolution?.source, .devCheckout)
+    }
+
+    private func makeDirectory(named relativePath: String) throws -> URL {
+        let url = tempDir.appendingPathComponent(relativePath)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
     func testImportCorpusCompilesAndIsQueryable() async throws {
         let compiledDir = tempDir.appendingPathComponent("compiled")
         setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDir.path, 1)
