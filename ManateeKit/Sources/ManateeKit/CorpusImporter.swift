@@ -15,7 +15,11 @@ public struct DetectedSchema: Sendable {
 
 public enum CorpusImportError: Error, CustomStringConvertible {
     case emptyVerticalFile
-    case encodevertNotFound(String)
+    /// `hint` differs by which candidate location was consulted (bundled
+    /// Helpers missing is a packaging bug; the dev checkout missing just
+    /// means "build manatee-open first") - see
+    /// `CorpusImporter.missingToolsHint(for:)`.
+    case encodevertNotFound(path: String, hint: String)
     case encodevertFailed(status: Int32, output: String)
     /// `Process.terminationStatus` doubles as a signal number when
     /// `terminationReason == .uncaughtSignal` - this is a crash (e.g. an
@@ -35,8 +39,8 @@ public enum CorpusImportError: Error, CustomStringConvertible {
         switch self {
         case .emptyVerticalFile:
             return "The vertical file has no token lines to sniff a schema from."
-        case .encodevertNotFound(let path):
-            return "encodevert not found at \(path) - build manatee-open first (see scripts/setup-dev-machine.sh)."
+        case .encodevertNotFound(let path, let hint):
+            return "encodevert not found at \(path) - \(hint)"
         case .encodevertFailed(let status, let output):
             return "encodevert exited \(status): \(output)"
         case .encodevertCrashed(let signal, let output):
@@ -289,9 +293,16 @@ public enum CorpusImporter {
             attributes: attributes, structures: structures)
         try registryText.write(to: registryPath, atomically: true, encoding: .utf8)
 
-        let encodevert = manateeOpenRoot().appendingPathComponent("src/encodevert")
+        // Which directory the import tools (`encodevert`, and the sibling
+        // tools it calls via system() like `mkregexattr`) live in — see
+        // `toolsDirectory()` for the candidate order (shipped app bundle,
+        // env override, dev checkout fallback).
+        let resolution = CorpusImporter.toolsDirectory()
+        let resolvedToolsDirectory = resolution?.url ?? CorpusImporter.devCheckoutToolsDirectory()
+        let encodevert = resolvedToolsDirectory.appendingPathComponent("encodevert")
         guard FileManager.default.isExecutableFile(atPath: encodevert.path) else {
-            throw CorpusImportError.encodevertNotFound(encodevert.path)
+            throw CorpusImportError.encodevertNotFound(
+                path: encodevert.path, hint: CorpusImporter.missingToolsHint(for: resolution))
         }
 
         let process = Process()
@@ -308,7 +319,7 @@ public enum CorpusImporter {
         // (found by reading encodevert.cc's compile_regexopt(): it's an
         // optional speedup for regex-heavy CQL queries against that
         // attribute, not needed for correctness), but easy to just fix.
-        let toolsDirectory = manateeOpenRoot().appendingPathComponent("src").path
+        let toolsDirectory = resolvedToolsDirectory.path
         let inheritedPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
         process.environment = ProcessInfo.processInfo.environment.merging(
             [
@@ -423,17 +434,87 @@ public enum CorpusImporter {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    // Package.swift resolves manatee-open the same way, relative to this
-    // package's own root rather than any hardcoded machine path - fine for
-    // this project's current dev-only state (see docs/project-plan.md's
-    // "Packaging" note); a real shipped build would need encodevert bundled
-    // into the app instead.
-    private static func manateeOpenRoot() -> URL {
+    /// Which of `resolveToolsDirectory`'s candidate locations was chosen.
+    /// Not purely cosmetic: the fix for a *missing* tool depends entirely on
+    /// which location was consulted - see `missingToolsHint(for:)`.
+    enum ToolsDirectorySource: Equatable {
+        /// `$KORPORA_MANATEE_TOOLS_DIR` (dev/CI escape hatch).
+        case environment
+        /// `Contents/Helpers` inside the running app bundle - the shipped
+        /// layout, populated at build time by the copy phase in
+        /// `Korpora/project.yml` when `MANATEE_TOOLS_DIR` is set.
+        case appBundle
+        /// `<repo>/manatee-open/src` next to this checkout (`#filePath`-based)
+        /// - the dev-only fallback.
+        case devCheckout
+    }
+
+    /// Pure resolver: the first candidate directory that exists, or nil when
+    /// none do. A candidate whose directory is *absent* is skipped rather
+    /// than failing - notably a `KORPORA_MANATEE_TOOLS_DIR` pointing at a
+    /// nonexistent path silently loses to the next candidate, which is
+    /// forgiving for stale CI config (the hint on a subsequent
+    /// `encodevertNotFound` still names the winning source).
+    /// `bundleHelpersDirectory`/`devCheckoutDirectory` are injectable (and
+    /// their existence checked through the injected `FileManager`) so
+    /// resolution order can be unit-tested without a live corpus - or a
+    /// second app bundle to pretend to be.
+    static func resolveToolsDirectory(
+        environment: [String: String],
+        bundleHelpersDirectory: URL,
+        devCheckoutDirectory: URL,
+        fileManager: FileManager = .default
+    ) -> (url: URL, source: ToolsDirectorySource)? {
+        if let override = environment["KORPORA_MANATEE_TOOLS_DIR"], !override.isEmpty {
+            let url = URL(fileURLWithPath: override)
+            if fileManager.fileExists(atPath: url.path) { return (url, .environment) }
+        }
+        if fileManager.fileExists(atPath: bundleHelpersDirectory.path) {
+            return (bundleHelpersDirectory, .appBundle)
+        }
+        if fileManager.fileExists(atPath: devCheckoutDirectory.path) {
+            return (devCheckoutDirectory, .devCheckout)
+        }
+        return nil
+    }
+
+    /// The production entry point: real environment, real main bundle, real
+    /// dev-checkout path.
+    static func toolsDirectory() -> (url: URL, source: ToolsDirectorySource)? {
+        resolveToolsDirectory(
+            environment: ProcessInfo.processInfo.environment,
+            bundleHelpersDirectory: Bundle.main.bundleURL
+                .appendingPathComponent("Contents/Helpers"),
+            devCheckoutDirectory: devCheckoutToolsDirectory())
+    }
+
+    /// The `#filePath` fallback that used to be the *only* lookup:
+    /// `manatee-open` as a checkout nested in this repo (dev-only, baked in
+    /// at compile time - the same trick `Package.swift` uses for headers,
+    /// and with the same limitation: it names a path on the build machine,
+    /// which a shipped app can't rely on). Absent a bundled `Helpers/`
+    /// directory - i.e. in `swift test` and the CLI - this keeps dev
+    /// behavior exactly as it was.
+    static func devCheckoutToolsDirectory() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent() // ManateeKit (Sources/ManateeKit)
             .deletingLastPathComponent() // Sources
             .deletingLastPathComponent() // ManateeKit (package root)
             .deletingLastPathComponent() // repo root
             .appendingPathComponent("manatee-open")
+            .appendingPathComponent("src")
+    }
+
+    static func missingToolsHint(for resolution: (url: URL, source: ToolsDirectorySource)?) -> String {
+        switch resolution?.source {
+        case .environment:
+            return "KORPORA_MANATEE_TOOLS_DIR is set but that directory contains no executable encodevert."
+        case .appBundle:
+            return "this build ships its import tools inside the app bundle, and the Helpers/ directory " +
+                "has no encodevert - a packaging bug (build with MANATEE_TOOLS_DIR pointing at a built " +
+                "manatee-open src/ directory; see scripts/build-release-deps.sh)."
+        case .devCheckout?, nil:
+            return "build manatee-open first (see scripts/setup-dev-machine.sh)."
+        }
     }
 }

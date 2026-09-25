@@ -37,6 +37,27 @@ targets:
     dependencies:
       - package: ManateeKit
         product: ManateeKit
+    # Bundle encodevert/mkregexattr into Contents/Helpers/ for release
+    # builds (see docs/project-plan.md's "Goal - Ship a signed GitHub
+    # release", blocker 2: a shipped app can't find them via the #filePath
+    # dev-checkout fallback). Gated on MANATEE_TOOLS_DIR so dev builds -
+    # where the manatee-open checkout is right there and CorpusImporter
+    # falls back to it - are byte-identical to before. Run
+    # scripts/build-release-deps.sh and export the var it prints.
+    postCompileScripts:
+      - name: Bundle manatee import tools
+        script: |
+          if [ -z "${MANATEE_TOOLS_DIR:-}" ]; then
+            echo "MANATEE_TOOLS_DIR unset - not bundling manatee tools (dev build uses the checkout at runtime)"
+            exit 0
+          fi
+          helpers="${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Helpers"
+          mkdir -p "$helpers"
+          for tool in encodevert mkregexattr; do
+            cp "${MANATEE_TOOLS_DIR}/${tool}" "${helpers}/${tool}" || exit 1
+            chmod +x "${helpers}/${tool}"
+          done
+          echo "Bundled manatee tools from ${MANATEE_TOOLS_DIR} into ${helpers}"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.cuni.mff.ufal.mac-corpora.dev
