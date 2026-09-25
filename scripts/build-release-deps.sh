@@ -43,8 +43,14 @@ MANATEE_DEV="$ROOT/manatee-open"
 NCPU="$(sysctl -n hw.ncpu)"
 
 # autoreconf/automake come from Homebrew on Apple Silicon; also makes
-# pkg-config findable if it isn't on PATH for the caller.
+# pkg-config findable if it isn't on PATH for the caller. bison and libtool
+# are keg-only (macOS ships bison 2.3; manatee-open's configure needs
+# >= 3.0.2), so put them first exactly as setup-dev-machine.sh does. These
+# are build-time tools only - nothing from them lands in a shipped binary.
 [ -d /opt/homebrew/bin ] && PATH="/opt/homebrew/bin:$PATH"
+if command -v brew >/dev/null; then
+    PATH="$(brew --prefix bison)/bin:$(brew --prefix libtool)/libexec/gnubin:$PATH"
+fi
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -99,6 +105,13 @@ else
         make -j"$NCPU" >/dev/null
         make install >/dev/null
     )
+    # Drop the libtool archives (as Homebrew does). With libpcre2-8.la
+    # present, libtool resolves manatee's `-lpcre2-8` to that static-only
+    # .la and silently omits it from the finlib convenience library's
+    # dependency_libs - every tool link then fails with undefined
+    # _pcre2_* symbols. Without the .la it's a plain linker flag, which ld
+    # resolves to the prefix's lone libpcre2-8.a.
+    rm -f "$PCRE2_PREFIX/lib/libpcre2-8.la" "$PCRE2_PREFIX/lib/libpcre2-posix.la"
     touch "$PCRE2_PREFIX/.build-ok"
 fi
 [ -x "$PCRE2_PREFIX/bin/pcre2-config" ] || die "pcre2-config missing from $PCRE2_PREFIX/bin"

@@ -3503,7 +3503,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling landed 2026-09-25; signing/notarization pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling landed and verified 2026-09-26; signing/notarization pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3703,17 +3703,22 @@ can be verified on its own.
    `/opt/homebrew` load commands; `lipo -archs` shows the intended set;
    `nm` spot-check that the app's eventual link can resolve pcre2 from
    the `.a`.
-   **Status (2026-09-25): script landed but NEVER EXECUTED — the whole of
-   step 2's verification below is still outstanding.** `FLOOR`/`ARCH` are
-   env-overridable (defaults 15.0/arm64); it refuses a wrong manatee-open
-   branch, self-checks its output (`otool -L` grep + no-dylib-in-prefix
-   guard) and prints the three env vars (`KORPORA_MANATEE_ROOT`,
-   `PKG_CONFIG_PATH`, `MANATEE_TOOLS_DIR`) the app build needs. The
-   session that wrote it ran on a machine whose Bash permission classifier
-   timed out on any command referencing the script (see "Handoff" below),
-   so it has produced no artifacts on any machine yet. Treat blocker 1 as
-   "authored, unverified" until step 2's `otool`/`lipo` checks actually
-   run — see the Handoff subsection for the exact continuation.**
+   **Status (2026-09-26): verified — first real execution.** Two bugs
+   surfaced on that run and are fixed in the script: (i) manatee-open's
+   `configure` needs Bison >= 3.0.2 and macOS ships 2.3 — the script now
+   puts Homebrew's keg-only `bison` and `libtool` gnubin first on `PATH`,
+   exactly as `setup-dev-machine.sh` does; (ii) with pcre2's own
+   `libpcre2-8.la` installed in the prefix, libtool resolved `-lpcre2-8` to
+   that static-only libtool archive and silently dropped it from the
+   `finlib` convenience library's `dependency_libs`, so every tool link
+   (`lskw`, `lswl`, ...) failed with undefined `_pcre2_*` symbols — the
+   script now deletes the two `.la` files after `make install` (Homebrew
+   strips them too, which is why the dev build never hit this). Measured
+   results: `encodevert` and `mkregexattr` are real arm64 Mach-O
+   executables (`lipo -archs` = `arm64`, `LC_BUILD_VERSION minos 15.0`),
+   `otool -L` shows only `libSystem`, `libiconv`, `libc++` from
+   `/usr/lib`; `nm` shows pcre2 compiled into `encodevert` (`mkregexattr`
+   doesn't use pcre2 at all). `libbuiltinmanatee.a` is arm64.
 3. Bundle + resolve the helpers (blocker 2): copy them into
    `Contents/Helpers/` at build time, `Bundle.main`-relative lookup in
    `CorpusImporter` with a dev override, updated `encodevertNotFound`
@@ -3725,6 +3730,29 @@ can be verified on its own.
    tests, with the live import tests still passing through the
    dev-checkout fallback. The built-app acceptance check lands with the
    release-style build (blocker-1 verification below).**
+   **Status (2026-09-26): verified.** Release-style build
+   (`-configuration Release MACOSX_DEPLOYMENT_TARGET=15.0 ARCHS=arm64`
+   with the three env vars): **BUILD SUCCEEDED**;
+   `Contents/Helpers/{encodevert,mkregexattr}` present; `otool -L` on
+   `Contents/MacOS/Korpora` lists only `/usr/lib` and `/System` libraries
+   (no pcre2, nothing from `/opt/homebrew`); `LSMinimumSystemVersion` =
+   15.0, `minos 15.0`, arm64. Acceptance check: with `manatee-open/`
+   renamed away and `KORPORA_MANATEE_TOOLS_DIR` pointing at the built
+   app's `Contents/Helpers`, `CorpusImporterTests` (13/13, incl. the live
+   `testImportCorpusCompilesAndIsQueryable` compile + query) passed,
+   linked against the release worktree's static libs — so the bundled
+   helpers work with no checkout present. The `Bundle.main` candidate
+   itself is covered by the resolver unit tests; a click-through import
+   in the built `.app` has not been done yet — it belongs to step 6's
+   smoke matrix on the floor OS anyway. Two findings for later steps:
+   Release builds universal by default, so step 4 must pin
+   `ARCHS: arm64` in `project.yml` (or the deps script must go
+   universal) — without it the link fails on the x86_64 slice against the
+   arm64-only `libpcre2-8.a`; and the shared test fixture builder (the
+   one `AttributeValuesTests` and friends use) hardcodes
+   `manatee-open/src/encodevert` rather than using
+   `CorpusImporter.resolveToolsDirectory()`, so only
+   `CorpusImporterTests` can run with the checkout renamed away.
 4. Release signing config: `project.yml` Release settings —
    `CODE_SIGN_IDENTITY: Developer ID Application`,
    `DEVELOPMENT_TEAM: 8YW3ZU8MFU`, `ENABLE_HARDENED_RUNTIME: YES`,
@@ -3747,48 +3775,20 @@ can be verified on its own.
    a later convenience, not v1 — get the manual pipeline green once
    first.
 
-### Handoff — continuing this goal on another machine (2026-09-25)
+### Handoff (2026-09-25) — completed 2026-09-26
 
-Blockers 1-3 code landed on branch **`feat/signed-release-deps`**. Blocker
-2 is verified (`swift test` 64/64, incl. the resolver-order tests);
-blockers 1 and the built-app half of 3 are **written but never run** —
-the machine that authored them had a Claude Code Bash/Write permission
-classifier that timed out (surfacing as "LLM temporarily unavailable") on
-any command referencing a script whose *body or comments* contain a
-recursive delete (`rm -r`/`rm -rf`) or an inline remote-fetch-then-build
-(`curl` → `shasum` → `tar`). Reading is why `setup-dev-machine.sh` (plain
-`autoreconf`/`configure`/`make`) always passed while this script never
-did. It is intermittent and content-triggered, not the model being down.
-
-Continuation, in order:
-1. Checkout the branch; ensure prereqs: `manatee-open` on branch
-   `macos-arm64-portability` at `Korpora/manatee-open` (see "Repository
-   state"), Homebrew `autoconf automake libtool`, and `xcodegen`. Sanity
-   check with `swift test` (expect 64/64).
-2. **Regenerate the Xcode project** — `Korpora/project.yml` gained the
-   post-compile copy phase, but the committed `Korpora.xcodeproj` was
-   deliberately left stale this session:
-   `cd Korpora && xcodegen generate`.
-3. Run `scripts/build-release-deps.sh` (defaults `FLOOR=15.0 ARCH=arm64`)
-   — this is step 2's *first real execution*; its built-in `otool -L` /
-   no-dylib-in-prefix checks are the recorded result step 2 still lacks.
-   If the `pcre2-10.48.tar.gz` fetch stalls on a limited link, pre-place
-   the tarball at `.release-deps/src-cache/pcre2-10.48.tar.gz`.
-4. Release-style app build + the step-3 acceptance check: export the
-   three vars the script prints (`KORPORA_MANATEE_ROOT`,
-   `PKG_CONFIG_PATH`, `MANATEE_TOOLS_DIR`), build with
-   `MACOSX_DEPLOYMENT_TARGET=15.0`, then confirm `otool -L` on the app
-   binary shows no pcre2 dylib, `Contents/Helpers/{encodevert,mkregexattr}`
-   are present, `LSMinimumSystemVersion` is 15.0, and — the real test —
-   corpus import still works with `manatee-open/` **renamed away**.
-
-After that, steps 4-7 (signing, notarization, DMG, clean-VM smoke matrix,
-`gh release`) remain, none started.
+The branch `feat/signed-release-deps` carried blockers 1-3; its handoff
+checklist (regenerate `Korpora.xcodeproj` with `xcodegen generate`, first
+real run of `scripts/build-release-deps.sh`, release-style build +
+acceptance check) is done — results recorded under steps 2 and 3 above.
+Next up is step 4 (release signing config, including `ARCHS: arm64`),
+then 5-7; step 1's arch-scope/bundle-id/API-key choices are still open.
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
 repo's script bodies, comments, and commit messages is a live workaround
-for the classifier above, not mere style — reintroducing it will re-block
-any Claude Code session that touches these files.
+for a Claude Code Bash-permission-classifier timeout that blocked the
+session which wrote the deps script — not mere style; reintroducing it
+may re-block sessions that touch these files.
 
 ### Explicitly out of scope for this goal
 
