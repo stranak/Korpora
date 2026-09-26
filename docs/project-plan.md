@@ -3363,6 +3363,36 @@ and confirm the popup doesn't immediately reopen; and confirm all of it in
 the New Concordance and Filter sheets, where Escape previously made this
 unreachable.
 
+#### 6.8b — three more completion bugs, found in the release smoke test (fixed 2026-09-26)
+
+Click-testing during the release goal's step 6 (see there) turned up three
+more, all in `CQLQueryField`/`ConcordanceViewController`:
+
+- **`[` at the start of a query offered keywords (`within`).**
+  `NSTextView` fires `textDidChange` synchronously *inside*
+  `super.insertText`, i.e. before `insertText`'s auto-pairing moved the
+  caret back between `[` and `]` - so `autoCompleteIfUseful` classified a
+  caret sitting after `[]`, outside any bracket, as keyword position.
+  `as[` only looked fine because AppKit's partial word there is `as[]`,
+  which matches no keyword. Fix: an `isAutoPairing` flag suppresses the
+  check during the insert, and `insertText` runs it once the caret is
+  placed.
+- **The automatic popup typed for you.** `complete(_:)` by default
+  preselects *and provisionally inserts* the first candidate, so `[` wrote
+  out the alphabetically first attribute (`afun`, `attr2`, …). An
+  auto-triggered popup now returns `indexOfSelectedItem = -1` ("no
+  selection", documented in `NSTextView.h`); an explicit Escape/F5 keeps
+  the default preselection.
+- **The document window's query bar had no attribute names** for any
+  Cmd-N document: `ConcordanceViewController.viewDidLoad` built the
+  provider once, while a new document's `corpusName` was still empty (the
+  corpus is chosen afterwards, in the sheet). Now
+  `updateCompletionProvider()` runs on every `refresh` and rebuilds when
+  the document's corpus changes. The New Concordance sheet was unaffected
+  - it rebuilds per corpus-popup change.
+
+Verified by hand in the Debug build (macOS 27) and on macOS 15.7 (VM).
+
 ### 6.9 — Text-Types-style subcorpus creation (not started)
 
 Today, `NewSubcorpusPopoverController` takes a free-text CQL restriction
@@ -3503,7 +3533,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, signed + notarized DMG pipeline verified 2026-09-26; floor-OS smoke test and release pending)
+## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, notarized DMG verified and smoke-tested on macOS 15 2026-09-26; GitHub release pending)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3849,6 +3879,50 @@ can be verified on its own.
    works; corpus import works (this is the helper-subprocess end-to-end
    check, the one no same-machine test can prove); settings persist; the
    two "beta quirk" items from decision 7 are re-checked.
+   **Status (2026-09-26): done on macOS 15.7.7 — found and fixed four
+   bugs; passed after the fixes.** Setup: `tart` 2.32.1 (the Homebrew
+   tap's formula is broken with current Homebrew; installed from the
+   release tarball, checked against the formula's SHA-256, notarized by
+   Cirrus Labs), image `ghcr.io/cirruslabs/macos-sequoia-vanilla` —
+   macOS 15.7.7 (24G720), arm64, no Homebrew. Two deviations from a real
+   user's Mac, both handled: the image ships with **Gatekeeper
+   assessments disabled** (`spctl` reported `override=security
+   disabled`), so it was turned back on with `sudo spctl --global-enable`
+   before the checks that count; and Command Line Tools are preinstalled
+   (irrelevant to the app, which loads nothing from them). The scripted
+   half is `scripts/release-smoke-vm.sh` (`install` phase before any
+   launch, `exec` phase after the manual part); its header has the host
+   setup.
+   Results on the final DMG (`Korpora-0.1.dmg`, SHA-256
+   `1f275924…4dbb50001`, notarizations `6f53f0a8-…` app / `37c16b56-…`
+   DMG), Gatekeeper on, quarantined like a Safari download: **15/15
+   scripted checks pass** — DMG and installed app both `accepted,
+   source=Notarized Developer ID`, stapled ticket, `syspolicy_check
+   distribution` → "App passed all pre-distribution checks and is ready
+   for distribution", strict codesign verify, bundle id
+   `cz.cuni.mff.ufal.korpora`, minimum 15.0; the bundled `encodevert`
+   compiles `test.vert` (72 data files) with `mkregexattr` found via
+   `PATH`, no dyld errors, fresh settings domain created cleanly. First
+   launch: the system log showed Gatekeeper's scan passing
+   (`evaluateScanResult: 0`, team `8YW3ZU8MFU`) then `Prompt shown …,
+   waiting for response` — the plain confirmation prompt, which the user
+   clicked through; import via the app UI worked (bundled helper,
+   quarantined + App-Translocated app).
+   **Bugs found**: (1) **query text invisible on macOS 15** — the CQL
+   field's text view was a bare `NSTextView()` with a zero frame and no
+   resizing setup inside its scroll view; keystrokes reached the text
+   storage (history recorded them) but nothing was drawn, and macOS 27
+   sized the view anyway, hiding it. Fixed with the standard
+   `scrollableTextView()`-equivalent setup; the user confirmed it on 15.
+   (2)-(4) completion bugs, detailed under Phase 6.8b. All four fixed on
+   `fix/query-field-macos15` and confirmed by the user.
+   Not re-checked, and open: the two decision-7 "beta quirk" items
+   (per-launch tooltips, one-off 0-hit result) weren't specifically
+   exercised; one unexplained report of typed `[]` arriving as `a0`
+   (stored verbatim as U+0061 U+0030 in query history, so it's what the
+   app received) was set aside by the user — possibly VM keyboard
+   forwarding, unconfirmed. Settings persistence: the VM's domain held the
+   user's changed `resultsFontName` after relaunch.
 7. Cut the GitHub Release: DMG + SHA-256 + notes + tag via
    `gh release create`. GitHub Actions CI (with cert/API-key secrets) is
    a later convenience, not v1 — get the manual pipeline green once
@@ -3862,8 +3936,9 @@ real run of `scripts/build-release-deps.sh`, release-style build +
 acceptance check) is done — results recorded under steps 2 and 3 above.
 Step 4's config followed on `feat/release-signing` (2026-09-26) — see
 its status (verified with the real Developer ID identity), then step 5
-(first notarized DMG) and step 1's remaining decisions. Next is step 6,
-the smoke test on a clean macOS 15 VM — nothing is tagged before it. Step 1's bundle-id and API-key choices are still open; arch
+(first notarized DMG) and step 1's remaining decisions, then step 6 (the
+macOS 15 VM smoke test — four bugs found and fixed, then passed). Next is
+step 7, cutting the GitHub release. Step 1's bundle-id and API-key choices are still open; arch
 scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
