@@ -8,6 +8,9 @@ final class ConcordanceViewController: NSViewController {
 
     private let document: ConcordanceDocument
     private let queryField = CQLQueryField()
+    /// The corpus `queryField.completionProvider` was built for - see
+    /// `updateCompletionProvider`.
+    private var completionCorpusName = ""
     private let statusLabel = NSTextField(labelWithString: "")
     private let tableView = SortableTableView()
     private let scrollView = NSScrollView()
@@ -108,13 +111,7 @@ final class ConcordanceViewController: NSViewController {
 
         queryField.text = document.initialQuery
         queryField.onSubmit = { [weak self] in self?.runQuery() }
-        // Attribute-name/value completion for the corpus this document is
-        // querying (6.8). Deliberately the corpus, not the subcorpus: a
-        // subcorpus restricts which *hits* come back, not which attributes
-        // or values exist, and it shares the parent's lexicon anyway.
-        if !document.corpusName.isEmpty {
-            queryField.completionProvider = CQLCompletionProvider(corpusName: document.corpusName)
-        }
+        updateCompletionProvider()
 
         document.onResultsChanged = { [weak self] animated in self?.refresh(animated: animated) }
         refresh()
@@ -832,7 +829,24 @@ final class ConcordanceViewController: NSViewController {
         return field
     }
 
+    /// Attribute-name completion for the corpus this document is querying
+    /// (6.8). Deliberately the corpus, not the subcorpus: a subcorpus
+    /// restricts which *hits* come back, not which attributes exist.
+    ///
+    /// Re-checked on every `refresh`, not just once in `viewDidLoad`: a new
+    /// document's window loads while it's still untitled (empty
+    /// `corpusName`), and the corpus is only chosen afterwards in the New
+    /// Concordance sheet - so a one-time setup left the query bar without
+    /// attribute names for every document created with Cmd-N.
+    private func updateCompletionProvider() {
+        let corpusName = document.corpusName
+        guard corpusName != completionCorpusName else { return }
+        completionCorpusName = corpusName
+        queryField.completionProvider = corpusName.isEmpty ? nil : CQLCompletionProvider(corpusName: corpusName)
+    }
+
     private func refresh(animated: Bool = true) {
+        updateCompletionProvider()
         if queryField.text != document.initialQuery {
             queryField.text = document.initialQuery
         }
