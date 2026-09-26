@@ -3533,7 +3533,7 @@ Same pattern as every prior phase in this project:
   summary → test counts → "not yet manually click-tested" caveat → wait
   for user confirmation before commit) - not all at once at the end.
 
-## Goal — Ship a signed GitHub release (in progress — deps & helper bundling verified, notarized DMG verified and smoke-tested on macOS 15 2026-09-26; GitHub release pending)
+## Goal — Ship a signed GitHub release (done — v0.1 released 2026-09-26)
 
 Raised 2026-09-25 as its own goal, separate from the feature phases: put a
 `Korpora.dmg` on `github.com/stranak/Korpora/releases` that a normal Mac
@@ -3927,6 +3927,25 @@ can be verified on its own.
    `gh release create`. GitHub Actions CI (with cert/API-key secrets) is
    a later convenience, not v1 — get the manual pipeline green once
    first.
+   **Status (2026-09-26): done — [Korpora 0.1](https://github.com/stranak/Korpora/releases/tag/v0.1).**
+   Tag `v0.1` → `e060d43` (merge of #5). The DMG was built from
+   `9d60330`; the only differences up to the tag are
+   `docs/project-plan.md` and `scripts/release-smoke-vm.sh`, so the tagged
+   app code is exactly what shipped. Assets: `Korpora-0.1.dmg` (1.7 MB,
+   SHA-256 `1f275924…4dbb50001`) + `.sha256`; not a pre-release. The notes
+   state macOS 15+ / Apple Silicon, and the known gaps (no Intel build,
+   no auto-update, no icon, macOS 16–26 not run). Post-publish check:
+   the DMG downloaded from the release URL inside the macOS 15 VM matched
+   the published checksum and, quarantined with Gatekeeper on, was
+   `accepted, source=Notarized Developer ID` (DMG and app; app staple
+   validates).
+   **Recipe for the next release:** bump `CFBundleShortVersionString`/
+   `CFBundleVersion` in `Korpora/Korpora/Info.plist` →
+   `scripts/build-release-deps.sh` (if deps changed) →
+   `scripts/make-release.sh` → `scripts/release-smoke-vm.sh` in a floor-OS
+   VM → `gh release create vX.Y` with the DMG + `.sha256`, `--target`
+   given as a *full* SHA (an abbreviated one is rejected with HTTP 422).
+   Watch the Developer ID cert expiry (2027-02-01).
 
 ### Handoff (2026-09-25) — completed 2026-09-26
 
@@ -3937,8 +3956,8 @@ acceptance check) is done — results recorded under steps 2 and 3 above.
 Step 4's config followed on `feat/release-signing` (2026-09-26) — see
 its status (verified with the real Developer ID identity), then step 5
 (first notarized DMG) and step 1's remaining decisions, then step 6 (the
-macOS 15 VM smoke test — four bugs found and fixed, then passed). Next is
-step 7, cutting the GitHub release. Step 1's bundle-id and API-key choices are still open; arch
+macOS 15 VM smoke test — four bugs found and fixed, then passed), then
+step 7: v0.1 is published. The goal is complete. Step 1's bundle-id and API-key choices are still open; arch
 scope is de facto arm64-only v1 (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
