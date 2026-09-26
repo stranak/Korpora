@@ -78,6 +78,19 @@ final class CQLQueryField: NSView {
         textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         textView.textContainerInset = NSSize(width: 4, height: 3)
         textView.onSubmit = { [weak self] in self?.onSubmit?() }
+        // A bare `NSTextView()` starts with a zero frame and no resizing
+        // behavior - `NSTextView.scrollableTextView()` normally sets this
+        // up. Without it the view stayed 0 pt wide on macOS 15: keystrokes
+        // reached the text storage (query history recorded them) but
+        // nothing was drawn. macOS 27, where the app was developed, happens
+        // to size the document view anyway, which hid the omission.
+        textView.minSize = NSSize(width: 0, height: Self.minHeight)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = textView
@@ -157,6 +170,17 @@ final class CQLQueryField: NSView {
         /// also lands in `textDidChange`, so without this the popup would
         /// immediately reopen on top of the completion it just accepted.
         private var isInsertingCompletion = false
+        /// Set while an auto-paired `[]`/`""`/… goes in. `NSTextView` fires
+        /// `textDidChange` synchronously *inside* `super.insertText`, before
+        /// the caret has been moved back between the two halves - so a
+        /// completion check at that moment sees the caret after `[]`,
+        /// outside any bracket, and offered keywords (`within`) instead of
+        /// attribute names. `insertText` runs the check itself once the
+        /// caret is in place.
+        private var isAutoPairing = false
+        /// Set while `autoCompleteIfUseful` opens the popup, as opposed to
+        /// the user asking for completion (Escape/F5). See `completions`.
+        private var isAutoTriggered = false
 
         override func insertNewline(_ sender: Any?) {
             if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
@@ -167,7 +191,15 @@ final class CQLQueryField: NSView {
         }
 
         override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String]? {
-            candidates(forPartialWordRange: charRange)
+            // By default AppKit preselects - and provisionally *inserts* -
+            // the first candidate as soon as the popup opens. For a popup
+            // that opens by itself while typing, that means typing `[`
+            // wrote out the alphabetically first attribute (`afun`,
+            // `attr2`, …). -1 ("no selection", per NSTextView.h) keeps the
+            // automatic popup a suggestion only; an explicit request keeps
+            // the default.
+            if isAutoTriggered { index?.pointee = -1 }
+            return candidates(forPartialWordRange: charRange)
         }
 
         /// The single source of candidates, shared by AppKit's completion
@@ -206,12 +238,14 @@ final class CQLQueryField: NSView {
         /// empty popup, and never on deletion or while accepting a
         /// completion.
         func autoCompleteIfUseful() {
-            guard lastEditWasInsertion, !isInsertingCompletion else { return }
+            guard lastEditWasInsertion, !isInsertingCompletion, !isAutoPairing else { return }
             let range = rangeForUserCompletion
             guard range.location != NSNotFound else { return }
             guard let candidates = candidates(forPartialWordRange: range), !candidates.isEmpty else {
                 return
             }
+            isAutoTriggered = true
+            defer { isAutoTriggered = false }
             complete(nil)
         }
 
@@ -238,8 +272,11 @@ final class CQLQueryField: NSView {
                 forTyping: input, text: self.string, selectedRange: selectedRange()) {
             case .insert(let text, let caretOffset):
                 let start = selectedRange().location
+                isAutoPairing = true
                 super.insertText(text, replacementRange: replacementRange)
                 setSelectedRange(NSRange(location: start + caretOffset, length: 0))
+                isAutoPairing = false
+                autoCompleteIfUseful()
             case .moveOver:
                 setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
             case .passThrough:
