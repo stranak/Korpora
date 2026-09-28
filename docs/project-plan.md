@@ -4001,8 +4001,19 @@ Metal Toolchain and 12 SPM packages (from none). Signing and notarization
 need no changes (a test submission was Accepted with no issues), and
 guided generation ran in the signed hardened-runtime app.
 
-The user judged that worth it (go, 2026-09-29). Next: phase 0, the accuracy
-spike with stock Qwen models on UD English EWT (`scripts/nl-spike/`).
+The user judged that worth it (go, 2026-09-29).
+
+Phase 0 (accuracy spike, `scripts/nl-spike/`, 2026-09-29): stock 4-bit
+models on 20 + 20 held-out English requests on UD English EWT reach
+roughly 55–75% acceptable queries at 1–2 s per request (Qwen3-4B, Gemma 4
+E4B, Qwen3-8B); the 2B class reaches about 30%. Glossed tag notes beat raw
+frequency lists. The remaining errors are systematic (position structure,
+UD conventions), so fine-tuning (phase 6) will probably be needed. Go, with
+Qwen3-4B-4bit (2.3 GB) as the stock default.
+
+Next: phase 2's remaining pieces (runtime JSON Schema from `Corpus.info()`,
+`QueryContextBuilder` with a bundled UD gloss table, example banks) and a
+≥100-request benchmark.
 
 ## Key files
 

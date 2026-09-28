@@ -209,9 +209,68 @@ single position and dropped the adjective), which is what the
 evidence above predicts without examples and corpus facts. Accuracy is the
 job of the phase 0 spike, not this measurement.
 
+## Phase 0 results (2026-09-29)
+
+Harness: `scripts/nl-spike/run.py` (mlx-lm + XGrammar, the engine
+`MLXGuidedGeneration` vendors; compact JSON, greedy decoding, thinking
+off) on UD English EWT. Two sets of 20 English requests with gold CQL:
+`requests.tsv` (dev: prompts were written against it) and `heldout.tsv`
+(written afterwards, never used for prompt changes). A gold may list
+acceptable alternatives after ` || ` (other reasonable readings, e.g.
+`word!=` where the gold has `lemma!=`). Scores compare the total hit count
+plus the first five hit positions (a proxy for hit-set equality).
+Per-request times are on the M3 Ultra.
+
+Acceptable / 20, stock 4-bit models:
+
+| model (weights) | v1 dev | v1 held-out | v2+retry dev | v2+retry held-out | s/request |
+|---|---|---|---|---|---|
+| Qwen3-1.7B (1.0 GB) | 5 | — | — | — | 0.5 |
+| Qwen3.5-2B (1.7 GB) | 6 | — | — | — | 0.6 |
+| Qwen3-4B (2.3 GB) | 13 | 15 | 12 | 11 | 1.0–1.3 |
+| Gemma 4 E4B (5.2 GB) | 14 | 12 | 15 | 10 | 1.1–1.5 |
+| Qwen3-8B (4.6 GB) | 15 | 13 | 15 | 13 | 1.4–2.0 |
+
+- **v1** is `instructions.txt`: hand-written corpus notes with glosses
+  ("ADP (preposition)", "Degree=Cmp (comparative)") and a curated feats
+  list, plus 5 examples. **v2** is `instructions-v2.txt`: the corpus
+  section generated from frequency lists, as `QueryContextBuilder` would
+  build it (all 64 feats values, top deprel/xpos, without glosses), 3
+  added rules (one token per position, regex anchoring, only listed
+  values), 2 more examples, and one validation retry (a nonexistent value
+  or zero hits is fed back to the model).
+- **Findings:**
+  1. The 2B class is unusable without fine-tuning. 4–8B stock models get
+     roughly 55–75% acceptable, with 1–2 s per request. They're usable as a
+     starting point, but not reliable.
+  2. v2 did **not** help: flat on dev, worse on held-out. Glosses seem to
+     matter more than completeness: with raw lists the models pick
+     plausible-looking wrong values (`PronType=Art` for possessives, `ADP`
+     for infinitival "to"). So bundle a **UD gloss table** (UD is universal,
+     so it's a static resource) and put glossed values in the prompt; raw
+     frequency lists are for unknown tagsets only.
+  3. The retry fixed only a few cases: the model tends to swap one wrong
+     value for another. Keep it (it's cheap and catches invented values),
+     but don't count on it.
+  4. The remaining errors are systematic: token order and position
+     structure ("the preposition of between two nouns" → `[of][N][N]`, `[]?`
+     for "any word"), and UD conventions (relative clause → `acl:relcl`,
+     "to" + infinitive is `PART`). These are the kind of errors
+     fine-tuning on engine-verified QueryPlans (phase 6) targets. Few-shot
+     retrieval from a larger example bank is the cheaper thing to try
+     first.
+  5. 20 requests per set is noisy (one request = 5 points); results within
+     ±2 aren't differences. The benchmark needs ≥100 before phase 5
+     compares anything.
+- **Go/no-go: go, with caveats.** Build the app pipeline (everything in
+  phases 2–4 is model-independent and needed for a fine-tuned model too)
+  with **Qwen3-4B-4bit** as the stock default: 2.3 GB, the best held-out
+  score under 5 GB, Apache-2.0. Expect phase 6 fine-tuning to be needed
+  for a good product rather than optional.
+
 ## Phases
-0. **Feasibility spike (dev-only, no app UI).** Unblocked: it no longer
-   waits for Apple's model. Run ~20 English requests against a UD-annotated
+0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0
+   results": go, default Qwen3-4B-4bit. Run ~20 English requests against a UD-annotated
    corpus (UD English converted with `scripts/conllu2vert.py`) through the
    real prompt (corpus facts + examples) and schema, with stock
    Qwen3.5-2B-4bit and Qwen3-4B-4bit. Score by hand: valid? same hits as
