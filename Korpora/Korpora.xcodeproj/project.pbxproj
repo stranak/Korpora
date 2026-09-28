@@ -27,11 +27,14 @@
 		52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */; };
 		5460A66C8408B07767556999 /* SamplePopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */; };
 		59997812E5187B68B3AB9863 /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F115CEAC930466168A9217 /* SortableTableView.swift */; };
+		5B599A10D3613112A3BD6698 /* CQLSerializerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADACC47048587CE905664F8 /* CQLSerializerTests.swift */; };
 		6277F53E976159C5958D88C6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2244ED579AEB14CE01DD800F /* AppDelegate.swift */; };
+		6828490BA7FA801EDD184AFC /* CQLSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4562142EA2AE996B1B225B36 /* CQLSerializer.swift */; };
 		6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */; };
 		6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */; };
 		753C61BDF55CC67A1C13E23A /* ExtendedContextOverlayInsetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */; };
 		7F41071BF0E94BB152F02C33 /* ConcordanceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */; };
+		836932E246976CE9285F7B5E /* QueryPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC407541BD4D886D400F4430 /* QueryPlan.swift */; };
 		8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */; };
 		93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674887DFEED6258891E125A /* OperationsPopoverController.swift */; };
 		9706A787B7D8B81891AC6D95 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A2ABBCF839D0C66351D969 /* main.swift */; };
@@ -75,6 +78,7 @@
 		118D96F87811C199B75B172C /* ConcordanceWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceWindowController.swift; sourceTree = "<group>"; };
 		16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryHistoryStore.swift; sourceTree = "<group>"; };
 		194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributeDisplayPopoverController.swift; sourceTree = "<group>"; };
+		1ADACC47048587CE905664F8 /* CQLSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLSerializerTests.swift; sourceTree = "<group>"; };
 		206361B4B6C7135D9E8D6D48 /* Korpora.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Korpora.entitlements; sourceTree = "<group>"; };
 		20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedContextWindowController.swift; sourceTree = "<group>"; };
 		2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLAutoPairingTests.swift; sourceTree = "<group>"; };
@@ -84,6 +88,7 @@
 		36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICCellView.swift; sourceTree = "<group>"; };
 		38F142C472071C00A420ABC5 /* AppearanceSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsViewController.swift; sourceTree = "<group>"; };
 		3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceViewController.swift; sourceTree = "<group>"; };
+		4562142EA2AE996B1B225B36 /* CQLSerializer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLSerializer.swift; sourceTree = "<group>"; };
 		50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScriptTests.swift; sourceTree = "<group>"; };
 		548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverController.swift; sourceTree = "<group>"; };
 		5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
@@ -111,6 +116,7 @@
 		BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
 		C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsViewController.swift; sourceTree = "<group>"; };
 		CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationWindowController.swift; sourceTree = "<group>"; };
+		CC407541BD4D886D400F4430 /* QueryPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryPlan.swift; sourceTree = "<group>"; };
 		CF1FD3479E35618789EA56FC /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
 		D0F115CEAC930466168A9217 /* SortableTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortableTableView.swift; sourceTree = "<group>"; };
 		D1CEB379EAD1C7D1F10F792C /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -179,6 +185,15 @@
 			path = Controllers;
 			sourceTree = "<group>";
 		};
+		4D70985D02C3B63DF01609EA /* Assistant */ = {
+			isa = PBXGroup;
+			children = (
+				4562142EA2AE996B1B225B36 /* CQLSerializer.swift */,
+				CC407541BD4D886D400F4430 /* QueryPlan.swift */,
+			);
+			path = Assistant;
+			sourceTree = "<group>";
+		};
 		661A2B36F0D8637FD4135D34 = {
 			isa = PBXGroup;
 			children = (
@@ -196,6 +211,7 @@
 				7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */,
 				2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */,
 				7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */,
+				1ADACC47048587CE905664F8 /* CQLSerializerTests.swift */,
 				EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */,
 				0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */,
 				70108D2D157AC3924026A527 /* LegacyDefaultsMigrationTests.swift */,
@@ -223,6 +239,7 @@
 				0B7823CD7A43E310862382A0 /* Info.plist */,
 				206361B4B6C7135D9E8D6D48 /* Korpora.entitlements */,
 				B5A2ABBCF839D0C66351D969 /* main.swift */,
+				4D70985D02C3B63DF01609EA /* Assistant */,
 				3884778F62C23F3C51ACF9F9 /* Controllers */,
 				E35D1AF2A62F3C261539018C /* Documents */,
 				BEECC4DA17FD8ED40EAA3591 /* Settings */,
@@ -362,6 +379,7 @@
 			files = (
 				FE3E752BE968D4DE9C1779B1 /* CQLAutoPairingTests.swift in Sources */,
 				C6212C93C0C81D9DD271EBD5 /* CQLCompletionContextTests.swift in Sources */,
+				5B599A10D3613112A3BD6698 /* CQLSerializerTests.swift in Sources */,
 				97CB75829A78ECC1D477B9CE /* ConcordanceExporterTests.swift in Sources */,
 				6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */,
 				753C61BDF55CC67A1C13E23A /* ExtendedContextOverlayInsetTests.swift in Sources */,
@@ -383,6 +401,7 @@
 				16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */,
 				13E3136A6E77E54771C201BB /* CQLCompletion.swift in Sources */,
 				B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */,
+				6828490BA7FA801EDD184AFC /* CQLSerializer.swift in Sources */,
 				9E0E01C3DC4DE65D38AB17B9 /* CollocationSheetController.swift in Sources */,
 				F2A45E9E1E451D9DAC934FF9 /* CollocationWindowController.swift in Sources */,
 				ABB771AD9CD40A0BB1F5332E /* ConcordanceDocument.swift in Sources */,
@@ -409,6 +428,7 @@
 				F36D175CD48D51F2E3C45511 /* NewSubcorpusPopoverController.swift in Sources */,
 				93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */,
 				F89A78E1B12E53AFE9E4F061 /* QueryHistoryStore.swift in Sources */,
+				836932E246976CE9285F7B5E /* QueryPlan.swift in Sources */,
 				5460A66C8408B07767556999 /* SamplePopoverController.swift in Sources */,
 				2A3E4066F2F30C0CF2347756 /* SettingsWindowController.swift in Sources */,
 				060E5D3B9CA606588879B548 /* SortPopoverController.swift in Sources */,
