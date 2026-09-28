@@ -3974,6 +3974,26 @@ signing key + notarized-update pipeline); universal binary if the
 arm64-only scope survives step 1's user-base check; x86_64 testing
 hardware.
 
+## Phase 7 — Natural-language → CQL query assistant (planned 2026-09-28)
+
+Full plan: [`docs/nl-query-assistant.md`](nl-query-assistant.md). In short:
+the user describes a query in natural language and gets CQL to review, edit
+and run. The feature requires macOS 27; the app itself stays at macOS 15.
+It is built on the Foundation Models framework, and the model fills a
+structured `QueryPlan` that the app serializes to CQL, so the output is
+always valid syntax. The prompt carries the corpus's real attributes and tag
+values plus retrieved examples, and every result goes through the engine
+parser before it's shown.
+- **Baseline (no download):** Apple's on-device model, English requests,
+  UD tagset.
+- **Optional download, only if the benchmark shows it pays off:** a
+  fine-tuned MLX model adding Czech requests and the Czech positional
+  tagset.
+
+Next: phase 0, the feasibility spike with the `fm` CLI. It's waiting for
+this Mac's Apple Intelligence model, which `fm available` currently reports
+as `modelNotReady`.
+
 ## Key files
 
 - `ManateeKit/Sources/CManatee/include/mtcbridge.h`,
