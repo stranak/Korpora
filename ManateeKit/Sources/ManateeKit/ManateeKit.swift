@@ -278,6 +278,54 @@ public actor Corpus {
             error: &error)
     }
 
+    /// Checks `cql` without building a concordance, and counts its hits up
+    /// to `limit` (`limit: 0` only checks that it parses and names real
+    /// attributes and structures). Throws the engine's own message on
+    /// failure - for a syntax error it ends in "near position N", a
+    /// character offset into `cql`.
+    ///
+    /// The query assistant's validation step (docs/nl-query-assistant.md):
+    /// cheap enough to run on every generated query, and the capped count
+    /// is what the popover shows ("1000+ hits") before the user commits.
+    public func probeQuery(_ cql: String, limit: Int = 0) throws -> Int {
+        var error: UnsafeMutablePointer<CChar>?
+        let count = mtc_query_probe(handle, cql, Int64(limit), &error)
+        guard count >= 0 else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        return Int(count)
+    }
+
+    /// The `limit` most frequent values of positional attribute
+    /// `attribute`, most frequent first, with their token frequencies.
+    ///
+    /// Reads every value's frequency, so it's O(lexicon) - instant for a
+    /// tagset, acceptable for lemmas. The assistant uses it to show the
+    /// model what a corpus's tags actually look like instead of guessing
+    /// the tagset from the attribute's name.
+    public func topAttributeValues(attribute: String, limit: Int) throws -> [(value: String, frequency: Int)] {
+        var error: UnsafeMutablePointer<CChar>?
+        return try Self.decodeValues(
+            mtc_corpus_attr_top_values(handle, attribute, Int32(limit), &error), error: &error
+        ).map { entry in
+            let parts = entry.components(separatedBy: "\u{1E}")
+            return (parts[0], Int(parts.count > 1 ? parts[1] : "") ?? 0)
+        }
+    }
+
+    /// A registry value by dotted path: `"INFO"`, `"TAGSETDOC"` at corpus
+    /// level, `"tag.LABEL"` for an attribute, `"doc.author.LABEL"` for a
+    /// structure attribute. An unset key gives `""`; a path through an
+    /// attribute or structure the corpus doesn't have throws.
+    public func registryValue(_ path: String) throws -> String {
+        var error: UnsafeMutablePointer<CChar>?
+        guard let cstr = mtc_corpus_get_conf(handle, path, &error) else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        defer { mtc_free_string(cstr) }
+        return String(cString: cstr)
+    }
+
     /// Splits the bridge's leading-`\u{1F}`-delimiter encoding back into one
     /// entry per value - the same decoding `LiveConcordance.kwicLines` does
     /// for KWIC segments, and not a plain split for the same reason: a

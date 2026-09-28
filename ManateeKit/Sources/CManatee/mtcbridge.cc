@@ -760,6 +760,84 @@ char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, co
     }
 }
 
+long long mtc_query_probe(MTCCorpus *corp, const char *cql, long long max_count, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return -1;
+    }
+    try {
+        std::string query = std::string(cql) + ";";
+        // Lazy: nothing is evaluated beyond the hits stepped over below, so
+        // max_count 0 costs a parse plus the lexicon lookups the grammar
+        // actions do for attribute values.
+        std::unique_ptr<RangeStream> rs(corp->corp->filter_query(
+            eval_cqpquery(query.c_str(), corp->corp)));
+        long long seen = 0;
+        if (rs) {
+            for (; seen < max_count && !rs->end(); rs->next())
+                ++seen;
+        }
+        return seen;
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return -1;
+    } catch (...) {
+        set_error(error, "unknown error evaluating query");
+        return -1;
+    }
+}
+
+char *mtc_corpus_attr_top_values(MTCCorpus *corp, const char *attr_name, int max_values, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        PosAttr *attr = corp->corp->get_attr(attr_name);
+        int range = attr->id_range();
+        std::vector<std::pair<NumOfPos, int>> freqs;
+        freqs.reserve(range);
+        for (int id = 0; id < range; ++id)
+            freqs.emplace_back(attr->freq(id), id);
+        size_t keep = std::min(freqs.size(), static_cast<size_t>(std::max(max_values, 0)));
+        // Ties broken by id, i.e. lexicon order, so the result is stable.
+        std::partial_sort(freqs.begin(), freqs.begin() + keep, freqs.end(),
+                          [](const std::pair<NumOfPos, int> &a, const std::pair<NumOfPos, int> &b) {
+                              return a.first != b.first ? a.first > b.first : a.second < b.second;
+                          });
+        std::string result;
+        for (size_t i = 0; i < keep; ++i) {
+            result += '\x1F';
+            result += attr->id2str(freqs[i].second);
+            result += '\x1E';
+            result += std::to_string(static_cast<long long>(freqs[i].first));
+        }
+        return strdup(result.c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading attribute frequencies");
+        return nullptr;
+    }
+}
+
+char *mtc_corpus_get_conf(MTCCorpus *corp, const char *path, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        return strdup(corp->corp->get_conf(path).c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading registry value");
+        return nullptr;
+    }
+}
+
 int mtc_create_subcorpus(MTCCorpus *corp, const char *subc_path, const char *struct_name,
                           const char *query, char **error) {
     if (!corp) {

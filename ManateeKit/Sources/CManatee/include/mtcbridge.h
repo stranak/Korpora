@@ -279,6 +279,45 @@ char *mtc_corpus_attr_values(MTCCorpus *corp, const char *attr_name, char **erro
 char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
                                       int ignore_case, int max_values, char **error);
 
+/* -------------------- query assistant support --------------------
+ * Primitives for the natural-language query assistant (docs/
+ * nl-query-assistant.md): checking a generated query cheaply, and telling
+ * the model what a corpus's attributes actually contain. */
+
+/* Parses and evaluates `cql` lazily, the way mtc_query does, but never
+ * builds a Concordance: it steps the result stream at most `max_count`
+ * times and returns how many hits it saw (0..max_count). max_count 0 only
+ * checks that the query parses and names existing attributes/structures.
+ * Returns -1 with *error set otherwise - for a syntax error the message is
+ * the engine's own, ending in "near position N" (a character offset into
+ * `cql`), which is what the assistant hands back to the model.
+ *
+ * Same filter_query as mtc_query, so a count here agrees with the size of
+ * the concordance mtc_query would build. Not reentrant across corpora (the
+ * CQL parser keeps static state) - callers serialize, as the Corpus actor
+ * already does per handle. */
+long long mtc_query_probe(MTCCorpus *corp, const char *cql, long long max_count, char **error);
+
+/* The `max_values` most frequent values of positional attribute
+ * `attr_name`, most frequent first. Each entry is '\x1F' value '\x1E'
+ * decimal frequency, so a value may contain anything but those two
+ * control characters. Empty string for an empty lexicon; NULL and *error
+ * for an unknown attribute.
+ *
+ * O(lexicon size): every id's frequency is read (PosAttr::freq, which uses
+ * the .frq file when present and otherwise counts from the reverse index)
+ * and partially sorted. Instant for a tagset (thousands of values), still
+ * fine for a lemma lexicon. Meant for positional attributes; a structural
+ * "doc.genre"-style name works but reports token-based frequencies. */
+char *mtc_corpus_attr_top_values(MTCCorpus *corp, const char *attr_name, int max_values, char **error);
+
+/* A registry value by dotted path, as Corpus::get_conf reads it: "INFO" or
+ * "TAGSETDOC" at corpus level, "tag.LABEL" for an attribute, "doc.author.LABEL"
+ * for a structure attribute. An unset key gives an empty string (manatee's
+ * own defaulting); a path through a nonexistent attribute or structure
+ * gives NULL and *error. */
+char *mtc_corpus_get_conf(MTCCorpus *corp, const char *path, char **error);
+
 /* -------------------- subcorpora --------------------
  * A subcorpus is a Manatee-native concept: a saved range file restricting a
  * parent corpus to the hits of one CQL query scoped to a structure (e.g. one
