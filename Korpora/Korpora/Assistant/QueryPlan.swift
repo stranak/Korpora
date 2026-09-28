@@ -11,10 +11,10 @@ import Foundation
 /// structure tags as positions. The result lands in the query field for
 /// review, so anything beyond this subset is still a hand edit away.
 ///
-/// Plain `Codable`, available on every OS the app supports: the macOS 27
-/// generation schema is built *from* this type's shape at runtime, and
-/// the model's output is decoded back *into* it, so everything downstream
-/// (serializing, validating, testing) needs no Foundation Models at all.
+/// Plain `Codable`: the JSON Schema that constrains generation is built
+/// *from* this type's shape at runtime, and the model's output is decoded
+/// back *into* it, so everything downstream (serializing, validating,
+/// testing) needs no model at all.
 struct QueryPlan: Codable, Equatable {
     var positions: [Position]
     /// Restrictions on the enclosing structure, e.g. `doc.genre = email`.

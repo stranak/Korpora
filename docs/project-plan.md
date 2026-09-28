@@ -3974,25 +3974,35 @@ signing key + notarized-update pipeline); universal binary if the
 arm64-only scope survives step 1's user-base check; x86_64 testing
 hardware.
 
-## Phase 7 — Natural-language → CQL query assistant (planned 2026-09-28)
+## Phase 7 — Natural-language → CQL query assistant (planned 2026-09-28, re-planned 2026-09-29)
 
 Full plan: [`docs/nl-query-assistant.md`](nl-query-assistant.md). In short:
 the user describes a query in natural language and gets CQL to review, edit
-and run. The feature requires macOS 27; the app itself stays at macOS 15.
-It is built on the Foundation Models framework, and the model fills a
-structured `QueryPlan` that the app serializes to CQL, so the output is
+and run. The model fills a structured `QueryPlan`, constrained by a
+per-corpus JSON Schema, and the app serializes that to CQL, so the output is
 always valid syntax. The prompt carries the corpus's real attributes and tag
 values plus retrieved examples, and every result goes through the engine
 parser before it's shown.
-- **Baseline (no download):** Apple's on-device model, English requests,
-  UD tagset.
-- **Optional download, only if the benchmark shows it pays off:** a
-  fine-tuned MLX model adding Czech requests and the Czech positional
-  tagset.
 
-Next: phase 0, the feasibility spike with the `fm` CLI. It's waiting for
-this Mac's Apple Intelligence model, which `fm available` currently reports
-as `modelNotReady`.
+Re-planned 2026-09-29: Apple's on-device model never became available on
+the dev Mac (`fm available`: `modelNotReady`). So there's no Apple tier and
+no macOS 27 requirement. The assistant is **optional, off until the user
+downloads an MLX model**, and built on `mlx-swift-lm`'s
+`MLXGuidedGeneration` (JSON Schema / EBNF constrained decoding, macOS 14+).
+It runs at the app's own floor, macOS 15 on Apple silicon.
+
+Done: 7.1 engine primitives (`probeQuery`, `topAttributeValues`,
+`registryValue`), 7.2 (part) `QueryPlan` + `CQLSerializer`.
+
+Measured 2026-09-29 (details in the plan's "Cost of MLX"): linking MLX
+takes the app from 4.5 to 26 MB stripped (DMG 1.7 → 10.4 MB) and the clean
+Release build from 15 s to 102 s. It needs Xcode's separately downloaded
+Metal Toolchain and 12 SPM packages (from none). Signing and notarization
+need no changes (a test submission was Accepted with no issues), and
+guided generation ran in the signed hardened-runtime app.
+
+The user judged that worth it (go, 2026-09-29). Next: phase 0, the accuracy
+spike with stock Qwen models on UD English EWT (`scripts/nl-spike/`).
 
 ## Key files
 

@@ -1,0 +1,56 @@
+{
+  "title": "QueryPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "x-order": ["positions", "within", "explanation"],
+  "required": ["positions", "within", "explanation"],
+  "properties": {
+    "positions": {
+      "type": "array",
+      "description": "The tokens of the pattern, left to right. One entry per token.",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "x-order": ["conditions", "repeat"],
+        "required": ["conditions", "repeat"],
+        "properties": {
+          "conditions": {
+            "type": "array",
+            "description": "All must hold for this token (AND). Empty = any token.",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "x-order": ["attribute", "op", "value"],
+              "required": ["attribute", "op", "value"],
+              "properties": {
+                "attribute": {"type": "string", "enum": ["word", "lemma", "upos", "xpos", "feats", "deprel"]},
+                "op": {"type": "string", "enum": ["=", "!="]},
+                "value": {"type": "string", "description": "Exact value or a regular expression, e.g. NOUN, be, Number=Plur, un.*"}
+              }
+            }
+          },
+          "repeat": {"type": "string", "enum": ["once", "optional", "zero-or-more", "one-or-more"]}
+        }
+      }
+    },
+    "within": {
+      "type": "array",
+      "description": "Restrictions on the document. Usually empty.",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "x-order": ["attribute", "value"],
+        "required": ["attribute", "value"],
+        "properties": {
+          "attribute": {"type": "string", "enum": ["doc.genre", "doc.id", "doc.split"]},
+          "value": {"type": "string"}
+        }
+      }
+    },
+    "explanation": {"type": "string", "description": "One short sentence describing what the query finds."}
+  }
+}
