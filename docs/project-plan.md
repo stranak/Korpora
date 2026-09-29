@@ -3986,6 +3986,49 @@ for a Claude Code Bash-permission-classifier timeout that blocked the
 session which wrote the deps script — not mere style; reintroducing it
 may re-block sessions that touch these files.
 
+### Handoff (2026-09-29) — next release build, for the build machine
+
+v0.1 is out. Since then, on the dev machine (no signing identity, notary
+profile or `.release-deps/` there, so **nothing below has been built
+signed or notarized**):
+
+- **Merged (#7): app icon** — the "Monogram" Icon Composer bundle,
+  `Korpora/AppIcon/Korpora.icon`, wired in `project.yml`. Debug build
+  verified to produce `Assets.car` + a `Korpora.icns` fallback (the 15.0
+  floor needs it). **Not yet seen on the macOS 15 VM or in a signed
+  build.**
+- **Open (#8, `fix/release-strip`): strip the Release binary** —
+  `DEPLOYMENT_POSTPROCESSING` + `DEAD_CODE_STRIPPING`. Measured on an
+  unsigned build only: 2.8 → 1.46 MB, ~11,300 → ~820 symbols.
+
+To cut the release:
+
+1. Merge #8 first (or build from its branch), then `git pull`.
+2. `scripts/build-release-deps.sh` if `.release-deps/` is missing or stale,
+   then `scripts/make-release.sh` (full, notarized) — its header lists
+   the prerequisites (Developer ID identity, `korpora-notary` profile).
+3. Check what this round changed, beyond the script's own checks:
+   - the script's signature checks and notarization still pass on the
+     *stripped* binary (the reason #8 is unverified);
+   - the app has the icon: `Contents/Resources` has `Assets.car` and
+     `Korpora.icns`, and Finder/the DMG show the K, not a generic icon;
+   - `nm Korpora.app/Contents/MacOS/Korpora | wc -l` is in the hundreds,
+     not ~11,000 (if not, `DEPLOYMENT_POSTPROCESSING` didn't take under
+     `make-release.sh`'s `build` — fix in `project.yml`, don't strip by
+     hand after signing, that breaks the signature);
+   - the two Helpers (`encodevert`, `mkregexattr`) still run — stripping
+     touched the app's link, not them, but they were the fragile part of
+     the original release.
+4. **Keep the dSYM** (`.release-deps/DerivedData/Build/Products/Release/
+   Korpora.app.dSYM`) with the release: `make-release.sh` doesn't copy it
+   into `release/`, and a stripped binary can't be symbolicated without
+   it. Consider adding that copy to the script.
+5. Smoke-test on the macOS 15 VM (`scripts/release-smoke-vm.sh`) — it
+   also covers the icon on the floor OS.
+6. Pick the version (`CFBundleShortVersionString`/`CFBundleVersion` in
+   `Info.plist`; v0.1 was `0.1`/`1`, so bump the build number at least),
+   then cut it as in step 7 above. Record results here.
+
 ### Explicitly out of scope for this goal
 
 Mac App Store (needs sandbox, decision 6); Sparkle/auto-updates (GitHub
