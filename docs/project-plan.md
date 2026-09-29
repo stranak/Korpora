@@ -3725,6 +3725,15 @@ can be verified on its own.
      `Korpora.icns` (the pre-macOS 26 fallback for the 15.0 floor) in
      Resources, with `CFBundleIconName`/`CFBundleIconFile` set. Not yet
      looked at on the macOS 15 VM itself;
+   - **Release binary was unstripped** *(fixed 2026-09-29,
+     `fix/release-strip`)*: `STRIP_INSTALLED_PRODUCT` was already on, but
+     Xcode strips only under `DEPLOYMENT_POSTPROCESSING`, which `archive`
+     sets and `make-release.sh`'s plain `build` doesn't. Release config
+     now sets it plus `DEAD_CODE_STRIPPING`. Measured on an unsigned
+     Release build: executable 2.8 MB → 1.46 MB, ~11,300 → ~820 symbols;
+     symbolication still works from the dSYM, so keep each release's.
+     Swift `-O` whole-module and C/C++ `-O2` (speed) were already right.
+     Still to confirm with a signed/notarized `make-release.sh` run;
    - `CFBundleShortVersionString 0.1` / `CFBundleVersion 1` — pick a real
      version and write release notes for the first tag.
 

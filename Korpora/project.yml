@@ -117,6 +117,14 @@ targets:
           DEVELOPMENT_TEAM: 8YW3ZU8MFU
           ENABLE_HARDENED_RUNTIME: YES
           OTHER_CODE_SIGN_FLAGS: --timestamp
+          # Strip the shipped binary. STRIP_INSTALLED_PRODUCT/STRIP_STYLE
+          # are already on, but Xcode only strips when deployment
+          # postprocessing is on, which `archive` sets and the plain
+          # `build` scripts/make-release.sh runs does not. Symbols stay
+          # recoverable from the dSYM (dwarf-with-dsym), so keep it per
+          # release.
+          DEPLOYMENT_POSTPROCESSING: YES
+          DEAD_CODE_STRIPPING: YES
           # Otherwise Xcode injects com.apple.security.get-task-allow on a
           # plain `build` (only `archive` strips it), and the notary service
           # rejects the app outright.
