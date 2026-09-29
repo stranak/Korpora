@@ -23,7 +23,8 @@
 # Env overrides: NOTARY_PROFILE (default korpora-notary), SIGN_IDENTITY
 # (default "Developer ID Application").
 #
-# Output: release/Korpora-<version>.dmg and its .sha256 next to it.
+# Output: release/Korpora-<version>.dmg and its .sha256 next to it, plus
+# Korpora-<version>.dSYM.zip (keep it: the binary is stripped).
 set -euo pipefail
 
 NOTARY_PROFILE="${NOTARY_PROFILE:-korpora-notary}"
@@ -104,6 +105,16 @@ if otool -L "$APP/Contents/MacOS/Korpora" "$APP/Contents/Helpers/"* | grep -q /o
     die "a binary still links a /opt/homebrew library"
 fi
 
+# Keep the dSYM: the shipped binary is stripped and can't be symbolicated
+# without it. It isn't part of the DMG; archive it next to it.
+if [ -d "$APP.dSYM" ]; then
+    rm -f "$OUT/Korpora-$VERSION.dSYM.zip"
+    ditto -c -k --keepParent "$APP.dSYM" "$OUT/Korpora-$VERSION.dSYM.zip"
+    echo "    dSYM: $OUT/Korpora-$VERSION.dSYM.zip"
+else
+    echo "WARNING: no dSYM at $APP.dSYM - this release can't be symbolicated." >&2
+fi
+
 # Notarize one artifact and staple its ticket. The app and the DMG are
 # notarized separately so that *both* carry a stapled ticket: the DMG's
 # covers first open of the download, the app's covers it after it has been
@@ -130,6 +141,11 @@ notarize() {  # <file-to-submit> <what-to-staple> <label>
 }
 
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/korpora-release.XXXXXX")"
+# The staged copy of the app must not outlive the run: Launch Services
+# registers every Korpora.app it sees under its bundle id, and stale copies
+# in temp directories can leave the Dock showing an old icon.
+cleanup() { hdiutil detach "$STAGE/mnt" >/dev/null 2>&1 || true; rm -rf "$STAGE"; }
+trap cleanup EXIT
 mkdir "$STAGE/dmgroot"
 ditto "$APP" "$STAGE/dmgroot/Korpora.app"
 STAGED_APP="$STAGE/dmgroot/Korpora.app"
