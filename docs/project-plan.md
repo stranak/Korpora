@@ -4021,6 +4021,11 @@ Qwen3-4B its prompt scores within noise of the hand-written one on dev,
 but lower on held-out; more detail beats less. `heldout.tsv` has been read,
 so it's no longer a clean held-out set.
 
+`feat/nl-query-assistant` is a long-term research branch whose end point
+is the fine-tuned model (phase 6; decided 2026-09-29, no longer
+conditional). It may pause for other goals between phases, and
+`docs/nl-query-assistant.md`'s status line says where it stopped.
+
 Next: a ≥100-request benchmark with a fresh, unread held-out split, then
 prompt work against its dev split.
 

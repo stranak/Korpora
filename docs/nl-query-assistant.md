@@ -1,6 +1,8 @@
 # Phase 7 — Natural-language → CQL query assistant (plan)
 
-Status: re-planned 2026-09-29 around an **optional, downloaded MLX model on
+Status: long-term research branch (`feat/nl-query-assistant`), ending in
+a fine-tuned model (phase 6); it may pause for other goals between
+phases. Re-planned 2026-09-29 around an **optional, downloaded MLX model on
 macOS 15+** (was: Apple's on-device model, macOS 27 only). Engine
 primitives (7.1) and `QueryPlan`/`CQLSerializer` (7.2, part) are done and
 unaffected. The build/size/release cost of MLX was measured the same day
@@ -68,8 +70,15 @@ and benchmark items (phase 6), and they test the generic path (`pos`, not
 
 - (2026-09-28, still valid) The model fills a structured `QueryPlan`; the
   app serializes it to CQL. English requests + UD tagset first; Czech
-  requests + the Czech positional tagset come with a fine-tuned model,
-  only if the benchmark shows fine-tuning pays off.
+  requests + the Czech positional tagset come with the fine-tuned model.
+- (2026-09-29) **Fine-tuning is the planned end point, no longer
+  conditional.** `feat/nl-query-assistant` is a long-term research
+  branch: benchmark → prompt pipeline → app integration → fine-tuned
+  model. Work on it may pause for other goals at any phase boundary, so
+  each phase should end in a committed, documented state that can sit for
+  a while (this file's status line + the phase's results section say
+  where it stopped). The benchmark's job is to measure what fine-tuning
+  buys, not to decide whether to do it.
 - (2026-09-29) No Apple model tier. The assistant is **off until the user
   downloads a model** in Settings. Target: the app's own floor, macOS 15,
   Apple silicon. No `FoundationModels` import.
@@ -360,10 +369,12 @@ fresh held-out split that nobody reads before the final comparison.
 4. UI (popover, both entry points) + Settings "Assistant" pane with model
    download/delete; the project.yml/`make-release.sh` changes from "Cost of
    MLX".
-5. **Decision point:** does fine-tuning buy enough? Compare benchmark
-   results across stock models and sizes.
-6. (If 5 says yes) fine-tuned model, adding Czech requests + the Czech
-   positional tagset:
+5. **Baseline for fine-tuning:** benchmark results across stock models,
+   sizes and prompt variants, on the untouched held-out split. That's
+   the number fine-tuning has to beat. It also picks the base model and
+   the smallest size worth tuning.
+6. Fine-tuned model (the branch's end goal), adding Czech requests + the
+   Czech positional tagset:
    - Training data, generated dev-side, never shipped: sample valid
      QueryPlans from templates over real UD and Czech positional corpora,
      keep those with non-empty hits (engine-verified), back-translate each
