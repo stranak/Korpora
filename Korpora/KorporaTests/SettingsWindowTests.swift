@@ -89,4 +89,63 @@ import Testing
         layOut(window)
         #expect(list.frame.height >= before + 150, "list went from \(before) to \(list.frame.height)")
     }
+
+    /// "Keep in Memory" was cut to "Keep in Me…". The table used "last column
+    /// only" autoresizing, so at the opening size the columns plus spacing
+    /// didn't fit and the last one shrank to 75 points (and, widened, took
+    /// all the extra width). Now every heading fits its column at every
+    /// window size, and extra width goes to the Name column alone.
+    @Test func everyCorpusTableHeadingFitsItsColumn() throws {
+        let window = try shownWindow()
+        defer { window.orderOut(nil) }
+        SettingsWindowController.shared.showPane(.corpora)
+        layOut(window)
+        let controller = try #require(window.contentViewController as? CorporaSettingsViewController)
+        let table = controller.tableView
+
+        /// The heading text plus room for the header cell's own padding and
+        /// the ellipsis it would otherwise fall back to.
+        func check(_ label: String) {
+            for column in table.tableColumns {
+                let needed = column.headerCell.attributedStringValue.size().width + 30
+                #expect(column.width >= needed, "\(label): \u{201C}\(column.title)\u{201D} needs \(needed), has \(column.width)")
+            }
+        }
+        func widths() -> [CGFloat] { table.tableColumns.map(\.width) }
+
+        check("opening size")
+        let opening = widths()
+        window.setContentSize(NSSize(width: 800, height: 500))
+        layOut(window)
+        check("wider")
+        let wider = widths()
+        #expect(wider[0] > opening[0] + 200, "Name takes the extra width: \(opening[0]) -> \(wider[0])")
+        #expect(Array(wider.dropFirst()) == Array(opening.dropFirst()), "the other columns keep their widths")
+
+        window.setContentSize(controller.view.frame.size)
+        window.setContentSize(NSSize(width: 540, height: 440))
+        layOut(window)
+        check("back at the minimum")
+        #expect(widths() == opening, "same layout at the same size")
+    }
+
+    /// The panes that are just a form (Concordance) or a form plus a list
+    /// (Appearance) keep their content in a centered column of the designed
+    /// width instead of leaving it in a corner of a bigger window.
+    @Test func formPanesStayCenteredWhenTheWindowIsWider() throws {
+        let window = try shownWindow()
+        defer { window.orderOut(nil) }
+        for (pane, width) in [(SettingsWindowController.Pane.concordance, CGFloat(460)),
+                              (.appearance, CGFloat(420))] {
+            SettingsWindowController.shared.showPane(pane)
+            layOut(window)
+            window.setContentSize(NSSize(width: 900, height: 700))
+            layOut(window)
+            let controller = try #require(window.contentViewController)
+            let column = try #require(controller.view.subviews.first, "\(pane)")
+            #expect(column.frame.width == width, "\(pane) column width")
+            #expect(abs(column.frame.midX - controller.view.bounds.midX) < 1, "\(pane) is centered: \(column.frame)")
+            #expect(column.frame.minY == 0 && column.frame.height == controller.view.bounds.height, "\(pane) full height")
+        }
+    }
 }

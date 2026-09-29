@@ -1123,6 +1123,19 @@ extension ConcordanceViewController: NSMenuItemValidation {
         document.cancelSearch()
     }
 
+    /// The standard key bindings turn \u{2318}. and Esc into `cancelOperation:`
+    /// for a focused text view, which passes it up the responder chain when
+    /// it has nothing to cancel itself (a completion list). A second route to
+    /// Cancel Search besides the menu's key equivalent; with no search
+    /// running it's passed on unchanged.
+    override func cancelOperation(_ sender: Any?) {
+        if document.isSearching {
+            document.cancelSearch()
+        } else {
+            super.cancelOperation(sender)
+        }
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(cancelSearch(_:)) {
             return document.isSearching

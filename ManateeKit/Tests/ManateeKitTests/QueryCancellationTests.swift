@@ -56,6 +56,28 @@ final class QueryCancellationTests: XCTestCase {
         XCTAssertEqual(size, 5)
     }
 
+    /// Fetching the lines of a big result is the slow part of many searches
+    /// (every hit is fetched), so it stops for a cancelled task too.
+    func testFetchingLinesStopsForACancelledTask() async throws {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        let live = try await LiveConcordance(corpus: corpus, cql: #"[tag="NN"]"#)
+        let task = Task { () -> Int in
+            while !Task.isCancelled { await Task.yield() }
+            return try await live.kwicLines().count
+        }
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("expected CancellationError")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+        // Not cancelled: the same call works.
+        let lines = try await live.kwicLines()
+        XCTAssertEqual(lines.count, 4)
+    }
+
     /// A syntax error is still an ordinary error, not a cancellation.
     func testABadQueryStillThrowsItsOwnError() async throws {
         let corpus = try await Corpus(name: Self.fixture.corpusName)

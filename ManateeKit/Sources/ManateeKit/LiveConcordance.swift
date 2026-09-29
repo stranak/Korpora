@@ -357,8 +357,14 @@ public actor LiveConcordance {
     /// UI realistically requests, but something to keep in mind against an
     /// already-large, unpaginated result set (`kwicLines` fetches every
     /// hit's line up front, regardless of how many are ever shown).
+    ///
+    /// Fetches *every* hit (there is no paging yet, Phase 6.11), which for a
+    /// common word in a big corpus is millions of lines: the calling task's
+    /// cancellation is checked here as it goes (and throws `CancellationError`),
+    /// or a cancelled search would sit in this loop until the last line.
     public func kwicLines(leftContext: String = "-10", rightContext: String = "10",
                            kwicAttr: String = "word", secondaryAttributes: [String] = []) throws -> [KWICLine] {
+        try Task.checkCancellation()
         var error: UnsafeMutablePointer<CChar>?
         guard let kwic = mtc_kwic_open(corpusHandle, handle, leftContext, rightContext, kwicAttr, &error) else {
             throw ManateeError.failure(consumeError(error))
@@ -395,6 +401,8 @@ public actor LiveConcordance {
 
         var lines: [KWICLine] = []
         while mtc_kwic_next(kwic) != 0 {
+            // Cheap enough to do every 256 lines; instant to notice.
+            if lines.count & 0xFF == 0xFF { try Task.checkCancellation() }
             lines.append(KWICLine(
                 leftTokens: try segment { mtc_kwic_get_left_attr(kwic, $0, &error) },
                 kwicTokens: try segment { mtc_kwic_get_kwic_attr(kwic, $0, &error) },

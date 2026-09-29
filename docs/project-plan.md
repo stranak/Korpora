@@ -300,10 +300,10 @@ Confirmed product decisions (from earlier in this project):
 | Goal — signed release | n/a | v0.1 (2026-09-26) and v0.2 (2026-09-29) published | yes — macOS 15.7.7 VM smoke tests, incl. an upgrade 0.1 → 0.2 |
 
 Test counts in the rows above are as of each phase's completion. Today:
-ManateeKit 107 (XCTest; one opt-in slow test skipped), app 118 (Swift Testing).
+ManateeKit 108 (XCTest; one opt-in slow test skipped), app 125 (Swift Testing).
 
 All Swift/C++ code builds cleanly and all tests pass (`swift test` in
-`ManateeKit` → 107 run, 1 opt-in skipped; app suite 118/118, 2026-09-30).
+`ManateeKit` → 108 run, 1 opt-in skipped; app suite 125/125, 2026-09-30).
 
 ## Open goals (refreshed 2026-09-29)
 
@@ -1698,7 +1698,30 @@ per test: a normal search completes; a cancelled one says so and keeps the
 query; a newer search replaces a running one and leaves no trace; cancel
 with nothing running is a no-op; the window's hint and the menu item follow
 the document. A mutation check (cancel made a no-op) fails the test.
-**Not yet done:** trying it on SYN2025 in the running app.
+**First click-test (user, SYN2025): ⌘. "did nothing" during a long search
+and the tab had to be closed.** Cause found and fixed: the cancel only
+reached the engine *query*, but the app then fetches the KWIC lines of
+**every** hit (no paging until 6.11), and for a common word in SYN2025
+that fetch is the long part; `LiveConcordance.kwicLines` and
+`buildRows` never checked for cancellation, so the search sat there until
+the last line. Both now check as they go (`kwicLines` every 256 lines,
+`buildRows` before each row). Measured with the real document code on a
+3M-token corpus, a search with a million hits cancelled during its line
+fetch: **11 s before, 49 ms after** (opt-in test,
+`KORPORA_SLOW_TESTS=1`).
+Also added: the view controller answers `cancelOperation:`, which is what
+the standard key bindings send a focused text view for ⌘. and Esc, as a
+second route to Cancel Search besides the menu's key equivalent (Esc
+cancels a running search too; with none running it's passed on).
+**Testing limit:** ⌘. through the real menu cannot be sent from a test.
+The test host is never the active app, so no window becomes key and a menu
+action has no responder chain (`NSApp.target(forAction:)` is nil). So the
+links are tested one by one: the menu item's title, key, modifier, action
+and nil target; that it validates only while searching; and that both
+actions travel from the focused query field to the view controller and
+cancel a search held open by a test hook (`beforeSearchHook`). The actual
+key press stays a manual check.
+**Not yet done:** ⌘. on SYN2025 again, in the running app.
 
 ### Settings window: resizable (built 2026-09-30; awaiting a look)
 
@@ -1712,6 +1735,21 @@ the window snapped back after every resize. `showPane` now reads the size
 once, clears it before installing the pane, and applies it as the initial
 size and minimum. Tests resize the real window (it must be on screen for
 AppKit to lay it out) and check each pane follows and the lists grow.
+
+**First click-test (user).** (1) The Concordance and Appearance tabs left
+their content stuck in the top-left of a bigger window: both are now a
+fixed-width column centered in the window (`SettingsLayout.centeredRoot`),
+and Appearance's list takes the extra height; Corpora keeps stretching edge
+to edge. (2) On the Corpora tab "Keep in Memory" was cut to "Keep in Me…":
+the table used "last column only" autoresizing, so at the opening size the
+four columns plus spacing didn't fit and the last column shrank to **75
+points** (widened, it swallowed all the extra width). Now Name is the one
+flexible column (`firstColumnOnlyAutoresizingStyle`) and the others have
+minimum widths for their headings (Keep in Memory 130). The test measures
+each heading's text plus padding against its real column width at the
+opening size, wider, and back, and fails on the old setup ("needs 114.5,
+has 75"). (An earlier version of that test used `cellSize` and passed on
+the broken layout; it measured the wrong thing.)
 
 ## Phase 5 — Concordance UX enhancements, KonText-inspired (done; click-test status per item below)
 

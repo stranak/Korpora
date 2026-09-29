@@ -26,9 +26,6 @@ final class AppearanceSettingsViewController: NSViewController {
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 400))
-        // Follow the window when it's resized; without this Auto Layout pins the
-        // view to the size it was created with.
-        root.autoresizingMask = [.width, .height]
 
         let fontTitle = NSTextField(labelWithString: "Results font:")
         let selectFontButton = NSButton(title: "Select…", target: self, action: #selector(selectFont))
@@ -133,7 +130,8 @@ final class AppearanceSettingsViewController: NSViewController {
             removeButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -20),
         ])
 
-        view = root
+        // A centered column; the per-script list in it takes extra height.
+        view = SettingsLayout.centeredRoot(around: root, width: 420)
         preferredContentSize = NSSize(width: 420, height: 400)
         reloadScriptOverrides()
     }

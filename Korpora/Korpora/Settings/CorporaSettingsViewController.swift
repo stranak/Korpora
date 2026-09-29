@@ -86,21 +86,34 @@ final class CorporaSettingsViewController: NSViewController {
         let chooseDirectoryButton = NSButton(title: "Choose\u{2026}", target: self, action: #selector(chooseDirectory))
 
         tableView.headerView = NSTableHeaderView()
+        // Name takes whatever room there is; the others are wide enough for
+        // their headings and don't shrink below that ("Keep in Memory" was
+        // cut to "Keep in Me…").
         let nameColumn = NSTableColumn(identifier: .init(Column.name.rawValue))
         nameColumn.title = "Name"
-        nameColumn.width = 160
+        nameColumn.minWidth = 100
+        nameColumn.width = 150
+        nameColumn.resizingMask = [.autoresizingMask, .userResizingMask]
         let sourceColumn = NSTableColumn(identifier: .init(Column.source.rawValue))
         sourceColumn.title = "Source"
-        sourceColumn.width = 120
+        sourceColumn.minWidth = 110
+        sourceColumn.width = 110
+        sourceColumn.resizingMask = .userResizingMask
         let sizeColumn = NSTableColumn(identifier: .init(Column.size.rawValue))
         sizeColumn.title = "Size"
+        sizeColumn.minWidth = 70
         sizeColumn.width = 80
+        sizeColumn.resizingMask = .userResizingMask
         let residentColumn = NSTableColumn(identifier: .init(Column.resident.rawValue))
         residentColumn.title = "Keep in Memory"
-        residentColumn.width = 120
+        residentColumn.minWidth = 125
+        residentColumn.width = 130
+        residentColumn.resizingMask = .userResizingMask
         for column in [nameColumn, sourceColumn, sizeColumn, residentColumn] {
             tableView.addTableColumn(column)
         }
+        // Extra width goes to the Name column, not spread over all four.
+        tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         tableView.dataSource = self
         tableView.delegate = self
         tableView.usesAlternatingRowBackgroundColors = true

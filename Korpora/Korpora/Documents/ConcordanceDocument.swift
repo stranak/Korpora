@@ -309,6 +309,11 @@ final class ConcordanceDocument: NSDocument {
     /// window's "press ⌘. to cancel" hint and the Cancel Search menu item.
     private(set) var isSearching = false
 
+    /// Awaited at the start of each search, once its turn has come. Tests
+    /// hold a search open with it (a tiny corpus answers faster than a menu
+    /// key press can be delivered); always nil in the app.
+    var beforeSearchHook: (() async -> Void)?
+
     /// Aborts the running search: the engine stops (see
     /// `LiveConcordance.init(corpus:cql:)`) and the document shows no
     /// results and the status "Search cancelled." - the query and its
@@ -433,6 +438,7 @@ final class ConcordanceDocument: NSDocument {
             await previousReplay?.value
             // Overtaken while waiting: the newer replay covers this one.
             guard generation == replayGeneration else { return }
+            await beforeSearchHook?()
             do {
                 let corpus = try Corpus(name: corpusName)
                 let queryCorpus: Corpus
@@ -510,6 +516,9 @@ final class ConcordanceDocument: NSDocument {
         var newRows = [ConcordanceRow?](repeating: nil, count: lines.count)
         await withTaskGroup(of: (Int, ConcordanceRow).self) { group in
             for (offset, line) in lines.enumerated() {
+                // One child task per row: with millions of rows, stop
+                // creating them as soon as the search is cancelled.
+                if Task.isCancelled { break }
                 group.addTask {
                     let lineGroup = await live.linegroup(at: offset)
                     var structuralValue: String?
