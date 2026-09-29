@@ -4096,13 +4096,16 @@ To cut the release:
    `Info.plist`; v0.1 was `0.1`/`1`, so bump the build number at least),
    then cut it as in step 7 above. Record results here.
 
-### Release 0.2 — build and test record (2026-09-29)
+### Release 0.2 — build and test record (2026-09-29) — published
 
 Built from `9ba315f` with `scripts/make-release.sh` (full, notarized);
-`Korpora 0.2 (2)`. Tests: app 94, ManateeKit 82, all passing. **Not yet
-published**: cut it as in step 7 above (`gh release create v0.2` with the
-DMG, its `.sha256`, and notes). Keep `release/Korpora-0.2.dSYM.zip` with
-it; the script now archives it.
+`Korpora 0.2 (2)`. Tests: app 94, ManateeKit 82, all passing.
+**Published 2026-09-29: [Korpora 0.2](https://github.com/stranak/Korpora/releases/tag/v0.2)**,
+tag `v0.2` → `9ba315f`. Assets: the DMG, its `.sha256`, and
+`Korpora-0.2.dSYM.zip` (for symbolicating crash reports; the shipped binary
+is stripped). The published DMG was re-downloaded and checked: checksum,
+stapled ticket and Gatekeeper all pass. The notes are in the release
+itself (`release/notes-0.2.md` locally, gitignored).
 - `Korpora-0.2.dmg` SHA-256 `f9ca36b8…ffb9d`; notarization submissions
   `668f29b3-…` (app), `6ee6b382-…` (DMG); both stapled; Gatekeeper accepts
   a quarantined copy.
