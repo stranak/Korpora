@@ -18,6 +18,15 @@ Run (the model is fetched from Hugging Face into its cache on first use):
 
 requests.tsv is the dev set; heldout.tsv must not be used to tune prompts.
 instructions-v2.txt has a {FACTS} placeholder filled from the corpus.
+With the app's own prompt builder and schema (KorporaAssistant):
+
+    B=KorporaAssistant/.build/debug/korpora-assistant
+    MANATEE_REGISTRY=data/ud-en-ewt/registry $B schema ud_en_ewt > data/nl-spike/schema-app.json
+    MANATEE_REGISTRY=data/ud-en-ewt/registry $B prompts ud_en_ewt scripts/nl-spike/heldout.tsv \
+        > data/nl-spike/prompts-heldout.jsonl
+    ... run.py MODEL scripts/nl-spike/heldout.tsv --schema data/nl-spike/schema-app.json \
+        --prompts data/nl-spike/prompts-heldout.jsonl --tag=-app-heldout
+
 Writes data/nl-spike/results-<model><tag>.tsv and prints a summary.
 Results so far: docs/nl-query-assistant.md, "Phase 0 results".
 """
@@ -206,6 +215,11 @@ def main():
     ap.add_argument("requests", nargs="?", default=os.path.join(HERE, "requests.tsv"))
     ap.add_argument("--instructions", default=os.path.join(HERE, "instructions.txt"))
     ap.add_argument("--retry", action="store_true", help="one validation retry, as the app does")
+    ap.add_argument("--prompts", metavar="JSONL",
+                    help="system/user prompts per request from `korpora-assistant prompts`, "
+                         "instead of --instructions")
+    ap.add_argument("--schema", default=os.path.join(HERE, "schema.json"),
+                    help="generation JSON Schema (e.g. from `korpora-assistant schema`)")
     ap.add_argument("--tag", default="", help="suffix for the results file name")
     ap.add_argument("--rescore", metavar="RESULTS_TSV",
                     help="re-judge a results file against REQUESTS; no model run (MODEL is ignored)")
@@ -216,13 +230,18 @@ def main():
     model, tokenizer = load(args.model)
     info = xgr.TokenizerInfo.from_huggingface(tokenizer._tokenizer, vocab_size=model.args.vocab_size
                                               if hasattr(model, "args") and hasattr(model.args, "vocab_size") else None)
-    schema = open(os.path.join(HERE, "schema.json")).read()
+    schema = open(args.schema).read()
     # Compact JSON: no free whitespace between tokens, so a small model can't
     # stall emitting blanks (the app gets the same effect from
     # WhitespaceTokenBias).
     compiled = xgr.GrammarCompiler(info).compile_json_schema(schema, any_whitespace=False)
     lex, genres = lexicons()
     instructions = open(args.instructions).read().replace("{FACTS}", facts(lex, genres))
+    prompts = {}
+    if args.prompts:
+        for line in open(args.prompts):
+            record = json.loads(line)
+            prompts[record["request"]] = (record["system"], record["user"])
     eos_id = tokenizer.eos_token_id
 
     def ask(messages):
@@ -243,8 +262,8 @@ def main():
     for line in open(args.requests):
         request, gold = line.rstrip("\n").split("\t")
         golds = gold_hits(gold)
-        messages = [{"role": "system", "content": instructions},
-                    {"role": "user", "content": f"Request: {request}"}]
+        system, user = prompts.get(request) or (instructions, f"Request: {request}")
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         t0 = time.time()
         text, plan, cql, got, err = ask(messages)
         note = ""

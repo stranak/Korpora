@@ -3,8 +3,8 @@ import Foundation
 /// Turns a `QueryPlan` into CQL. Pure and total: every plan serializes, and
 /// quoting is done here rather than trusted to the model, so a value like
 /// `say "hi"` can't break out of its string.
-enum CQLSerializer {
-    static func cql(for plan: QueryPlan) -> String {
+public enum CQLSerializer {
+    public static func cql(for plan: QueryPlan) -> String {
         var query = plan.positions.map(position).joined()
         // One `within` per structure, its conditions ANDed: CQL takes
         // `within <doc genre="email" & split="dev"/>`, not two `<doc>`s.
@@ -50,7 +50,7 @@ enum CQLSerializer {
     /// Matches manatee's lexer exactly (`unescapeString` in
     /// manatee-open/query/cqpeval.y turns `\\` into `\` and `\"` into `"`,
     /// nothing else), so a regex value `\.` arrives as `\.` - a literal dot.
-    static func quoted(_ value: String) -> String {
+    public static func quoted(_ value: String) -> String {
         let escaped = value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")

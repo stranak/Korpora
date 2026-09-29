@@ -284,6 +284,59 @@ Acceptable / 20, stock 4-bit models:
   score under 5 GB, Apache-2.0. Expect phase 6 fine-tuning to be needed
   for a good product rather than optional.
 
+## Phase 2 results (2026-09-29)
+
+The model-independent half lives in a local package, **`KorporaAssistant/`**
+(next to `ManateeKit`, linked into the app via project.yml). It tests with
+plain `swift test`, and its dev CLI `korpora-assistant` prints the profile,
+schema and exact prompts for a corpus, so `scripts/nl-spike/run.py
+--prompts/--schema` benchmarks the app's own prompt builder.
+- `QueryPlan`, `CQLSerializer` (moved from the app target).
+- `QuerySchema`: per-corpus JSON Schema, keys in generation order.
+  Attribute and structure-attribute names are `enum`s, and `within` is
+  pinned empty for a corpus without structure attributes.
+- `CorpusProfile`: gathers per-attribute value samples
+  (`topAttributeValues`; for MULTIVALUE attributes the lexicon's
+  combinations are dropped, since it holds single values *and*
+  combinations), structure-attribute values, and registry LABELs. It
+  detects each attribute's **role from its values**, not its name: UD POS
+  (`upos` in EWT, `pos` in DGT-UD), UD features, UD relations, Czech
+  positional tag, word, lemma, other. Categorical structure attributes
+  (genre) are told apart from identifiers (`doc.id`).
+- `QueryContextBuilder`: rules, then corpus facts (UD values glossed from
+  `Resources/TagsetGlosses.json`; Czech positional slots explained;
+  `p_*`/`ep_*` parent copies named as such), then examples from
+  `Resources/ExampleBank.json`. The bank is written against role
+  placeholders (`{udPOS}`, `{category}`) and filled with the corpus's own
+  names; examples a corpus can't express are skipped. Retrieval is by
+  keyword overlap, and a token budget steps down through four detail
+  levels.
+- 28 package tests; the app suite is 90 (the 8 serializer tests moved to
+  the package).
+
+Benchmark of the Swift-built prompt (no retry), acceptable / 20:
+
+| | dev | held-out |
+|---|---|---|
+| Qwen3-4B, app prompt | 12 | 10 |
+| Qwen3-4B, v1 (hand-written) | 13 | 15 |
+| Qwen3-8B, app prompt | 13 | 13 |
+| Qwen3-8B, v1 | 15 | 13 |
+
+Ablation on dev only (Qwen3-4B, acceptable / 20): full detail + retrieval
+12; full, fixed examples 10; level 2 (shorter lists, 3 examples) 9 / 7;
+level 3 at 7. So **more corpus detail helps**, and retrieval helps a
+little. The hand-written v1's held-out lead isn't explained by length; with
+20 items per set it may be partly noise. New failure types with the app
+prompt: pluralized structure values (`genre="weblogs"`), relation names put
+in the POS attribute (`upos="OBJ"`), and retrieval copying an example's
+structure ("proper nouns in the plural" picked "a sequence of proper
+nouns" and added `+`).
+
+**Held-out hygiene:** the held-out failures above were read during this
+work, so `heldout.tsv` is now contaminated. The ≥100 benchmark needs a
+fresh held-out split that nobody reads before the final comparison.
+
 ## Phases
 0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0
    results": go, default Qwen3-4B-4bit. Run ~20 English requests against a UD-annotated
@@ -294,9 +347,11 @@ Acceptable / 20, stock 4-bit models:
    unusable even with structure + examples, the assistant needs
    fine-tuning from the start (phase 6 becomes mandatory) or is shelved.
 1. ~~Engine additions + tests~~ — done (7.1).
-2. `QueryPlan` + `CQLSerializer` — done. Remaining: runtime JSON Schema
-   builder from a corpus's `info()`, `QueryContextBuilder`, example banks.
-   Everything is unit-tested without a model.
+2. ~~`QueryPlan`, `CQLSerializer`, `QuerySchema`, `CorpusProfile`,
+   `QueryContextBuilder`, glosses, UD example bank~~ — done, see "Phase 2
+   results". Next: a ≥100-request benchmark (dev + untouched held-out
+   split, several UD corpora incl. a DGT-UD one via LINDAT), then prompt
+   work against its dev split only.
 3. `QueryAssistant`: model loading, guided generation (with the biases
    above), decode, validation/retry loop. A benchmark harness: ≥100 English
    NL→CQL pairs on a UD corpus, scored by execution accuracy (same hit set
@@ -321,20 +376,23 @@ Acceptable / 20, stock 4-bit models:
      `czech-positional` example bank.
 
 ## Critical files
-- New: `Korpora/Korpora/Assistant/` — `QueryPlan.swift`,
-  `CQLSerializer.swift` (both done), `QuerySchema.swift` (runtime JSON
-  Schema), `QueryContextBuilder.swift`, `QueryAssistant.swift` (loading,
-  generation, retry), `ModelStore.swift` (download/verify/delete),
-  `DescribeQueryPopoverController.swift`,
-  `AssistantSettingsViewController.swift`; resources `CQLReference.md`,
-  `Examples/{ud,generic}.json`.
-- Modified: `Korpora/project.yml` (packages: `mlx-swift-lm` pinned by
-  revision → `MLXLLM`, `MLXLMCommon`, `MLXGuidedGeneration`;
-  `swift-transformers` → `Tokenizers`; Release stripping),
+- `KorporaAssistant/` (Swift package, macOS 14+, depends on ManateeKit):
+  `Sources/KorporaAssistant/` — `QueryPlan.swift`, `CQLSerializer.swift`,
+  `QuerySchema.swift`, `CorpusProfile.swift`, `QueryContextBuilder.swift`,
+  `Resources/{TagsetGlosses,ExampleBank}.json`; later `QueryAssistant.swift`
+  (loading, generation, retry) and `ModelStore.swift` (download/verify/
+  delete). `Sources/korpora-assistant/` is the dev CLI.
+- App (`Korpora/Korpora/`): `DescribeQueryPopoverController.swift`,
+  `AssistantSettingsViewController.swift`; modified
   `Views/CQLQueryField.swift`, `Controllers/NewConcordanceSheetController.swift`,
   `Controllers/ConcordanceViewController.swift`,
-  `Settings/SettingsWindowController.swift`, `Settings/AppSettings.swift`,
-  `scripts/make-release.sh`, `scripts/setup-dev-machine.sh`.
+  `Settings/SettingsWindowController.swift`, `Settings/AppSettings.swift`.
+- `Korpora/project.yml` (packages: `KorporaAssistant` (done); later
+  `mlx-swift-lm` pinned by revision → `MLXLLM`, `MLXLMCommon`,
+  `MLXGuidedGeneration`, and `swift-transformers` → `Tokenizers`, either
+  here or in `KorporaAssistant`; Release stripping), `scripts/make-release.sh`,
+  `scripts/setup-dev-machine.sh`.
+- `scripts/nl-spike/` — benchmark harness (Python, dev-only).
 
 ## Verification
 - Unit: serializer round-trips (done), schema builder, context budget

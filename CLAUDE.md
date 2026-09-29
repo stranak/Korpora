@@ -33,7 +33,8 @@ them by repo-relative path.
 
 ## Repos
 
-- `ManateeKit/`, `Korpora/`, `scripts/` — this repo
+- `ManateeKit/`, `KorporaAssistant/` (the query assistant's
+  model-independent half, a local package), `Korpora/`, `scripts/` — this repo
   (`github.com/stranak/Korpora`, renamed from `mac-corpora` along with the
   app). The local checkout directory is `korpora/`.
   - **The bundle identifier is `cz.cuni.mff.ufal.korpora`** (since the

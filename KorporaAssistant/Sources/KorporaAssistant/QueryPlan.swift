@@ -15,19 +15,25 @@ import Foundation
 /// *from* this type's shape at runtime, and the model's output is decoded
 /// back *into* it, so everything downstream (serializing, validating,
 /// testing) needs no model at all.
-struct QueryPlan: Codable, Equatable {
-    var positions: [Position]
+public struct QueryPlan: Codable, Equatable, Sendable {
+    public var positions: [Position]
     /// Restrictions on the enclosing structure, e.g. `doc.genre = email`.
-    var within: [StructureCondition]
+    public var within: [StructureCondition]
     /// One sentence for the user, shown next to the generated query.
-    var explanation: String
+    public var explanation: String
 
-    struct Position: Codable, Equatable {
+    public init(positions: [Position], within: [StructureCondition] = [], explanation: String = "") {
+        self.positions = positions
+        self.within = within
+        self.explanation = explanation
+    }
+
+    public struct Position: Codable, Equatable, Sendable {
         /// All must hold for the token (CQL `&`). Empty means any token, `[]`.
-        var conditions: [Condition]
-        var repetition: Repeat
+        public var conditions: [Condition]
+        public var repetition: Repeat
 
-        init(conditions: [Condition], repetition: Repeat = .once) {
+        public init(conditions: [Condition], repetition: Repeat = .once) {
             self.conditions = conditions
             self.repetition = repetition
         }
@@ -40,28 +46,39 @@ struct QueryPlan: Codable, Equatable {
         }
     }
 
-    struct Condition: Codable, Equatable {
-        var attribute: String
-        var op: Operator
+    public struct Condition: Codable, Equatable, Sendable {
+        public var attribute: String
+        public var op: Operator
         /// A literal or a manatee regex - CQL `=` matches regexes against
         /// the whole value, so `un.*` means "starts with un".
-        var value: String
+        public var value: String
+
+        public init(attribute: String, op: Operator = .equals, value: String) {
+            self.attribute = attribute
+            self.op = op
+            self.value = value
+        }
     }
 
-    struct StructureCondition: Codable, Equatable {
+    public struct StructureCondition: Codable, Equatable, Sendable {
         /// Dotted `structure.attribute`, the same spelling
         /// `CQLCompletionProvider.attributeNames` offers, e.g. `doc.genre`.
-        var attribute: String
-        var value: String
+        public var attribute: String
+        public var value: String
+
+        public init(attribute: String, value: String) {
+            self.attribute = attribute
+            self.value = value
+        }
     }
 
-    enum Operator: String, Codable, CaseIterable {
+    public enum Operator: String, Codable, CaseIterable, Sendable {
         case equals = "="
         case notEquals = "!="
     }
 
     /// CQL's repetition suffixes, spelled out so a model can't confuse them.
-    enum Repeat: String, Codable, CaseIterable {
+    public enum Repeat: String, Codable, CaseIterable, Sendable {
         case once
         case optional = "optional"          // ?
         case zeroOrMore = "zero-or-more"    // *

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Korpora
+@testable import KorporaAssistant
 
 @Suite struct CQLSerializerTests {
     private typealias P = QueryPlan

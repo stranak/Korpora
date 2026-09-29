@@ -1,0 +1,77 @@
+{
+  "_comment": "Few-shot examples for the query assistant (docs/nl-query-assistant.md, 'Corpus facts in the prompt'). Attribute names are role placeholders ({word}, {lemma}, {udPOS}, {udFeatures}, {udRelation}, {category}), filled in with the corpus's own names; an example needing a role the corpus lacks is skipped. {categoryValue} is a real value of the {category} structure attribute. Keep these disjoint from scripts/nl-spike/requests.tsv and heldout.tsv, or the benchmark measures memory.",
+  "examples": [
+    {
+      "request": "an adjective followed by a noun",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "ADJ"}], "repeat": "once"}, {"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "NOUN"}], "repeat": "once"}], "within": [], "explanation": "An adjective immediately followed by a noun."}
+    },
+    {
+      "request": "adverbs in {categoryValue}",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "ADV"}], "repeat": "once"}], "within": [{"attribute": "{category}", "value": "{categoryValue}"}], "explanation": "Adverbs, only where {category} is {categoryValue}."}
+    },
+    {
+      "request": "any form of \"take\" followed by \"care\", maybe with one word in between",
+      "plan": {"positions": [{"conditions": [{"attribute": "{lemma}", "op": "=", "value": "take"}], "repeat": "once"}, {"conditions": [], "repeat": "optional"}, {"conditions": [{"attribute": "{word}", "op": "=", "value": "care"}], "repeat": "once"}], "within": [], "explanation": "Forms of take followed by care, with at most one word in between."}
+    },
+    {
+      "request": "words starting with \"un\" that are adjectives",
+      "plan": {"positions": [{"conditions": [{"attribute": "{word}", "op": "=", "value": "un.*"}, {"attribute": "{udPOS}", "op": "=", "value": "ADJ"}], "repeat": "once"}], "within": [], "explanation": "Adjectives whose form starts with un."}
+    },
+    {
+      "request": "words ending in \"ness\"",
+      "plan": {"positions": [{"conditions": [{"attribute": "{word}", "op": "=", "value": ".*ness"}], "repeat": "once"}], "within": [], "explanation": "Words whose form ends in ness."}
+    },
+    {
+      "request": "present-tense verbs other than the lemma \"have\"",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "VERB"}, {"attribute": "{udFeatures}", "op": "=", "value": "Tense=Pres"}, {"attribute": "{lemma}", "op": "!=", "value": "have"}], "repeat": "once"}], "within": [], "explanation": "Present-tense verbs except forms of have."}
+    },
+    {
+      "request": "singular nouns followed by \"that\"",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "NOUN"}, {"attribute": "{udFeatures}", "op": "=", "value": "Number=Sing"}], "repeat": "once"}, {"conditions": [{"attribute": "{word}", "op": "=", "value": "that"}], "repeat": "once"}], "within": [], "explanation": "Singular nouns immediately followed by that."}
+    },
+    {
+      "request": "third person singular verbs",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "VERB"}, {"attribute": "{udFeatures}", "op": "=", "value": "Person=3"}, {"attribute": "{udFeatures}", "op": "=", "value": "Number=Sing"}], "repeat": "once"}], "within": [], "explanation": "Verbs in the third person singular."}
+    },
+    {
+      "request": "adjectives that modify a noun",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "ADJ"}, {"attribute": "{udRelation}", "op": "=", "value": "amod"}], "repeat": "once"}], "within": [], "explanation": "Adjectives in the adjectival-modifier relation."}
+    },
+    {
+      "request": "the main verb of a sentence",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "VERB"}, {"attribute": "{udRelation}", "op": "=", "value": "root"}], "repeat": "once"}], "within": [], "explanation": "Verbs that are the root of their sentence."}
+    },
+    {
+      "request": "\"big\" or \"large\" followed by a noun",
+      "plan": {"positions": [{"conditions": [{"attribute": "{word}", "op": "=", "value": "big|large"}], "repeat": "once"}, {"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "NOUN"}], "repeat": "once"}], "within": [], "explanation": "The words big or large immediately followed by a noun."}
+    },
+    {
+      "request": "a determiner followed by a word that is not a noun",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "DET"}], "repeat": "once"}, {"conditions": [{"attribute": "{udPOS}", "op": "!=", "value": "NOUN"}], "repeat": "once"}], "within": [], "explanation": "A determiner followed by any word other than a noun."}
+    },
+    {
+      "request": "a sequence of proper nouns",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "PROPN"}], "repeat": "one-or-more"}], "within": [], "explanation": "One or more proper nouns in a row."}
+    },
+    {
+      "request": "the auxiliary \"will\" followed by a verb",
+      "plan": {"positions": [{"conditions": [{"attribute": "{lemma}", "op": "=", "value": "will"}, {"attribute": "{udPOS}", "op": "=", "value": "AUX"}], "repeat": "once"}, {"conditions": [{"attribute": "{udPOS}", "op": "=", "value": "VERB"}], "repeat": "once"}], "within": [], "explanation": "The auxiliary will immediately followed by a verb."}
+    },
+    {
+      "request": "any form of \"give\", then \"up\", with at most two words in between",
+      "plan": {"positions": [{"conditions": [{"attribute": "{lemma}", "op": "=", "value": "give"}], "repeat": "once"}, {"conditions": [], "repeat": "optional"}, {"conditions": [], "repeat": "optional"}, {"conditions": [{"attribute": "{word}", "op": "=", "value": "up"}], "repeat": "once"}], "within": [], "explanation": "Forms of give followed by up, with up to two words in between."}
+    },
+    {
+      "request": "ordinal numbers",
+      "plan": {"positions": [{"conditions": [{"attribute": "{udFeatures}", "op": "=", "value": "NumType=Ord"}], "repeat": "once"}], "within": [], "explanation": "Ordinal numbers (first, second, 3rd)."}
+    },
+    {
+      "request": "the phrase \"in order to\"",
+      "plan": {"positions": [{"conditions": [{"attribute": "{word}", "op": "=", "value": "in"}], "repeat": "once"}, {"conditions": [{"attribute": "{word}", "op": "=", "value": "order"}], "repeat": "once"}, {"conditions": [{"attribute": "{word}", "op": "=", "value": "to"}], "repeat": "once"}], "within": [], "explanation": "The exact phrase in order to."}
+    },
+    {
+      "request": "any form of \"run\" in {categoryValue}",
+      "plan": {"positions": [{"conditions": [{"attribute": "{lemma}", "op": "=", "value": "run"}], "repeat": "once"}], "within": [{"attribute": "{category}", "value": "{categoryValue}"}], "explanation": "Forms of run, only where {category} is {categoryValue}."}
+    }
+  ]
+}

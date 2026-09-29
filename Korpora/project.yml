@@ -27,6 +27,8 @@ options:
 packages:
   ManateeKit:
     path: ../ManateeKit
+  KorporaAssistant:
+    path: ../KorporaAssistant
 
 targets:
   Korpora:
@@ -37,6 +39,8 @@ targets:
     dependencies:
       - package: ManateeKit
         product: ManateeKit
+      - package: KorporaAssistant
+        product: KorporaAssistant
     # Bundle encodevert/mkregexattr into Contents/Helpers/ for release
     # builds (see docs/project-plan.md's "Goal - Ship a signed GitHub
     # release", blocker 2: a shipped app can't find them via the #filePath

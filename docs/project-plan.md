@@ -4011,9 +4011,18 @@ frequency lists. The remaining errors are systematic (position structure,
 UD conventions), so fine-tuning (phase 6) will probably be needed. Go, with
 Qwen3-4B-4bit (2.3 GB) as the stock default.
 
-Next: phase 2's remaining pieces (runtime JSON Schema from `Corpus.info()`,
-`QueryContextBuilder` with a bundled UD gloss table, example banks) and a
-≥100-request benchmark.
+Phase 2 (2026-09-29): the model-independent half is the new local package
+`KorporaAssistant/` (`swift test`: 28 tests; dev CLI `korpora-assistant`
+prints a corpus's profile, schema and exact prompts for the harness):
+per-corpus JSON Schema, attribute roles detected from values (UD POS under
+any name, UD features/relations, Czech positional tags), glossed corpus
+facts, a role-placeholder example bank, and a token budget. With stock
+Qwen3-4B its prompt scores within noise of the hand-written one on dev,
+but lower on held-out; more detail beats less. `heldout.tsv` has been read,
+so it's no longer a clean held-out set.
+
+Next: a ≥100-request benchmark with a fresh, unread held-out split, then
+prompt work against its dev split.
 
 ## Key files
 
