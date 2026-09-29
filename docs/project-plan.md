@@ -4042,9 +4042,12 @@ derails the model, so the app generates from its own compact EBNF
 (`QueryGrammar`). XGrammar's jump-forward corrupts output (15/60 with it
 on), so it's off.
 
-Next: phase 4 (app UI: "Describe…" popover, Settings pane with model
-download; KorporaGeneration linked into the app, Release stripping, Metal
-Toolchain precondition in the release script).
+**Paused 2026-09-29 after phase 3.** Main is unaffected: none of this is
+merged. Next on resuming: phase 4 (app UI: "Describe…" popover, Settings
+pane with model download; KorporaGeneration linked into the app, Release
+stripping, Metal Toolchain precondition in the release script). It waits
+on three decisions listed in `docs/nl-query-assistant.md`, "Open decisions
+(phase 4)".
 
 ## Key files
 

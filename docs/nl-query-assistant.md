@@ -2,7 +2,9 @@
 
 Status: long-term research branch (`feat/nl-query-assistant`), ending in
 a fine-tuned model (phase 6); it may pause for other goals between
-phases. Re-planned 2026-09-29 around an **optional, downloaded MLX model on
+phases. **Paused 2026-09-29 after phase 3** (generation in Swift at
+parity with the Python harness). Resume at phase 4, which needs the
+decisions under "Open decisions (phase 4)". Re-planned 2026-09-29 around an **optional, downloaded MLX model on
 macOS 15+** (was: Apple's on-device model, macOS 27 only). Engine
 primitives (7.1) and `QueryPlan`/`CQLSerializer` (7.2, part) are done and
 unaffected. The build/size/release cost of MLX was measured the same day
@@ -464,6 +466,36 @@ Debug-only diagnostics). The retry rarely changes the outcome: the model
 tends to repeat itself or swap one wrong value for another. Debug builds
 are about 15x slower (unoptimized MLX/XGrammar C++): always benchmark
 Release.
+
+## Open decisions (phase 4)
+
+Asked 2026-09-29, not answered yet:
+1. **Default model:** Qwen3-4B-4bit (2.3 GB, 34/60 on dev) or Qwen3-8B-4bit
+   (4.6 GB, 42–43/60), or offer both.
+2. **Download source:** the `mlx-community` Hugging Face repos at a pinned
+   revision, or our own copy as a GitHub release asset (SHA-256 pinned
+   either way).
+3. **No model installed:** hide the "Describe…" button, or show it and
+   have it lead to the Settings "Assistant" pane.
+
+Also open, not blocking: Swift generation is slower than Python (2.2–2.6 s
+vs 1.3 s per request for the 4B), and the retry rarely helps.
+
+## Resuming
+
+- Python harness: `data/.venv-nl` (gitignored; recreate per `run.py`'s
+  header). Models are in the Hugging Face cache (on the dev Mac
+  `HF_HUB_CACHE=/Volumes/STORAGE/HF_Hub_Cache`).
+- `KorporaAssistant`: `swift build && swift test` (40 tests).
+- `KorporaGeneration`: xcodebuild Release (see `bench-swift.sh`'s header).
+  It needs the Metal Toolchain component (`xcodebuild -downloadComponent
+  MetalToolchain`), installed on the dev Mac 2026-09-29.
+- Corpora: UD English EWT at `data/ud-en-ewt/` (compiled, registry in
+  `data/ud-en-ewt/registry`); SYN2025 in the app's compiled corpora.
+- Dev loop: `scripts/nl-spike/bench-dev.sh` (Python, prompt variants) and
+  `bench-swift.sh` (the app's Swift path). The test split
+  (`bench/ud-en-ewt-test.tsv`) is still unread; keep it that way until a
+  milestone comparison.
 
 ## Phases
 0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0
