@@ -1510,7 +1510,7 @@ corruption, the window growth ×2, the quit/orphan-process bug, the
 `mkregexattr` gap, the stale-directory corruption, and now the duplicate-
 `word`-attribute crash) has had a real, verified root cause and fix.
 
-### Corpus Settings UX: one corpus list (implemented on `feat/unified-corpus-list`; not yet click-tested)
+### Corpus Settings UX: one corpus list (done, merged in #10; click-tested in the 0.2 smoke test)
 
 Flagged 2026-09-07 after `syn2025` produced an intermittent bad query
 result and the user first assumed it needed a "delete this corpus"
@@ -1586,11 +1586,13 @@ per-name "Keep in Memory" set, launch search path, one-time
 `migrateCorpusList()` called from `main.swift`; `CorpusResidencyManager`
 using it; the Corpora pane with a Source column, the "+" menu, the remove
 prompt; General pane and `GeneralSettingsViewController` deleted; 3 app
-tests, 93 in all). **Not yet done: a click-through in the running app**
-(Xcode agent's job per CLAUDE.md): "+" both entries, the remove sheet for
-each origin, Keep in Memory on an added corpus, an environment corpus's
-disabled "−", and a launch with a v0.1 preferences file holding a
-registry directory. A leftover `corpus-meta.json` of the old flag is
+tests, 93 in all). **Click-tested by the user in the 0.2 smoke test (2026-09-29), on macOS 15
+and 27.** That test found one bug, fixed in `9ba315f`: the pane's 2-second
+refresh reloaded the whole table, which cleared the selection before "−"
+could be clicked (the timer predates this work; 0.1 had it). Now only the
+Keep in Memory column is reloaded, and a full reload restores the
+selection by corpus name; a regression test covers it.
+A leftover `corpus-meta.json` of the old flag is
 harmless and left in place. The compiled-corpora directory's "Choose…"
 still only changes where *new* imports go; corpora already built in the
 old place drop off the list until re-added with Add Existing Corpus….
@@ -4093,6 +4095,47 @@ To cut the release:
 6. Pick the version (`CFBundleShortVersionString`/`CFBundleVersion` in
    `Info.plist`; v0.1 was `0.1`/`1`, so bump the build number at least),
    then cut it as in step 7 above. Record results here.
+
+### Release 0.2 — build and test record (2026-09-29)
+
+Built from `9ba315f` with `scripts/make-release.sh` (full, notarized);
+`Korpora 0.2 (2)`. Tests: app 94, ManateeKit 82, all passing. **Not yet
+published**: cut it as in step 7 above (`gh release create v0.2` with the
+DMG, its `.sha256`, and notes). Keep `release/Korpora-0.2.dSYM.zip` with
+it; the script now archives it.
+- `Korpora-0.2.dmg` SHA-256 `f9ca36b8…ffb9d`; notarization submissions
+  `668f29b3-…` (app), `6ee6b382-…` (DMG); both stapled; Gatekeeper accepts
+  a quarantined copy.
+- **macOS 15.7.7 VM** (Tart, Gatekeeper on): scripted install checks 9/9
+  (DMG and app `Notarized Developer ID`, stapled, `syspolicy_check`
+  clean, strict codesign, minimum OS 15.0), exec checks 6/6 (bundled
+  `encodevert` + `mkregexattr`, app relaunch, no dyld errors).
+- **Upgrade over 0.1**, seeded in the VM with 0.1's own tools: a registry
+  directory in the old setting, a Korpora-built corpus flagged Keep in
+  Memory the old way (`corpus-meta.json`), and a corpus imported through
+  the 0.1 UI. After the first launch of 0.2 (through the real Gatekeeper
+  dialog, App-Translocated): the old setting was removed, the registry
+  directory's corpus became a link in `AddedCorpora/`, the flag moved to
+  `keepResidentCorpora`, no crash reports. Checked on the rebuilt DMG
+  after resetting the VM to the pre-upgrade state.
+- The user also clicked through it in the VM and from the DMG on macOS
+  27: icon good in Finder, Dock and Xcode; the selection bug above.
+- **Not ours:** an Xcode *debug run* on macOS 27 still shows a generic
+  Dock tile for the running app, while the same bundle has the right icon
+  everywhere else (Finder, Xcode, a release build, the macOS 15 VM).
+  Launch Services also knew 15 stray copies of the app then (old
+  DerivedData, temp builds); unregistering them didn't change it.
+- **Tooling notes for the next run.** `tart` is not in Homebrew's working
+  formula: 2.40.0 from the release tarball (checksum and notarization
+  checked) is in `~/.local/opt/tart.app`, linked at `~/.local/bin/tart`.
+  The VM `korpora-smoke-15` accepts a dedicated key, `~/.tart/korpora-smoke-key`
+  (installed once over the image's default `admin` login; `~/.tart/askpass.sh`
+  answers the password prompt). `encodevert` needs `-v` to read the
+  registry's `VERTICAL` file, otherwise it waits on stdin forever. The
+  first launch of a newly installed build needs a click on Gatekeeper's
+  dialog in the VM window; nothing scripted can do it. `make-release.sh`
+  used to leave its staged app copies registered with Launch Services
+  (they can confuse icon lookup); it now unregisters and deletes them.
 
 ### Explicitly out of scope for this goal
 
