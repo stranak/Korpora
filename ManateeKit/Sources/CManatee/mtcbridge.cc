@@ -760,6 +760,77 @@ char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, co
     }
 }
 
+char *mtc_corpus_attr_top_values(MTCCorpus *corp, const char *attr_name, int max_values, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        PosAttr *attr = corp->corp->get_attr(attr_name);
+        int range = attr->id_range();
+        std::vector<std::pair<NumOfPos, int>> freqs;
+        freqs.reserve(range);
+        for (int id = 0; id < range; ++id)
+            freqs.emplace_back(attr->freq(id), id);
+        size_t keep = std::min(freqs.size(), static_cast<size_t>(std::max(max_values, 0)));
+        // Ties broken by id, i.e. lexicon order, so the result is stable.
+        std::partial_sort(freqs.begin(), freqs.begin() + keep, freqs.end(),
+                          [](const std::pair<NumOfPos, int> &a, const std::pair<NumOfPos, int> &b) {
+                              return a.first != b.first ? a.first > b.first : a.second < b.second;
+                          });
+        std::string result;
+        for (size_t i = 0; i < keep; ++i) {
+            result += '\x1F';
+            result += attr->id2str(freqs[i].second);
+            result += '\x1E';
+            result += std::to_string(static_cast<long long>(freqs[i].first));
+        }
+        return strdup(result.c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error reading attribute frequencies");
+        return nullptr;
+    }
+}
+
+char *mtc_corpus_attr_top_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
+                                          int ignore_case, int max_values, char **error) {
+    if (!corp) {
+        set_error(error, "null corpus handle");
+        return nullptr;
+    }
+    try {
+        PosAttr *attr = corp->corp->get_attr(attr_name);
+        std::unique_ptr<IdStrGenerator> values(attr->regexp2strids(pattern, ignore_case != 0));
+        std::vector<std::pair<NumOfPos, int>> freqs;
+        for (; !values->end(); values->next()) {
+            int id = values->getId();
+            freqs.emplace_back(attr->freq(id), id);
+        }
+        size_t keep = std::min(freqs.size(), static_cast<size_t>(std::max(max_values, 0)));
+        std::partial_sort(freqs.begin(), freqs.begin() + keep, freqs.end(),
+                          [](const std::pair<NumOfPos, int> &a, const std::pair<NumOfPos, int> &b) {
+                              return a.first != b.first ? a.first > b.first : a.second < b.second;
+                          });
+        std::string result;
+        for (size_t i = 0; i < keep; ++i) {
+            result += '\x1F';
+            result += attr->id2str(freqs[i].second);
+            result += '\x1E';
+            result += std::to_string(static_cast<long long>(freqs[i].first));
+        }
+        return strdup(result.c_str());
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return nullptr;
+    } catch (...) {
+        set_error(error, "unknown error matching attribute frequencies");
+        return nullptr;
+    }
+}
+
 int mtc_create_subcorpus(MTCCorpus *corp, const char *subc_path, const char *struct_name,
                           const char *query, char **error) {
     if (!corp) {

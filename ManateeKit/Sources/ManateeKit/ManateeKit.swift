@@ -296,6 +296,44 @@ public actor Corpus {
         return joined.dropFirst().components(separatedBy: "\u{1F}")
     }
 
+    /// The `limit` most frequent values of `attribute`, most frequent first,
+    /// each with its frequency. Ties keep lexicon order.
+    ///
+    /// Reads every value's frequency, so it's O(lexicon): instant for a
+    /// tagset or a genre list, acceptable for lemmas.
+    ///
+    /// What the frequency counts depends on the attribute: tokens for a
+    /// positional attribute (`tag`), but for a structural one (`doc.genre`)
+    /// the number of structure instances - documents - with that value, not
+    /// their tokens (tested in `SubcorpusRestrictionTests`).
+    public func topAttributeValues(attribute: String, limit: Int) throws -> [(value: String, frequency: Int)] {
+        var error: UnsafeMutablePointer<CChar>?
+        return try Self.decodeCounted(
+            mtc_corpus_attr_top_values(handle, attribute, Int32(limit), &error), error: &error)
+    }
+
+    /// The same, among the values matching regex `pattern` (the whole value
+    /// must match; `SubcorpusRestriction.containsPattern` builds a "contains"
+    /// pattern). Every match is read before the most frequent are chosen.
+    public func topAttributeValues(
+        attribute: String, matching pattern: String, ignoreCase: Bool = true, limit: Int
+    ) throws -> [(value: String, frequency: Int)] {
+        var error: UnsafeMutablePointer<CChar>?
+        return try Self.decodeCounted(
+            mtc_corpus_attr_top_values_matching(
+                handle, attribute, pattern, ignoreCase ? 1 : 0, Int32(limit), &error),
+            error: &error)
+    }
+
+    private static func decodeCounted(
+        _ raw: UnsafeMutablePointer<CChar>?, error: inout UnsafeMutablePointer<CChar>?
+    ) throws -> [(value: String, frequency: Int)] {
+        try decodeValues(raw, error: &error).map { entry in
+            let parts = entry.components(separatedBy: "\u{1E}")
+            return (parts[0], Int(parts.count > 1 ? parts[1] : "") ?? 0)
+        }
+    }
+
     /// Opens a previously created subcorpus (see `createSubcorpus`) as its
     /// own `Corpus` - queries against it are automatically restricted to the
     /// subcorpus's range, since `SubCorpus` overrides `filter_query` in C++

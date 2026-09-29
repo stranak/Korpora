@@ -279,6 +279,26 @@ char *mtc_corpus_attr_values(MTCCorpus *corp, const char *attr_name, char **erro
 char *mtc_corpus_attr_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
                                       int ignore_case, int max_values, char **error);
 
+/* The `max_values` most frequent values of attribute `attr_name`, most
+ * frequent first. Each entry is '\x1F' value '\x1E' decimal frequency, so a
+ * value may contain anything but those two control characters. Empty string
+ * for an empty lexicon; NULL and *error for an unknown attribute.
+ *
+ * O(lexicon size): every id's frequency is read (PosAttr::freq, which uses
+ * the .frq file when present and otherwise counts from the reverse index)
+ * and partially sorted. Instant for a tagset (thousands of values), still
+ * fine for a lemma lexicon. For a positional attribute the frequency is the
+ * number of tokens with the value; for a structural attribute ("doc.genre")
+ * it is the number of structure instances (documents) with the value. */
+char *mtc_corpus_attr_top_values(MTCCorpus *corp, const char *attr_name, int max_values, char **error);
+
+/* Like mtc_corpus_attr_top_values, but only among the values matching regex
+ * `pattern` (whole-value match, as mtc_corpus_attr_values_matching). All
+ * matches are read before choosing the most frequent, so the cost follows
+ * the number of matches, not `max_values`. */
+char *mtc_corpus_attr_top_values_matching(MTCCorpus *corp, const char *attr_name, const char *pattern,
+                                          int ignore_case, int max_values, char **error);
+
 /* -------------------- subcorpora --------------------
  * A subcorpus is a Manatee-native concept: a saved range file restricting a
  * parent corpus to the hits of one CQL query scoped to a structure (e.g. one

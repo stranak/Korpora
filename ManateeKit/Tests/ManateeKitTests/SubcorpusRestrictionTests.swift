@@ -141,6 +141,41 @@ final class SubcorpusRestrictionTests: XCTestCase {
         }
     }
 
+    /// What the picker's numbers mean: for a structure attribute, how many
+    /// structure instances (here documents) have the value - not tokens.
+    /// (Each fixture document has two tokens, so tokens would read 6 and 4.)
+    func testStructureAttributeFrequenciesCountDocuments() async throws {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        let genres = try await corpus.topAttributeValues(attribute: "doc.genre", limit: 10)
+        XCTAssertEqual(genres.map(\.value), ["essay", "fiction"])
+        XCTAssertEqual(genres.map(\.frequency), [3, 2])
+        let years = try await corpus.topAttributeValues(attribute: "doc.year", limit: 10)
+        XCTAssertEqual(years.map(\.frequency), [2, 2, 1])  // 1876 and 1901 twice, 1845 once
+        XCTAssertEqual(Set(years.map(\.value)), ["1845", "1876", "1901"])
+    }
+
+    /// The search behind a big attribute's list: matches only, most
+    /// frequent first, with counts.
+    func testCountedSearchReturnsMatchesMostFrequentFirst() async throws {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        let smiths = try await corpus.topAttributeValues(
+            attribute: "doc.author", matching: R.containsPattern("smith"), ignoreCase: true, limit: 10)
+        XCTAssertEqual(Set(smiths.map(\.value)), ["Smith (Jr.)", "Smith Jrx"])
+        XCTAssertEqual(smiths.map(\.frequency), [1, 1])
+        // Case-sensitive: nothing matches "smith" in lowercase.
+        let none = try await corpus.topAttributeValues(
+            attribute: "doc.author", matching: R.containsPattern("smith"), ignoreCase: false, limit: 10)
+        XCTAssertEqual(none.count, 0)
+        // A regex metacharacter in the search text is literal.
+        let paren = try await corpus.topAttributeValues(
+            attribute: "doc.author", matching: R.containsPattern("(Jr"), ignoreCase: true, limit: 10)
+        XCTAssertEqual(paren.map(\.value), ["Smith (Jr.)"])
+        // The limit keeps the most frequent: years 1876/1901 (2 each) before 1845.
+        let top = try await corpus.topAttributeValues(
+            attribute: "doc.year", matching: ".*", ignoreCase: false, limit: 2)
+        XCTAssertEqual(top.map(\.frequency), [2, 2])
+    }
+
     /// The lists the picker shows: every distinct value of an attribute
     /// (capped), and a "contains" search over them.
     func testTheValueListsAreWhatThePickerNeeds() async throws {

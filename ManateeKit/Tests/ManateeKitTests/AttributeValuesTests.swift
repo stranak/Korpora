@@ -155,4 +155,38 @@ final class AttributeValuesTests: XCTestCase {
             // Expected.
         }
     }
+
+    // MARK: Values with frequencies
+
+    /// tag over the 17-token fixture: JJ x5, and DT, NN, VBZ x4 each.
+    func testTopValuesAreMostFrequentFirstWithTiesInLexiconOrder() async throws {
+        let corpus = try await openFixture()
+        let top = try await corpus.topAttributeValues(attribute: "tag", limit: 10)
+        XCTAssertEqual(top.map(\.value), ["JJ", "DT", "NN", "VBZ"])
+        XCTAssertEqual(top.map(\.frequency), [5, 4, 4, 4])
+        XCTAssertEqual(top.map(\.frequency).reduce(0, +), 17)
+    }
+
+    func testTopValuesLimit() async throws {
+        let corpus = try await openFixture()
+        let two = try await corpus.topAttributeValues(attribute: "tag", limit: 2)
+        XCTAssertEqual(two.map(\.value), ["JJ", "DT"])
+        let none = try await corpus.topAttributeValues(attribute: "tag", limit: 0)
+        XCTAssertTrue(none.isEmpty)
+    }
+
+    func testTopValuesOfAnUnknownAttributeThrow() async throws {
+        let corpus = try await openFixture()
+        do {
+            _ = try await corpus.topAttributeValues(attribute: "nonexistent", limit: 5)
+            XCTFail("expected an error")
+        } catch {}
+    }
+
+    func testTopValuesMatchingKeepsFrequencies() async throws {
+        let corpus = try await openFixture()
+        let nouns = try await corpus.topAttributeValues(attribute: "tag", matching: "N.*|JJ", ignoreCase: false, limit: 10)
+        XCTAssertEqual(nouns.map(\.value), ["JJ", "NN"])
+        XCTAssertEqual(nouns.map(\.frequency), [5, 4])
+    }
 }

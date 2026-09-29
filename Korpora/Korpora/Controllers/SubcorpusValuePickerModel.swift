@@ -12,12 +12,19 @@ import ManateeKit
 /// user has already moved on from) is tested with fake loaders.
 @MainActor
 final class SubcorpusValuePickerModel {
+    /// A value and how many times it occurs: for a structure attribute, how
+    /// many instances of the structure (documents) have it.
+    struct ValueCount: Equatable, Sendable {
+        var value: String
+        var count: Int
+    }
+
     struct Loaders {
-        /// Distinct values of a dotted attribute (`doc.genre`), at most
-        /// `limit` of them.
-        var values: @Sendable (_ attribute: String, _ limit: Int) async throws -> [String]
-        /// Values containing `text` (case-insensitive), at most `limit`.
-        var search: @Sendable (_ attribute: String, _ text: String, _ limit: Int) async throws -> [String]
+        /// The most frequent values of a dotted attribute (`doc.genre`),
+        /// most frequent first, at most `limit` of them.
+        var values: @Sendable (_ attribute: String, _ limit: Int) async throws -> [ValueCount]
+        /// The same among values containing `text` (case-insensitive).
+        var search: @Sendable (_ attribute: String, _ text: String, _ limit: Int) async throws -> [ValueCount]
     }
 
     /// The longest list shown. An attribute with more values than this
@@ -30,8 +37,10 @@ final class SubcorpusValuePickerModel {
 
     private(set) var structure: String
     private(set) var attribute: String?
-    /// What the list shows now, sorted for reading.
-    private(set) var rows: [String] = []
+    /// What the list shows now: a list that fits is in reading order
+    /// (alphabetical, numbers as numbers); a capped list, and search results
+    /// in one, are the most frequent values, most frequent first.
+    private(set) var rows: [ValueCount] = []
     /// `rows` is only part of the matching values (`listCap` of more).
     private(set) var isTruncated = false
     private(set) var isLoading = false
@@ -39,7 +48,7 @@ final class SubcorpusValuePickerModel {
 
     /// Every value of the attribute, when there are few enough to hold; the
     /// search then filters this instead of asking the engine.
-    private var complete: [String]?
+    private var complete: [ValueCount]?
     private var selected: [String: Set<String>] = [:]
     /// Bumped by every request, so a slow answer to an old question can't
     /// overwrite the answer to the current one.
@@ -98,9 +107,9 @@ final class SubcorpusValuePickerModel {
             guard mine == generation else { return }
             if values.count > Self.listCap {
                 isTruncated = true
-                rows = Self.sorted(Array(values.prefix(Self.listCap)))
+                rows = Array(values.prefix(Self.listCap))
             } else {
-                complete = Self.sorted(values)
+                complete = Self.sortedForReading(values)
                 rows = complete ?? []
             }
         } catch {
@@ -115,7 +124,7 @@ final class SubcorpusValuePickerModel {
         let text = text.trimmingCharacters(in: .whitespaces)
         if let complete {
             generation += 1
-            rows = text.isEmpty ? complete : complete.filter { $0.localizedCaseInsensitiveContains(text) }
+            rows = text.isEmpty ? complete : complete.filter { $0.value.localizedCaseInsensitiveContains(text) }
             return
         }
         guard let dotted = dottedAttribute else { return }
@@ -131,7 +140,7 @@ final class SubcorpusValuePickerModel {
             let found = try await loaders.search(dotted, text, Self.listCap + 1)
             guard mine == generation else { return }
             isTruncated = found.count > Self.listCap
-            rows = Self.sorted(Array(found.prefix(Self.listCap)))
+            rows = Array(found.prefix(Self.listCap))
         } catch {
             guard mine == generation else { return }
             loadError = "\(error)"
@@ -146,6 +155,10 @@ final class SubcorpusValuePickerModel {
 
     private static func sorted(_ values: [String]) -> [String] {
         values.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private static func sortedForReading(_ values: [ValueCount]) -> [ValueCount] {
+        values.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
     }
 
     // MARK: Picking

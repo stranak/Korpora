@@ -300,10 +300,10 @@ Confirmed product decisions (from earlier in this project):
 | Goal — signed release | n/a | v0.1 (2026-09-26) and v0.2 (2026-09-29) published | yes — macOS 15.7.7 VM smoke tests, incl. an upgrade 0.1 → 0.2 |
 
 Test counts in the rows above are as of each phase's completion. Today:
-ManateeKit 94 (XCTest), app 108 (Swift Testing).
+ManateeKit 103 (XCTest), app 113 (Swift Testing).
 
 All Swift/C++ code builds cleanly and all tests pass (`swift test` in
-`ManateeKit` → 94/94; app suite 108/108, 2026-09-29).
+`ManateeKit` → 103/103; app suite 113/113, 2026-09-30).
 
 ## Open goals (refreshed 2026-09-29)
 
@@ -3553,13 +3553,22 @@ free-text CQL today.
 - **CQL expression**: the old free-text field, kept rather than removed
   (ranges, regular expressions and negation can't be ticked). Switching to
   it starts from what was picked.
-- Values are shown with `Corpus.attributeValues` (6.7). An attribute with
-  up to 500 distinct values is listed whole and the search filters it
-  locally; with more (`doc.id` in a big corpus) the first 500 are shown and
-  the search asks the engine (`matching:`, case-insensitive, whole list).
-  **No value counts**: the count primitive (`topAttributeValues`) exists
-  only on the research branch, and this design didn't need it; adding
-  counts later is a small change once it's on main.
+- Values are listed with **counts** (added 2026-09-30 at the user's
+  request after testing on SYN2025): how many `<doc>`s have each value.
+  Checked in a test that this is documents, not tokens, for a structure
+  attribute (for a positional attribute it is tokens). An attribute with up
+  to 500 distinct values is listed whole in reading order and the search
+  filters it locally; with more (`doc.id` in a big corpus) the 500 *most
+  frequent* are shown, most frequent first, and the search asks the engine
+  (case-insensitive, most frequent matches first, with counts). Engine
+  primitives: `Corpus.topAttributeValues(attribute:limit:)` and
+  `topAttributeValues(attribute:matching:ignoreCase:limit:)`.
+  **Merging the research branch:** its Phase 7.1 commit has the same
+  `mtc_corpus_attr_top_values` / `topAttributeValues(attribute:limit:)`,
+  ported here unchanged. Expect a trivial conflict in `mtcbridge.h/.cc` and
+  `ManateeKit.swift` (keep the union), and correct the branch's header
+  comment, which says structure attributes report token frequencies; they
+  report document counts.
 - **Escaping matters and is tested.** CQL compares a *regular expression*
   against the whole value, so a picked `Smith (Jr.)` is regex-escaped
   before being quoted (`SubcorpusRestriction.literal`); raw, it would match

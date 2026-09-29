@@ -231,14 +231,15 @@ final class NewSubcorpusPopoverController: NSViewController {
         return .init(
             values: { attribute, limit in
                 guard let corpus else { throw PickerError.corpusUnavailable }
-                return try await corpus.attributeValues(
-                    attribute: attribute, matching: ".*", ignoreCase: false, limit: limit)
+                return try await corpus.topAttributeValues(attribute: attribute, limit: limit)
+                    .map { .init(value: $0.value, count: $0.frequency) }
             },
             search: { attribute, text, limit in
                 guard let corpus else { throw PickerError.corpusUnavailable }
-                return try await corpus.attributeValues(
+                return try await corpus.topAttributeValues(
                     attribute: attribute, matching: SubcorpusRestriction.containsPattern(text),
                     ignoreCase: true, limit: limit)
+                    .map { .init(value: $0.value, count: $0.frequency) }
             })
     }
 
@@ -273,7 +274,7 @@ final class NewSubcorpusPopoverController: NSViewController {
             var parts: [String] = []
             let searching = !searchField.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
             if model.isTruncated {
-                parts.append("First \(model.rows.count) values shown; search to narrow the list")
+                parts.append("The \(model.rows.count) most frequent values; search to find others")
             } else {
                 parts.append("\(model.rows.count) value\(model.rows.count == 1 ? "" : "s")"
                     + (searching ? " match" : ""))
@@ -346,7 +347,7 @@ final class NewSubcorpusPopoverController: NSViewController {
 
     @objc private func checkboxToggled(_ sender: NSButton) {
         guard model.rows.indices.contains(sender.tag) else { return }
-        model.toggle(model.rows[sender.tag])
+        model.toggle(model.rows[sender.tag].value)
         refresh()
     }
 
@@ -388,14 +389,44 @@ extension NewSubcorpusPopoverController: NSTextFieldDelegate {
 extension NewSubcorpusPopoverController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int { model?.rows.count ?? 0 }
 
+    /// A checkbox with the value, and how often it occurs on the right (for a
+    /// structure attribute: how many <doc>s have it).
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let value = model.rows[row]
-        let checkbox = NSButton(checkboxWithTitle: value.isEmpty ? "(empty)" : value,
+        let entry = model.rows[row]
+        let checkbox = NSButton(checkboxWithTitle: entry.value.isEmpty ? "(empty)" : entry.value,
                                 target: self, action: #selector(checkboxToggled(_:)))
         checkbox.tag = row
-        checkbox.state = model.isSelected(value) ? .on : .off
+        checkbox.state = model.isSelected(entry.value) ? .on : .off
         checkbox.lineBreakMode = .byTruncatingMiddle
-        checkbox.toolTip = value
-        return checkbox
+        checkbox.toolTip = entry.value
+        checkbox.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let count = NSTextField(labelWithString: Self.countFormatter.string(from: NSNumber(value: entry.count)) ?? "\(entry.count)")
+        count.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        count.textColor = .secondaryLabelColor
+        count.alignment = .right
+        count.setContentHuggingPriority(.required, for: .horizontal)
+        count.setContentCompressionResistancePriority(.required, for: .horizontal)
+        count.toolTip = "\(entry.count) \(model.structure) with this value"
+
+        let cell = NSView()
+        for view in [checkbox, count] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            checkbox.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
+            checkbox.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            count.leadingAnchor.constraint(greaterThanOrEqualTo: checkbox.trailingAnchor, constant: 8),
+            count.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6),
+            count.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+        ])
+        return cell
     }
+
+    private static let countFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
 }
