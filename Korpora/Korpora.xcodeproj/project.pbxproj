@@ -11,6 +11,7 @@
 		13E3136A6E77E54771C201BB /* CQLCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA90C45CF4B5BD7C43B5398D /* CQLCompletion.swift */; };
 		1646290BB74EF2EF5D5A25C7 /* ContextPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE414BB1705FBC35C5E276F /* ContextPopoverController.swift */; };
 		16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */; };
+		171B94927CACB5FA8C25D710 /* SettingsWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC33C652F154E0B0ACAAAF16 /* SettingsWindowTests.swift */; };
 		1938B1A7AFC746B80688FF6E /* CorporaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */; };
 		1C1033F37ED198EBDCED9FED /* FilterSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EAA9D465F5673F768EA3AA /* FilterSheetController.swift */; };
 		2361BEBD2F8EC06105F54B5F /* ConcordanceOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5BD468A9C191CD0CB9A323 /* ConcordanceOperation.swift */; };
@@ -128,6 +129,7 @@
 		EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyDefaultsMigration.swift; sourceTree = "<group>"; };
 		F498141E2902F7FE889DE76F /* NewConcordanceSheetController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConcordanceSheetController.swift; sourceTree = "<group>"; };
 		F564FB37D52D1AD65CC90F09 /* Korpora.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Korpora.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC33C652F154E0B0ACAAAF16 /* SettingsWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -217,6 +219,7 @@
 				0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */,
 				70108D2D157AC3924026A527 /* LegacyDefaultsMigrationTests.swift */,
 				D3253FB4AE0CC8DDD22A9B12 /* QueryHistoryStoreTests.swift */,
+				FC33C652F154E0B0ACAAAF16 /* SettingsWindowTests.swift */,
 				91CE8F8CB611E321AAA51650 /* SubcorpusValuePickerModelTests.swift */,
 				50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */,
 			);
@@ -398,6 +401,7 @@
 				45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */,
 				247ED6676A2FED188F50DAF6 /* LegacyDefaultsMigrationTests.swift in Sources */,
 				2B2B70AE01B0E3943F49F804 /* QueryHistoryStoreTests.swift in Sources */,
+				171B94927CACB5FA8C25D710 /* SettingsWindowTests.swift in Sources */,
 				8EE0AC24488FF49D925A04ED /* SubcorpusValuePickerModelTests.swift in Sources */,
 				DA2EEF3E76DF1BE3F5518902 /* UnicodeScriptTests.swift in Sources */,
 			);

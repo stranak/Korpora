@@ -75,6 +75,9 @@ final class CorporaSettingsViewController: NSViewController {
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 540, height: 440))
+        // Follow the window when it's resized; without this Auto Layout pins the
+        // view to the size it was created with.
+        root.autoresizingMask = [.width, .height]
 
         let directoryLabel = NSTextField(labelWithString: "Corpora built by Korpora are stored in:")
         directoryPathLabel.lineBreakMode = .byTruncatingMiddle
@@ -152,7 +155,9 @@ final class CorporaSettingsViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: directoryPathLabel.bottomAnchor, constant: 16),
             scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            scrollView.heightAnchor.constraint(equalToConstant: 140),
+            // At least 140 tall, and the pane's spare height when the window is
+            // resized: the list is the one thing that benefits from more room.
+            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
 
             importButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
             importButton.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -178,7 +183,7 @@ final class CorporaSettingsViewController: NSViewController {
             minimumFreeField.leadingAnchor.constraint(equalTo: minimumFreeLabel.trailingAnchor, constant: 8),
             minimumFreeSuffix.centerYAnchor.constraint(equalTo: minimumFreeLabel.centerYAnchor),
             minimumFreeSuffix.leadingAnchor.constraint(equalTo: minimumFreeField.trailingAnchor, constant: 4),
-            minimumFreeSuffix.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -20),
+            minimumFreeSuffix.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -20),
         ])
 
         view = root

@@ -22,6 +22,9 @@ final class ConcordanceSettingsViewController: NSViewController {
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 220))
+        // Follow the window when it's resized; without this Auto Layout pins the
+        // view to the size it was created with.
+        root.autoresizingMask = [.width, .height]
 
         let contextLabel = NSTextField(labelWithString: "Default context width:")
         let leftLabel = NSTextField(labelWithString: "Left:")

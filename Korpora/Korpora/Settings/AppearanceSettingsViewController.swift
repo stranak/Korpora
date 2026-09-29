@@ -26,6 +26,9 @@ final class AppearanceSettingsViewController: NSViewController {
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 400))
+        // Follow the window when it's resized; without this Auto Layout pins the
+        // view to the size it was created with.
+        root.autoresizingMask = [.width, .height]
 
         let fontTitle = NSTextField(labelWithString: "Results font:")
         let selectFontButton = NSButton(title: "Select…", target: self, action: #selector(selectFont))
@@ -120,13 +123,14 @@ final class AppearanceSettingsViewController: NSViewController {
             scriptScrollView.topAnchor.constraint(equalTo: scriptHint.bottomAnchor, constant: 8),
             scriptScrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             scriptScrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-            scriptScrollView.heightAnchor.constraint(equalToConstant: 80),
+            // At least 80 tall; takes the spare height when the window is resized.
+            scriptScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
 
             addButton.topAnchor.constraint(equalTo: scriptScrollView.bottomAnchor, constant: 6),
             addButton.leadingAnchor.constraint(equalTo: scriptScrollView.leadingAnchor),
             removeButton.topAnchor.constraint(equalTo: scriptScrollView.bottomAnchor, constant: 6),
             removeButton.leadingAnchor.constraint(equalTo: addButton.trailingAnchor, constant: 2),
-            removeButton.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -20),
+            removeButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -20),
         ])
 
         view = root
