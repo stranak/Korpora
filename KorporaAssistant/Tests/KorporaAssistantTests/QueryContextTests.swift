@@ -235,3 +235,83 @@ enum Profiles {
         #expect(tight.exampleRequests.count < full.exampleRequests.count)
     }
 }
+
+@Suite struct PromptShapeTests {
+    /// A feature's values share a line, features ordered by frequency.
+    @Test func featuresAreGroupedByFeature() {
+        let a = Profiles.attr("feats", Profiles.values("Number=Sing", "Person=3", "Number=Plur", "Degree=Sup"))
+        let text = QueryContextBuilder.groupedFeatures(a, limit: 80, glosses: ["Number=Plur": "plural"])
+        #expect(text == "    Number=Sing; Number=Plur – plural\n    Person=3\n    Degree=Sup")
+    }
+
+    /// Beside UD POS and features, xpos is a secondary tagset.
+    @Test func secondaryTagset() {
+        let prompt = QueryContextBuilder.build(profile: Profiles.udEnglish, request: "x")
+        #expect(prompt.system.contains("xpos: a second, language-specific tagset, e.g. NN; IN; ,. Prefer upos and feats."))
+    }
+
+    @Test func curatedListsFollowTheGlossTable() {
+        let prompt = QueryContextBuilder.build(profile: Profiles.udEnglish, request: "x",
+                                               options: .init(curatedUD: true))
+        // Gloss-table order is ADJ, ADP, ...; frequency order would start with NOUN.
+        #expect(prompt.system.contains("Universal Dependencies): ADJ – adjective; ADP"))
+        #expect(TagsetGlosses.shared.order.udPOS.first == "ADJ")
+        #expect(TagsetGlosses.shared.order.udFeatures.count == TagsetGlosses.shared.udFeatures.count)
+    }
+
+    @Test func basicRulesDropThePhase2Rules() {
+        let prompt = QueryContextBuilder.build(profile: Profiles.udEnglish, request: "x",
+                                               options: .init(extraRules: false))
+        #expect(!prompt.system.contains("Each position is ONE token"))
+        #expect(prompt.system.contains("Use lemma for"))
+    }
+
+    @Test func fixedExamplesComeFirst() {
+        let examples = ExampleBank.shared.instantiated(for: Profiles.udEnglish)
+        let chosen = ExampleBank.select(examples, for: "ordinal numbers", count: 4, fixed: 3)
+        #expect(Array(chosen.prefix(3)) == Array(examples.prefix(3)))
+        #expect(chosen.last?.request == "ordinal numbers")
+    }
+}
+
+@Suite struct QueryRepairTests {
+    private func plan(_ conditions: [QueryPlan.Condition],
+                      within: [QueryPlan.StructureCondition] = []) -> QueryPlan {
+        QueryPlan(positions: [.init(conditions: conditions)], within: within)
+    }
+
+    @Test func caseAndPluralAreRepaired() {
+        let (fixed, changes) = QueryRepair.repair(
+            plan([.init(attribute: "feats", value: "Degree=sup"), .init(attribute: "upos", value: "noun")],
+                 within: [.init(attribute: "doc.genre", value: "Emails")]),
+            profile: Profiles.udEnglish)
+        #expect(fixed.positions[0].conditions.map(\.value) == ["Degree=Sup", "NOUN"])
+        #expect(fixed.within[0].value == "email")
+        #expect(changes.count == 3)
+    }
+
+    /// Right values, regexes, unknown values and open-ended attributes
+    /// are left alone. `word` here has a full-size sample, so it's only
+    /// the top of a longer list and "The" may well exist beyond it.
+    @Test func otherwiseUntouched() {
+        var profile = Profiles.udEnglish
+        let i = profile.attributes.firstIndex { $0.name == "word" }!
+        profile.attributes[i].topValues = (0..<CorpusProfile.valueSampleSize).map {
+            .init(value: $0 == 0 ? "the" : "w\($0)", count: 1000 - $0)
+        }
+        let original = plan([
+            .init(attribute: "upos", value: "NOUN"), .init(attribute: "upos", value: "N.*"),
+            .init(attribute: "feats", value: "Tense=Imp"), .init(attribute: "word", value: "The"),
+        ])
+        let (fixed, changes) = QueryRepair.repair(original, profile: profile)
+        #expect(fixed == original)
+        #expect(changes.isEmpty)
+    }
+
+    /// Plural stripping is for structure values only: tags don't inflect.
+    @Test func noPluralGuessingForTags() {
+        #expect(QueryRepair.match("ADJs", in: ["ADJ"], plurals: false) == nil)
+        #expect(QueryRepair.match("weblogs", in: ["weblog", "email"], plurals: true) == "weblog")
+        #expect(QueryRepair.match("new", in: ["news", "New"], plurals: true) == "New")
+    }
+}

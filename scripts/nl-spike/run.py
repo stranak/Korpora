@@ -189,6 +189,47 @@ def judge(got, golds):
     return f"DIFF {got[0]} vs {golds[0][0]}"
 
 
+def categories(gold):
+    """What a request exercises, read off its gold query, for the per-
+    category breakdown: pos/feats/deprel/lemma/word attributes, regex
+    values, != negation, several positions, an empty [] gap, a repetition
+    suffix, a within clause, and "a|b" alternation."""
+    g = gold.split(" || ")[0]
+    cats = set()
+    for attr, cat in (("upos", "pos"), ("xpos", "pos"), ("feats", "feats"),
+                      ("deprel", "deprel"), ("lemma", "lemma"), ("word", "word")):
+        if re.search(rf"\b{attr}!?=", g):
+            cats.add(cat)
+    values = re.findall(r'!?="((?:[^"\\]|\\.)*)"', g)
+    if any(set(v) & set(".*+?[]()\\") for v in values):
+        cats.add("regex")
+    if any("|" in v for v in values):
+        cats.add("alt")
+    if "!=" in g:
+        cats.add("neg")
+    # Structure is read with the quoted values blanked out, or a regex
+    # value like "[A-Z]+" would count as a position with a repetition.
+    shape = re.sub(r'"(?:[^"\\]|\\.)*"', '""', g)
+    if shape.count("[") > 1:
+        cats.add("seq")
+    if "[]" in shape:
+        cats.add("gap")
+    if re.search(r"\][?*+]", shape):
+        cats.add("rep")
+    if " within " in shape:
+        cats.add("within")
+    return cats
+
+
+def breakdown(golds_and_verdicts):
+    by = {}
+    for gold, v in golds_and_verdicts:
+        for c in categories(gold):
+            n, ok = by.get(c, (0, 0))
+            by[c] = (n + 1, ok + (v in ("EXACT", "OK")))
+    return "  ".join(f"{c} {ok}/{n}" for c, (n, ok) in sorted(by.items()))
+
+
 def summary(verdicts):
     n, exact = len(verdicts), verdicts.count("EXACT")
     return (f"{exact}/{n} exact, {exact + verdicts.count('OK')}/{n} acceptable "
@@ -201,12 +242,17 @@ def rescore(results, requests):
     for line in open(requests):
         r, g = line.rstrip("\n").split("\t")
         golds[r] = gold_hits(g)
-    verdicts = []
+    verdicts, gold_texts = [], {}
+    for line in open(requests):
+        r, g = line.rstrip("\n").split("\t")
+        gold_texts[r] = g
+    pairs = []
     for line in open(results):
         cols = line.rstrip("\n").split("\t")
         got, _ = hits(cols[2]) if cols[2] else (None, None)
         verdicts.append(judge(got, golds[cols[0]]))
-    print(f"{os.path.basename(results)}: {summary(verdicts)}")
+        pairs.append((gold_texts[cols[0]], verdicts[-1]))
+    print(f"{os.path.basename(results)}: {summary(verdicts)}\n  {breakdown(pairs)}")
 
 
 def main():
@@ -218,6 +264,9 @@ def main():
     ap.add_argument("--prompts", metavar="JSONL",
                     help="system/user prompts per request from `korpora-assistant prompts`, "
                          "instead of --instructions")
+    ap.add_argument("--app-cli", metavar="KORPORA_ASSISTANT",
+                    help="serialize (and repair) plans with the app's code: path to the "
+                         "korpora-assistant binary, run as `plans ud_en_ewt`")
     ap.add_argument("--schema", default=os.path.join(HERE, "schema.json"),
                     help="generation JSON Schema (e.g. from `korpora-assistant schema`)")
     ap.add_argument("--tag", default="", help="suffix for the results file name")
@@ -244,19 +293,37 @@ def main():
             prompts[record["request"]] = (record["system"], record["user"])
     eos_id = tokenizer.eos_token_id
 
+    app = None
+    if args.app_cli:
+        app = subprocess.Popen([args.app_cli, "plans", "ud_en_ewt"], stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, text=True, env=ENV)
+
+    def serialize(plan):
+        """(cql, repairs) - the app's QueryRepair + CQLSerializer, or the
+        Python mirror of the serializer when no --app-cli is given."""
+        if app is None:
+            return to_cql(plan), ""
+        app.stdin.write(json.dumps(plan) + "\n")
+        app.stdin.flush()
+        out = json.loads(app.stdout.readline())
+        if "error" in out:
+            raise ValueError(out["error"])
+        return out["cql"], out.get("repairs", "")
+
     def ask(messages):
         prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True,
                                                enable_thinking=False)
         text = generate(model, tokenizer, prompt, max_tokens=400, verbose=False,
                         sampler=make_sampler(temp=0.0),
                         logits_processors=[GrammarProcessor(compiled, eos_id)])
+        repairs = ""
         try:
             plan = json.loads(text)
-            cql = to_cql(plan)
+            cql, repairs = serialize(plan)
             got, err = hits(cql)
         except Exception as e:  # truncated output (max_tokens) or bad JSON
             cql, got, err, plan = "", None, f"generation failed: {e}: {text[:200]}", {}
-        return text, plan, cql, got, err
+        return text, plan, cql, got, err, repairs
 
     rows, retries, t_total = [], 0, 0.0
     for line in open(args.requests):
@@ -265,16 +332,16 @@ def main():
         system, user = prompts.get(request) or (instructions, f"Request: {request}")
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         t0 = time.time()
-        text, plan, cql, got, err = ask(messages)
-        note = ""
+        text, plan, cql, got, err, repairs = ask(messages)
+        note = f"repaired ({repairs})" if repairs else ""
         if args.retry and plan:
             feedback = err or problems(plan, lex, got)
             if feedback:
                 retries += 1
-                note = f"retried ({feedback}; first: {cql})"
+                note = (note + " " if note else "") + f"retried ({feedback}; first: {cql})"
                 messages += [{"role": "assistant", "content": text},
                              {"role": "user", "content": f"{feedback} Fix the QueryPlan."}]
-                text, plan, cql, got, err = ask(messages)
+                text, plan, cql, got, err, repairs = ask(messages)
         dt = time.time() - t0
         t_total += dt
         verdict = judge(got, golds)
@@ -287,6 +354,7 @@ def main():
     with open(os.path.join(OUT, f"results-{name}.tsv"), "w") as f:
         for r in rows:
             f.write("\t".join(r) + "\n")
+    print(f"\nby category (acceptable/n): {breakdown([(r[1], r[3]) for r in rows])}")
     print(f"\n{args.model}{args.tag}: {summary([r[3] for r in rows])}, "
           f"{retries} retries, {t_total / len(rows):.1f}s per request")
 

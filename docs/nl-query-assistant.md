@@ -312,6 +312,8 @@ schema and exact prompts for a corpus, so `scripts/nl-spike/run.py
   (`upos` in EWT, `pos` in DGT-UD), UD features, UD relations, Czech
   positional tag, word, lemma, other. Categorical structure attributes
   (genre) are told apart from identifiers (`doc.id`).
+- `QueryRepair` (added with the benchmark): unambiguous case/plural fixes
+  of values against fully sampled value lists.
 - `QueryContextBuilder`: rules, then corpus facts (UD values glossed from
   `Resources/TagsetGlosses.json`; Czech positional slots explained;
   `p_*`/`ep_*` parent copies named as such), then examples from
@@ -346,6 +348,66 @@ nouns" and added `+`).
 work, so `heldout.tsv` is now contaminated. The ≥100 benchmark needs a
 fresh held-out split that nobody reads before the final comparison.
 
+## Benchmark (2026-09-29)
+
+`scripts/nl-spike/bench/` holds the benchmark. So far it has one corpus,
+UD English EWT.
+- `ud-en-ewt-dev.tsv` (60) is for any prompt or pipeline work. It holds
+  the phase 0 sets (`requests.tsv`, and `heldout.tsv`, whose failures were
+  read in phase 2) plus 20 new requests.
+- `ud-en-ewt-test.tsv` (60 new) is **not to be used for tuning**. Run it
+  only for a milestone comparison (the phase 5 baseline, a fine-tuned
+  model), and don't change prompts because of what it shows. Once its
+  failures have been read, it needs replacing like `heldout.tsv` did.
+
+Gold queries may list acceptable alternatives after ` || `. Every gold
+query and alternative was checked to parse and find hits. `run.py`
+reports a per-category breakdown read off the gold (pos, feats, deprel,
+lemma, word, regex, alt, neg, seq, gap, rep, within).
+`scripts/nl-spike/bench-dev.sh TAG [MODEL...]` runs the dev split through
+the app's own code: prompt builder and schema (`korpora-assistant
+prompts/schema`) plus repair and serializer (`korpora-assistant plans`,
+via `run.py --app-cli`). `FLAGS` selects prompt variants.
+
+Still to come: a second corpus with different attribute names (a DGT-UD
+corpus from LINDAT, or a local UD treebank with `pos` for UPOS), Czech
+positional requests for phase 6, and more gap/alt/rep items (1–3 each so
+far).
+
+### Dev-split results, acceptable / 60 (no retry)
+
+Columns are subsets of the dev split: orig = `requests.tsv`, held =
+`heldout.tsv`, new = the 20 added in the benchmark.
+
+| prompt | Qwen3-4B | orig / held / new | Qwen3-8B |
+|---|---|---|---|
+| v1 (phase 0, hand-written for EWT) | 41 | 13 / 15 / 13 | 40 |
+| app, phase 2 | 34 | 12 / 10 / 12 | 38 |
+| + features grouped, "copy values exactly" rule, 3 fixed examples | 31 | | 42 |
+| + xpos as secondary tagset, value repair (**current default**) | 34 | 12 / 10 / 12 | 42 |
+| default, curated UD lists (gloss-table order) | 34 | | 34 |
+| curated, v1 rules | 30 | | |
+| uncurated, v1 rules | 28 | | |
+| curated, detail level 2 / 3 | 24 / 23 | | |
+| curated, fixed examples only | 31 | | |
+| no feature/relation glosses | 32 | | 39 |
+| v1 text with the app's schema + serializer | 41 | | |
+
+- Qwen3-8B with the default app prompt beats v1 (42 vs 40). For Qwen3-4B
+  the app prompt ties v1 on the 20 new requests, and all of v1's lead is on
+  the held-20 subset: position-order and condition-splitting errors
+  (`[of][N][N]`, `[PRON][deprel=obj]`). That's a 4B weakness around
+  structure that the prompt only partly fixes. It's a fine-tuning target.
+- The phase 2 rules help (34 vs 30). Glosses help slightly. Less detail
+  hurts a lot, especially features. Curating UD lists is neutral for the
+  4B and bad for the 8B (34 vs 42), so it's off by default. The schema
+  doesn't matter (v1 scores the same with the app's).
+- Value repair (`QueryRepair`: an unambiguous case or plural fix against
+  a fully sampled value list) fired on 2 of 60 plans for the 4B, 0 for the
+  8B.
+- With 60 items one standard error is about ±4. Differences under ~6 are
+  not reliable.
+
 ## Phases
 0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0
    results": go, default Qwen3-4B-4bit. Run ~20 English requests against a UD-annotated
@@ -358,9 +420,9 @@ fresh held-out split that nobody reads before the final comparison.
 1. ~~Engine additions + tests~~ — done (7.1).
 2. ~~`QueryPlan`, `CQLSerializer`, `QuerySchema`, `CorpusProfile`,
    `QueryContextBuilder`, glosses, UD example bank~~ — done, see "Phase 2
-   results". Next: a ≥100-request benchmark (dev + untouched held-out
-   split, several UD corpora incl. a DGT-UD one via LINDAT), then prompt
-   work against its dev split only.
+   results". ~~Benchmark: 60 dev + 60 untouched test on UD English EWT~~ —
+   done, see "Benchmark". Still open: a second corpus (other attribute
+   names), more gap/alt/rep items.
 3. `QueryAssistant`: model loading, guided generation (with the biases
    above), decode, validation/retry loop. A benchmark harness: ≥100 English
    NL→CQL pairs on a UD corpus, scored by execution accuracy (same hit set

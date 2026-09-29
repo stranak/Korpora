@@ -12,9 +12,15 @@ import ManateeKit
 //   korpora-assistant prompts CORPUS FILE.tsv   one JSON object per line:
 //                                               {"request", "system", "user"}
 //                                               for each request (column 1)
+//   korpora-assistant plans CORPUS              reads QueryPlan JSON, one per
+//                                               line on stdin; writes
+//                                               {"cql", "repairs"} per line
+//                                               (QueryRepair + CQLSerializer)
 //
 // prompt/prompts take --level N (start at a less detailed prompt level)
-// and --no-retrieval (the bank's first examples for every request).
+// --no-retrieval (the bank's first examples for every request),
+// --curated (UD values in gloss-table order, glossed ones only),
+// --basic-rules (phase 0 v1 rules) and --no-feature-glosses.
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -31,9 +37,14 @@ if let i = rest.firstIndex(of: "--level"), i + 1 < rest.count, let n = Int(rest[
     options.firstLevel = n
     rest.removeSubrange(i...(i + 1))
 }
-if let i = rest.firstIndex(of: "--no-retrieval") {
-    options.retrieveExamples = false
-    rest.remove(at: i)
+for (flag, apply) in [("--no-retrieval", { options.retrieveExamples = false }),
+                      ("--curated", { options.curatedUD = true }),
+                      ("--basic-rules", { options.extraRules = false }),
+                      ("--no-feature-glosses", { options.glossFeatures = false })] as [(String, () -> Void)] {
+    if let i = rest.firstIndex(of: flag) {
+        apply()
+        rest.remove(at: i)
+    }
 }
 
 do {
@@ -67,6 +78,24 @@ do {
             let prompt = QueryContextBuilder.build(profile: profile, request: request, options: options)
             let record = ["request": request, "system": prompt.system, "user": prompt.user]
             print(String(decoding: try encoder.encode(record), as: UTF8.self))
+        }
+    case "plans":
+        let profile = try await CorpusProfile.gather(from: corpus)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        while let line = readLine() {
+            var record: [String: String] = [:]
+            do {
+                let plan = try JSONDecoder().decode(QueryPlan.self, from: Data(line.utf8))
+                let (repaired, changes) = QueryRepair.repair(plan, profile: profile)
+                record["cql"] = CQLSerializer.cql(for: repaired)
+                record["repairs"] = changes.map { "\($0.attribute): \($0.from) -> \($0.to)" }
+                    .joined(separator: "; ")
+            } catch {
+                record["error"] = "\(error)"
+            }
+            print(String(decoding: try encoder.encode(record), as: UTF8.self))
+            fflush(stdout)
         }
     default:
         fail("unknown command \(command)")

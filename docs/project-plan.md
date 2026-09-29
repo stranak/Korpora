@@ -4026,8 +4026,15 @@ is the fine-tuned model (phase 6; decided 2026-09-29, no longer
 conditional). It may pause for other goals between phases, and
 `docs/nl-query-assistant.md`'s status line says where it stopped.
 
-Next: a ≥100-request benchmark with a fresh, unread held-out split, then
-prompt work against its dev split.
+Benchmark (2026-09-29): 60 dev + 60 untouched test requests on UD English
+EWT (`scripts/nl-spike/bench/`, `bench-dev.sh`). On dev, the app's default
+prompt + value repair reaches 34/60 (Qwen3-4B) and 42/60 (Qwen3-8B); the
+phase 0 hand-written prompt reaches 41 / 40. The 4B's remaining gap is
+all position-structure errors, which is a fine-tuning target.
+
+Next: phase 3, `QueryAssistant` in Swift (MLX loading, guided generation,
+repair, validation + one retry), so the benchmark runs through the app's
+generation path too.
 
 ## Key files
 
