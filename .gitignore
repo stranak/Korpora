@@ -5,6 +5,10 @@
 # Swift Package Manager build output
 ManateeKit/.build/
 ManateeKit/.swiftpm/
+KorporaAssistant/.build/
+KorporaAssistant/.swiftpm/
+KorporaGeneration/.build/
+KorporaGeneration/.swiftpm/
 
 # Throwaway tree scripts/build-release-deps.sh builds into (static pcre2
 # prefix + a git worktree of manatee-open). Machine-local, regenerable.
