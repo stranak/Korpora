@@ -61,7 +61,7 @@ final class CorporaSettingsViewController: NSViewController {
     private enum Column: String { case name, source, size, resident }
 
     private let directoryPathLabel = NSTextField(labelWithString: "")
-    private let tableView = NSTableView()
+    let tableView = NSTableView()
     private let scrollView = NSScrollView()
     private let memoryBar = MemoryBarView()
     private let memoryLabel = NSTextField(labelWithString: "")
@@ -197,7 +197,7 @@ final class CorporaSettingsViewController: NSViewController {
         super.viewWillAppear()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             self?.updateMemoryBar()
-            self?.tableView.reloadData()
+            self?.refreshMemoryDependentColumn()
         }
     }
 
@@ -207,7 +207,10 @@ final class CorporaSettingsViewController: NSViewController {
         refreshTimer = nil
     }
 
-    private func reloadCorpora() {
+    /// Rebuilds the list. The selection follows the corpus, not the row
+    /// number, so adding or removing another corpus doesn't move it.
+    func reloadCorpora() {
+        let selectedName = selectedCorpusName
         rows = AppSettings.shared.corpusLibraryEntries()
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             .map { entry in
@@ -216,8 +219,26 @@ final class CorporaSettingsViewController: NSViewController {
                     keepResident: AppSettings.shared.isKeepResident(entry.name))
             }
         tableView.reloadData()
+        if let selectedName, let row = rows.firstIndex(where: { $0.name == selectedName }) {
+            tableView.selectRowIndexes([row], byExtendingSelection: false)
+        }
         updateRemoveButton()
         updateMemoryBar()
+    }
+
+    var selectedCorpusName: String? {
+        rows.indices.contains(tableView.selectedRow) ? rows[tableView.selectedRow].name : nil
+    }
+
+    /// Whether a corpus still fits in free memory changes as memory does, so
+    /// the "Keep in Memory" checkboxes are refreshed on a timer. Only that
+    /// column: `reloadData()` would clear the selection, and with it the
+    /// chance to click "\u{2212}" (found in the macOS 15 smoke test of 0.2).
+    func refreshMemoryDependentColumn() {
+        let column = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(Column.resident.rawValue))
+        guard column >= 0, !rows.isEmpty else { return }
+        tableView.reloadData(forRowIndexes: IndexSet(integersIn: 0..<rows.count),
+                             columnIndexes: IndexSet(integer: column))
     }
 
     private func updateMemoryBar() {
@@ -392,7 +413,7 @@ final class CorporaSettingsViewController: NSViewController {
     @objc private func minimumFreeChanged() {
         let gb = UInt64(minimumFreeField.stringValue) ?? 10
         AppSettings.shared.minimumFreeMemoryAfterResidency = gb * 1_000_000_000
-        tableView.reloadData()
+        refreshMemoryDependentColumn()
     }
 
     @objc private func keepResidentToggled(_ sender: NSButton) {

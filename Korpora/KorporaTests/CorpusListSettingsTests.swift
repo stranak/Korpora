@@ -80,4 +80,46 @@ import Testing
         settings.migrateCorpusList()
         #expect(settings.keepResidentCorpora.isEmpty)
     }
+
+    /// The Corpora pane refreshes itself every 2 seconds (memory gauge and
+    /// the Keep in Memory checkboxes). It used to `reloadData()` the whole
+    /// table each time, which cleared the selection before "\u{2212}" could be
+    /// clicked (macOS 15 smoke test of 0.2).
+    @MainActor @Test func selectionSurvivesTheRefreshTimerAndReloads() throws {
+        let fm = FileManager.default
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("CorpusListSettingsTests-\(UUID().uuidString)")
+        let built = root.appendingPathComponent("built")
+        try fm.createDirectory(at: built, withIntermediateDirectories: true)
+        let saved = ["KORPORA_COMPILED_CORPORA_DIRECTORY", "KORPORA_ADDED_CORPORA_DIRECTORY"]
+            .map { ($0, ProcessInfo.processInfo.environment[$0]) }
+        defer {
+            for (key, value) in saved {
+                if let value { setenv(key, value, 1) } else { unsetenv(key) }
+            }
+            try? fm.removeItem(at: root)
+        }
+        setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", built.path, 1)
+        setenv("KORPORA_ADDED_CORPORA_DIRECTORY", root.appendingPathComponent("added").path, 1)
+        for name in ["one", "two", "three"] {
+            try "NAME \"\(name)\"\nPATH \"\(root.path)/\(name).data\"\n".write(
+                to: built.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+
+        let controller = CorporaSettingsViewController()
+        _ = controller.view
+        let table = controller.tableView
+        var target: Int?
+        for row in 0..<table.numberOfRows {
+            table.selectRowIndexes([row], byExtendingSelection: false)
+            if controller.selectedCorpusName == "two" { target = row }
+        }
+        let row = try #require(target)
+        table.selectRowIndexes([row], byExtendingSelection: false)
+
+        controller.refreshMemoryDependentColumn()
+        #expect(controller.selectedCorpusName == "two")
+        controller.reloadCorpora()
+        #expect(controller.selectedCorpusName == "two")
+    }
 }
