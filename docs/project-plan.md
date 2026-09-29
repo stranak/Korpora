@@ -1510,25 +1510,90 @@ corruption, the window growth ×2, the quit/orphan-process bug, the
 `mkregexattr` gap, the stale-directory corruption, and now the duplicate-
 `word`-attribute crash) has had a real, verified root cause and fix.
 
-### Backlog: corpus Settings UX (not started)
+### Corpus Settings UX: one corpus list (implemented on `feat/unified-corpus-list`; not yet click-tested)
 
 Flagged 2026-09-07 after `syn2025` produced an intermittent bad query
 result and the user first assumed it needed a "delete this corpus"
-function - see Phase 5.5's inconclusive-bug writeup. Resolved: a delete
-function already exists (Settings → Corpora's "−" button, calls
-`CompiledCorpusStore.remove(_:)`, which removes the registry file,
-compiled indices, and metadata) - the user confirmed that's sufficient
-once they knew it was there, and explicitly dropped the "recompile"
-idea. One item remains, deferred by the user ("put a pin in it"):
+function - see Phase 5.5's inconclusive-bug writeup. A delete function
+already existed (Settings → Corpora's "−"); the user explicitly dropped
+the "recompile" idea. What remained, and is now being done:
 
-- **Two separate, confusingly-similar corpus lists in Settings** - not
-  yet investigated. General's "Corpus registry directories" (`AppSettings
-  .corpusRegistryDirectories`, plain search-path strings, Manatee's own
-  `MANATEE_REGISTRY` equivalent - see `GeneralSettingsViewController`) vs.
-  Corpora's compiled-corpora table (`CompiledCorpusStore`, corpora this
-  app itself imported/compiled, with size/residency). The latter's
-  `baseDirectory` is one of the former's entries under the hood, but
-  nothing in the UI currently explains that relationship.
+**Problem.** Settings had two confusingly similar corpus lists. General's
+"Corpus registry directories" (`AppSettings.corpusRegistryDirectories`,
+plain search paths, Manatee's `MANATEE_REGISTRY` as a setting) was the
+first thing a user saw, and was useful only for corpora compiled
+*outside* Korpora (`encodevert` on the command line, a NoSketch/KonText
+installation, a colleague's corpus). Corpora's table showed only corpora
+Korpora had imported. The compiled-corpora directory was silently one of
+the General list's entries, and outside corpora never appeared in the
+Corpora table.
+
+**Decision (user, 2026-09-29): one list, both kinds treated alike.** A
+corpus Korpora built and one compiled elsewhere differ only in who
+compiled it and wrote its registry file. Everything else is the same for
+both:
+- The Corpora table lists **every** corpus the app can open, with a
+  Source column: "Built by Korpora", or the registry file's location for
+  an added one. Corpora from an inherited `MANATEE_REGISTRY` (the Xcode
+  scheme's DevCorpus, a shell launch) are listed as "Environment" and
+  can't be removed from within the app.
+- "+" offers **Import Vertical File…** (the existing importer) and
+  **Add Existing Corpus…** (pick a registry file, or a folder to add all
+  the registry files in it).
+- "−" asks, for either kind, whether to **also delete the corpus data**
+  (registry file and compiled indices, with their size shown), **keep the
+  data** (only remove the corpus from Korpora), or cancel.
+- **Keep in Memory** works for every listed corpus: its data directory
+  is the registry's `PATH`.
+- The General tab goes away. The location for corpora Korpora builds
+  becomes a line in the Corpora tab.
+
+**Mechanics.**
+- Added corpora are **symlinks** to the chosen registry files in a
+  Korpora-managed registry directory, `~/Library/Application Support/
+  Korpora/AddedCorpora/` (Finder-visible, like `CompiledCorpora/`). It's
+  one more `MANATEE_REGISTRY` entry, so Manatee's own lookup and
+  `CorpusRegistry` work unchanged, and a single corpus can be added
+  without exposing its siblings. A name that's already taken is refused,
+  because Manatee corpus names are registry file names.
+- Removing an added corpus deletes the symlink. Deleting its data also
+  removes the registry's `PATH` directory and the original registry file.
+- Removing a built corpus *with* its data is the old `CompiledCorpusStore
+  .remove`. *Keeping* its data moves the registry file and data to
+  `CompiledCorpora/Removed/<name>/`, with `PATH` rewritten; Manatee skips
+  subdirectories, so the corpus disappears from Korpora. It can be added
+  back later with Add Existing Corpus…, and the name is free for a new
+  import.
+- "Keep in Memory" flags move from `<name>.data/corpus-meta.json`
+  (built corpora only) to `AppSettings` (any corpus, by name). Existing
+  flags are carried over once.
+- Migration: directories in the old `corpusRegistryDirectories` setting
+  are turned into symlinks, one per registry file, once at launch. The
+  setting is then cleared, so nothing a v0.1 user set up disappears.
+- `ManateeKit.CorpusLibrary` owns the file-level logic (listing, add,
+  remove, `PATH` parsing) and is unit-tested with temporary directories.
+  The app owns the UI, the flags and the migration.
+- The import sheet checks the name against the list. A name used by an
+  added or environment corpus is refused (it would shadow, or be shadowed
+  by, that registry file). A name used by a corpus Korpora built asks
+  "Replace?", since re-importing under the same name is the normal way to
+  retry a failed import.
+
+**Status (2026-09-29).** Built and unit-tested: `ManateeKit.CorpusLibrary`
+(listing, add, remove, `PATH` parsing, migration of the old directories;
+18 tests, ManateeKit 81 in all) and the app side (`AppSettings`: the
+per-name "Keep in Memory" set, launch search path, one-time
+`migrateCorpusList()` called from `main.swift`; `CorpusResidencyManager`
+using it; the Corpora pane with a Source column, the "+" menu, the remove
+prompt; General pane and `GeneralSettingsViewController` deleted; 3 app
+tests, 93 in all). **Not yet done: a click-through in the running app**
+(Xcode agent's job per CLAUDE.md): "+" both entries, the remove sheet for
+each origin, Keep in Memory on an added corpus, an environment corpus's
+disabled "−", and a launch with a v0.1 preferences file holding a
+registry directory. A leftover `corpus-meta.json` of the old flag is
+harmless and left in place. The compiled-corpora directory's "Choose…"
+still only changes where *new* imports go; corpora already built in the
+old place drop off the list until re-added with Add Existing Corpus….
 
 ## Phase 5 — Concordance UX enhancements, KonText-inspired (in progress)
 

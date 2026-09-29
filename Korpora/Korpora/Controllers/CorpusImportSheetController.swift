@@ -433,6 +433,32 @@ final class CorpusImportSheetController: NSViewController {
             showFormError("Give the corpus a name.")
             return
         }
+        // A corpus name is its registry file name, and Manatee opens the
+        // first file it finds - so a name already in the list would either
+        // shadow it or be shadowed. Replacing one Korpora built is a normal
+        // way to retry an import, but only after asking.
+        if let existing = AppSettings.shared.corpusLibraryEntries().first(where: { $0.name == name }) {
+            guard case .built = existing.origin else {
+                showFormError("A corpus named \u{201C}\(name)\u{201D} is already in the list "
+                    + "(\(CorporaSettingsViewController.sourceTitle(existing.origin))). Pick another name, "
+                    + "or remove that corpus first.")
+                return
+            }
+            guard let window = view.window else { return }
+            let alert = NSAlert()
+            alert.messageText = "Replace \u{201C}\(name)\u{201D}?"
+            alert.informativeText = "Korpora already built a corpus with this name. Compiling replaces its data."
+            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Replace").hasDestructiveAction = true
+            alert.beginSheetModal(for: window) { [weak self] response in
+                if response == .alertSecondButtonReturn { self?.beginCompile(name: name) }
+            }
+            return
+        }
+        beginCompile(name: name)
+    }
+
+    private func beginCompile(name: String) {
         let attributes = attributesField.stringValue
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
