@@ -48,6 +48,22 @@ Evidence that still shapes the design (research 2026-09-28):
   The 2026-09-29 smoke test agrees: stock Qwen3-1.7B-4bit, zero-shot, no
   corpus facts, produced schema-valid but wrong plans (see "Cost of MLX").
 
+Related (checked 2026-09-29): `honzas83/kontext-mcp` (Jan Švec, ZČU, MIT)
+is a ~220-line MCP server wrapping LINDAT KonText's HTTP API (list
+corpora, corpus details, search, freqs, colls, filter). It has **no
+NL→CQL logic of its own**: a frontier model (Claude, Gemini, Codex) writes
+the CQL, looks at `concsize` and the hits, and refines. There's nothing to
+reuse in code. It does confirm the loop (corpus facts → query → check the
+hits → refine) and adds an idea: feed back a frequency distribution of the
+hits (e.g. top tags at the KWIC), not only the hit count. Its real value
+for us is as a data path: LINDAT hosts the **EU DGT-UD** corpora (24
+languages, `dgtud_cs` 100M tokens with `pos` = UPOS, `tag` = Czech
+positional (2261 values), `feats`, `deprel`, `p_*` parent attributes).
+These are the same engine, so a frontier model driving kontext-mcp can
+generate and engine-verify Czech-positional and multilingual training data
+and benchmark items (phase 6), and they test the generic path (`pos`, not
+`upos`).
+
 ## Decisions
 
 - (2026-09-28, still valid) The model fills a structured `QueryPlan`; the
