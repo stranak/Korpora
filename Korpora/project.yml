@@ -34,6 +34,10 @@ targets:
     platform: macOS
     sources:
       - path: Korpora
+      # Only the Icon Composer bundle ships; the rest of AppIcon/ (layer
+      # SVGs, make_layers.py, preview.svg) is its editable source.
+      - path: AppIcon/Korpora.icon
+        buildPhase: resources
     dependencies:
       - package: ManateeKit
         product: ManateeKit
@@ -93,6 +97,9 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Korpora/Info.plist
         CODE_SIGN_ENTITLEMENTS: Korpora/Korpora.entitlements
+        # Names AppIcon/Korpora.icon (an Icon Composer icon is named by its
+        # file); actool also derives the pre-macOS 26 .icns from it.
+        ASSETCATALOG_COMPILER_APPICON_NAME: Korpora
       # Distribution build: notarizable Developer ID signing (docs/
       # project-plan.md, "Goal - Ship a signed GitHub release", step 4).
       # Debug keeps Automatic signing and the 27.0 dev target above.

@@ -242,7 +242,7 @@ Confirmed product decisions (from earlier in this project):
   sample/line-groups), (2) corpus & subcorpus management, (3) analysis views
   (collocations, frequency distributions). Word sketches are explicitly out
   of scope.
-- **Packaging**: dev-only so far (no icon/signing/notarization work done)
+- **Packaging**: dev-only so far (no icon/signing/notarization work done; since done, see below)
   — superseded as a *plan* by the "Goal — Ship a signed GitHub release"
   section below, which is the separate, tracked goal for that work. It
   remains true as a description of current state until that goal starts.
@@ -3712,8 +3712,19 @@ can be verified on its own.
    - the per-launch tooltips quirk (Phase 5.3) and the one-off 0-hit
      result (Phase 5.5) were both attributed to macOS 27 beta / left
      unreproduced — re-verify both on the floor OS before tagging;
-   - **no app icon exists** ("Packaging: dev-only" above) — notarization
-     won't reject over it, but a generic-icon DMG isn't "as expected";
+   - ~~**no app icon exists**~~ *(done 2026-09-29, `feat/app-icon`)*: the
+     "Monogram" icon — a K whose stem is a stack of gold KWIC keyword
+     pills and whose arms are lines of context, on oxblood. Source is
+     `Korpora/AppIcon/`: `Korpora.icon` (the Icon Composer bundle, the
+     only part that ships — added in `project.yml` as a resource, named
+     by `ASSETCATALOG_COMPILER_APPICON_NAME: Korpora`), its layer SVGs
+     plus `make_layers.py` that regenerates them, and a flat
+     `preview.svg`. Edit the layers, re-run the script, re-import them
+     in Icon Composer. Verified: `xcodegen generate` gives it
+     `wrapper.icon`, and a Debug build puts both `Assets.car` and a
+     `Korpora.icns` (the pre-macOS 26 fallback for the 15.0 floor) in
+     Resources, with `CFBundleIconName`/`CFBundleIconFile` set. Not yet
+     looked at on the macOS 15 VM itself;
    - `CFBundleShortVersionString 0.1` / `CFBundleVersion 1` — pick a real
      version and write release notes for the first tag.
 

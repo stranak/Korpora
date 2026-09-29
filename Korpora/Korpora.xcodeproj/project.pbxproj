@@ -31,6 +31,7 @@
 		6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */; };
 		6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */; };
 		753C61BDF55CC67A1C13E23A /* ExtendedContextOverlayInsetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */; };
+		78B53C98D1A5A167B0CA9400 /* Korpora.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0BFAF9063885A84A320C7405 /* Korpora.icon */; };
 		7F41071BF0E94BB152F02C33 /* ConcordanceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */; };
 		8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */; };
 		93B0520B6FDFB97D6B0E110F /* OperationsPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674887DFEED6258891E125A /* OperationsPopoverController.swift */; };
@@ -70,6 +71,7 @@
 
 /* Begin PBXFileReference section */
 		0B7823CD7A43E310862382A0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		0BFAF9063885A84A320C7405 /* Korpora.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Korpora.icon; sourceTree = "<group>"; };
 		0FBC2AD51085ABA715C92CF9 /* KWICFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICFormatterTests.swift; sourceTree = "<group>"; };
 		10EEF40040FBFD9EF32A2353 /* KWICFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KWICFormatter.swift; sourceTree = "<group>"; };
 		118D96F87811C199B75B172C /* ConcordanceWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceWindowController.swift; sourceTree = "<group>"; };
@@ -179,9 +181,18 @@
 			path = Controllers;
 			sourceTree = "<group>";
 		};
+		5ECFB255EC5CCAB5C079DD2A /* AppIcon */ = {
+			isa = PBXGroup;
+			children = (
+				0BFAF9063885A84A320C7405 /* Korpora.icon */,
+			);
+			path = AppIcon;
+			sourceTree = "<group>";
+		};
 		661A2B36F0D8637FD4135D34 = {
 			isa = PBXGroup;
 			children = (
+				5ECFB255EC5CCAB5C079DD2A /* AppIcon */,
 				9E97DF74688196CB341F9B0E /* Korpora */,
 				779D82994C6A303E2DDC3D8B /* KorporaTests */,
 				263061363AB85CD916D020FF /* Packages */,
@@ -268,6 +279,7 @@
 			buildPhases = (
 				CE3682BFB80ACACAB34A2529 /* Sources */,
 				E1165D4408700E15BC3249A3 /* Bundle manatee import tools */,
+				A85331744FFA43535FB9C618 /* Resources */,
 				344996EA9D0EC3329DFC7351 /* Frameworks */,
 			);
 			buildRules = (
@@ -333,6 +345,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A85331744FFA43535FB9C618 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78B53C98D1A5A167B0CA9400 /* Korpora.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		E1165D4408700E15BC3249A3 /* Bundle manatee import tools */ = {
@@ -432,7 +455,7 @@
 		3A6166325892E6B9636B229D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Korpora;
 				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -454,7 +477,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = arm64;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Korpora;
 				CODE_SIGN_ENTITLEMENTS = Korpora/Korpora.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
