@@ -8,6 +8,9 @@ import Foundation
 /// (the file name is the corpus name); Manatee falls back to `/corpora/registry`
 /// when the variable isn't set, so this does too. Subdirectories are skipped,
 /// matching Manatee's own scan (it treats a directory entry as "not found").
+/// Hidden files are skipped too: Manatee would open `.DS_Store` if asked for
+/// it, but nobody means it as a corpus, and Finder drops one in any folder it
+/// has looked at (a dev registry directory showed it in the corpus picker).
 public enum CorpusRegistry {
     public static func availableCorpusNames() -> [String] {
         let registry = ProcessInfo.processInfo.environment["MANATEE_REGISTRY"] ?? "/corpora/registry"
@@ -16,7 +19,7 @@ public enum CorpusRegistry {
         for dir in registry.split(separator: ":") {
             let dirPath = String(dir)
             guard let entries = try? FileManager.default.contentsOfDirectory(atPath: dirPath) else { continue }
-            for entry in entries.sorted() {
+            for entry in entries.sorted() where !entry.hasPrefix(".") {
                 var isDirectory: ObjCBool = false
                 let path = dirPath + "/" + entry
                 guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
