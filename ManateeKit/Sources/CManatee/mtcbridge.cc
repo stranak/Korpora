@@ -1,6 +1,8 @@
 #include "mtcbridge.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -8,6 +10,7 @@
 #include <numeric>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "bgrstat.hh"
@@ -23,6 +26,9 @@ struct MTCCorpus {
 };
 struct MTCConcordance {
     Concordance *conc;
+};
+struct MTCCancelToken {
+    std::atomic<bool> cancelled{false};
 };
 struct MTCKwic {
     KWICLines *kl;
@@ -224,7 +230,21 @@ long long mtc_corpus_size(MTCCorpus *corp, char **error) {
     }
 }
 
+MTCCancelToken *mtc_cancel_token_new(void) { return new MTCCancelToken; }
+void mtc_cancel_token_cancel(MTCCancelToken *token) {
+    if (token)
+        token->cancelled.store(true);
+}
+int mtc_cancel_token_is_cancelled(MTCCancelToken *token) {
+    return token && token->cancelled.load() ? 1 : 0;
+}
+void mtc_cancel_token_free(MTCCancelToken *token) { delete token; }
+
 MTCConcordance *mtc_query(MTCCorpus *corp, const char *cql, char **error) {
+    return mtc_query_cancellable(corp, cql, nullptr, error);
+}
+
+MTCConcordance *mtc_query_cancellable(MTCCorpus *corp, const char *cql, MTCCancelToken *token, char **error) {
     if (!corp) {
         set_error(error, "null corpus handle");
         return nullptr;
@@ -235,6 +255,25 @@ MTCConcordance *mtc_query(MTCCorpus *corp, const char *cql, char **error) {
             eval_cqpquery(query.c_str(), corp->corp));
         MTCConcordance *mc = new MTCConcordance;
         mc->conc = new Concordance(corp->corp, rs);
+        if (!token || !rs) {
+            mc->conc->sync();
+            return mc;
+        }
+        // The worker thread is already running. Wait for it in short steps so
+        // a cancel is noticed promptly, checking the token before each look
+        // at finished() so that a token raised before the query even started
+        // aborts deterministically.
+        while (true) {
+            if (token->cancelled.load()) {
+                delete mc->conc;  // cancels and joins the worker (concord.cc)
+                delete mc;
+                set_error(error, "query cancelled");
+                return nullptr;
+            }
+            if (mc->conc->finished())
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
         mc->conc->sync();
         return mc;
     } catch (std::exception &e) {

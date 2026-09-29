@@ -300,10 +300,10 @@ Confirmed product decisions (from earlier in this project):
 | Goal — signed release | n/a | v0.1 (2026-09-26) and v0.2 (2026-09-29) published | yes — macOS 15.7.7 VM smoke tests, incl. an upgrade 0.1 → 0.2 |
 
 Test counts in the rows above are as of each phase's completion. Today:
-ManateeKit 103 (XCTest), app 113 (Swift Testing).
+ManateeKit 107 (XCTest; one opt-in slow test skipped), app 118 (Swift Testing).
 
 All Swift/C++ code builds cleanly and all tests pass (`swift test` in
-`ManateeKit` → 103/103; app suite 113/113, 2026-09-30).
+`ManateeKit` → 107 run, 1 opt-in skipped; app suite 118/118, 2026-09-30).
 
 ## Open goals (refreshed 2026-09-29)
 
@@ -317,6 +317,14 @@ All Swift/C++ code builds cleanly and all tests pass (`swift test` in
    6.10): keep Swift Charts in an `NSHostingView`, isolated, and spike
    printing and hover first.
 3. **6.11** (not started) Concordance pagination/streaming: the biggest change, last.
+
+**Fixed on main since 0.2** (2026-09-30, committed but not pushed or
+released; the user tests before anything is pushed):
+- `.DS_Store` showed up as a corpus in the picker (hidden files are now
+  skipped in `CorpusRegistry`).
+- The Settings window is resizable (see "Settings window" below).
+- **Cancel a running query, ⌘.** (see "Cancel a running query" below).
+- 6.9 lists a count next to each value.
 
 **Known bugs**
 - **#11, tooltips** (KWIC hover and toolbar) don't appear until the app has
@@ -1645,6 +1653,65 @@ A leftover `corpus-meta.json` of the old flag is
 harmless and left in place. The compiled-corpora directory's "Choose…"
 still only changes where *new* imports go; corpora already built in the
 old place drop off the list until re-added with Add Existing Corpus….
+
+### Cancel a running query (built 2026-09-30; awaiting click-through)
+
+Asked for by the user: a way to stop a search that runs too long, ⌘. as on
+classic Mac OS, with the status line saying "Searching…" and
+"Press ⌘. to cancel" on its right.
+
+**Engine.** manatee evaluates a `Concordance` in a worker thread that
+calls `pthread_testcancel()` once per hit, and the `Concordance` destructor
+already cancels and joins it. So a query can be aborted by deleting the
+half-built concordance, with no change to manatee.
+`mtc_query_cancellable(corp, cql, token, &error)` (new; `mtc_query` is now
+this with no token) starts the query, waits for the worker in 10 ms steps
+watching a thread-safe `MTCCancelToken`, and on cancel deletes the
+concordance and returns "query cancelled". `LiveConcordance.init(corpus:
+cql:)` wires the calling task's cancellation to the token
+(`withTaskCancellationHandler`), so `Task.cancel()` throws
+`CancellationError` and the corpus stays usable.
+
+**Measured** (opt-in test, `KORPORA_SLOW_TESTS=1`, builds a 6M-token
+corpus, ~30 s): a query with 28 million hits takes 20.8 s; cancelled after
+4.2 s it returned 10 ms later, and the next query on the corpus worked.
+**Limits:** the engine only notices at the next hit, so a query still being
+parsed (regex lexicon expansion happens first) or searching a long stretch
+without a hit can't be stopped until then. Sort, filter and the other
+operations in the chain aren't interruptible either; a cancel during them
+takes effect when the step finishes.
+
+**App.** `ConcordanceDocument.isSearching` / `cancelSearch()`; the search
+Task is cancelled. A replay that's overtaken (cancelled, or waiting its
+turn behind a newer one) drops its results and touches no state
+(`replayGeneration`), and a new search now cancels a running one instead of
+queueing behind it; replays still run one at a time. Cancelled: no results,
+status "Search cancelled.", the query and its operations stay so Return
+searches again. The window shows "Press ⌘. to cancel" while searching, and
+a new **Query** menu has **Cancel Search ⌘.**, enabled only while the front
+window is searching (`ConcordanceViewController.validateMenuItem`).
+
+**Tests.** ManateeKit +3 (a cancelled task aborts deterministically, the
+corpus works afterwards, a syntax error isn't reported as a cancel) and the
+opt-in mid-flight test above. App +5 against a real tiny corpus compiled
+per test: a normal search completes; a cancelled one says so and keeps the
+query; a newer search replaces a running one and leaves no trace; cancel
+with nothing running is a no-op; the window's hint and the menu item follow
+the document. A mutation check (cancel made a no-op) fails the test.
+**Not yet done:** trying it on SYN2025 in the running app.
+
+### Settings window: resizable (built 2026-09-30; awaiting a look)
+
+Panes open at the size they were designed for, which is also their
+minimum; the Corpora list and Appearance's per-script list take extra
+room. Two things blocked it: the panes' root views had an empty
+autoresizing mask, and each pane set `preferredContentSize` in
+`loadView`, which AppKit turns into width/height constraints on the pane's
+view at priority 501, one above the window's own size constraint (500), so
+the window snapped back after every resize. `showPane` now reads the size
+once, clears it before installing the pane, and applies it as the initial
+size and minimum. Tests resize the real window (it must be on screen for
+AppKit to lay it out) and check each pane follows and the lists grow.
 
 ## Phase 5 — Concordance UX enhancements, KonText-inspired (done; click-test status per item below)
 

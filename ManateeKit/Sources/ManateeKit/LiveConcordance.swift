@@ -212,6 +212,19 @@ public struct FrequencyItem: Sendable {
 /// A single Manatee corpus query, kept open and mutable so sort/shuffle/
 /// sample/filter/line-group operations can compose on one running result
 /// set - the gap the old open-query-then-discard `Corpus.query` API left.
+/// A flag that aborts a running query from any thread (see
+/// `LiveConcordance.init(corpus:cql:)`, which raises it when its task is
+/// cancelled).
+final class QueryCancellationToken: @unchecked Sendable {
+    let handle: OpaquePointer
+
+    init() { handle = mtc_cancel_token_new()! }
+    deinit { mtc_cancel_token_free(handle) }
+
+    func cancel() { mtc_cancel_token_cancel(handle) }
+    var isCancelled: Bool { mtc_cancel_token_is_cancelled(handle) != 0 }
+}
+
 /// An actor for the same reason `Corpus` is one: Manatee's thread-safety
 /// under concurrent access to one handle is undocumented.
 public actor LiveConcordance {
@@ -231,15 +244,38 @@ public actor LiveConcordance {
     /// call rather than layering).
     private static let filterCollocationSlot: Int32 = 1
 
+    /// Runs `cql` and waits for the whole result.
+    ///
+    /// Cancelling the calling task aborts the query in the engine (its
+    /// worker thread is cancelled and joined) and this throws
+    /// `CancellationError`. Latency is about 10 ms plus the time to the
+    /// engine's next hit: a query that's still being parsed (regular
+    /// expressions are expanded over the lexicon first) or is searching a
+    /// long stretch without a hit notices the cancel only afterwards.
     public init(corpus: Corpus, cql: String) async throws {
         self.corpus = corpus
         let corpusHandle = corpus.handle
         self.corpusHandle = corpusHandle
-        var error: UnsafeMutablePointer<CChar>?
-        guard let h = mtc_query(corpusHandle, cql, &error) else {
-            throw ManateeError.failure(consumeError(error))
+        let token = QueryCancellationToken()
+        // The query blocks its thread; only the cancel handler, which runs on
+        // whichever thread cancels the task, can reach it while it does.
+        handle = try await withTaskCancellationHandler {
+            try Self.runQuery(corpusHandle, cql: cql, token: token)
+        } onCancel: {
+            token.cancel()
         }
-        handle = h
+    }
+
+    private static func runQuery(
+        _ corpusHandle: OpaquePointer, cql: String, token: QueryCancellationToken
+    ) throws -> OpaquePointer {
+        var error: UnsafeMutablePointer<CChar>?
+        guard let h = mtc_query_cancellable(corpusHandle, cql, token.handle, &error) else {
+            let message = consumeError(error)
+            if token.isCancelled { throw CancellationError() }
+            throw ManateeError.failure(message)
+        }
+        return h
     }
 
     deinit {

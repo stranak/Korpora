@@ -8,6 +8,7 @@ extern "C" {
 typedef struct MTCCorpus MTCCorpus;
 typedef struct MTCConcordance MTCConcordance;
 typedef struct MTCKwic MTCKwic;
+typedef struct MTCCancelToken MTCCancelToken;
 
 /* Opens a corpus by name (resolved via the MANATEE_REGISTRY env var / compiled-in
  * registry path, same lookup corpinfo/encodevert use). Returns NULL and sets
@@ -31,6 +32,22 @@ long long mtc_corpus_size(MTCCorpus *corp, char **error);
  * query-then-discard usage. Returns NULL and sets *error on failure (bad CQL
  * syntax, unknown attribute, etc). */
 MTCConcordance *mtc_query(MTCCorpus *corp, const char *cql, char **error);
+
+/* A flag that can be raised from any thread to abort a running query. */
+MTCCancelToken *mtc_cancel_token_new(void);
+void mtc_cancel_token_cancel(MTCCancelToken *token);
+int mtc_cancel_token_is_cancelled(MTCCancelToken *token);
+void mtc_cancel_token_free(MTCCancelToken *token);
+
+/* mtc_query that can be aborted. Manatee evaluates a Concordance in a worker
+ * thread that checks for cancellation once per hit; this waits for the
+ * worker while watching `token` (every ~10 ms) and, once it's cancelled,
+ * deletes the Concordance - whose destructor cancels and joins the worker -
+ * and returns NULL with *error "query cancelled". With a NULL token this is
+ * exactly mtc_query. A query stuck between two hits (or still parsing: regex
+ * lexicon expansion happens before the worker starts) can't be interrupted
+ * until it reaches the next hit. */
+MTCConcordance *mtc_query_cancellable(MTCCorpus *corp, const char *cql, MTCCancelToken *token, char **error);
 void mtc_concordance_close(MTCConcordance *conc);
 long long mtc_concordance_size(MTCConcordance *conc);
 

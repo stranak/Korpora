@@ -55,6 +55,10 @@ enum ExtendedContextDisplayMode: String, Codable {
 final class ConcordanceDocument: NSDocument {
     static let typeName = "cz.cuni.mff.ufal.korpora.concordance"
 
+    /// Where `runQuery` records the query history: the app's own defaults,
+    /// except in tests.
+    var historyDefaults: UserDefaults = .standard
+
     var corpusName: String = ""
     /// Path to a subcorpus (see `SubcorpusStore`) to query instead of the
     /// whole corpus, or nil to query `corpusName` directly.
@@ -204,7 +208,8 @@ final class ConcordanceDocument: NSDocument {
         // button (which sets corpusName/subcorpusPath then calls this) and
         // the persistent query bar's re-run, with no separate call site
         // needed at either.
-        QueryHistoryStore.record(corpusName: corpusName, subcorpusPath: subcorpusPath, query: cql)
+        QueryHistoryStore.record(
+            corpusName: corpusName, subcorpusPath: subcorpusPath, query: cql, defaults: historyDefaults)
         replay()
     }
 
@@ -294,6 +299,25 @@ final class ConcordanceDocument: NSDocument {
     /// before the first query resolves (e.g. `performSetLineGroups`, or any
     /// future rapid double-action) would otherwise fire concurrently.
     private var currentReplayTask: Task<Void, Never>?
+
+    /// Bumped by every `replay()`. A replay that finds it isn't the latest
+    /// any more (it was cancelled or overtaken while waiting its turn) drops
+    /// its results and leaves the document's state to the newer one.
+    private var replayGeneration = 0
+
+    /// A query (or the operation chain after it) is running. Drives the
+    /// window's "press ⌘. to cancel" hint and the Cancel Search menu item.
+    private(set) var isSearching = false
+
+    /// Aborts the running search: the engine stops (see
+    /// `LiveConcordance.init(corpus:cql:)`) and the document shows no
+    /// results and the status "Search cancelled." - the query and its
+    /// operations stay, so pressing Return in the query bar searches again.
+    /// Does nothing when no search is running.
+    func cancelSearch() {
+        guard isSearching else { return }
+        currentReplayTask?.cancel()
+    }
 
     /// Widens/narrows how many tokens of left/right context each KWIC line
     /// shows, in an already-open window - matches KonText's own live
@@ -386,6 +410,9 @@ final class ConcordanceDocument: NSDocument {
     private func replay() {
         guard !corpusName.trimmingCharacters(in: .whitespaces).isEmpty,
               !initialQuery.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        replayGeneration += 1
+        let generation = replayGeneration
+        isSearching = true
         status = "Searching…"
         onResultsChanged?(true)
         let corpusName = corpusName
@@ -399,8 +426,13 @@ final class ConcordanceDocument: NSDocument {
         let operations = operations
         let descendingSort = Self.descendingSort(in: operations)
         let previousReplay = currentReplayTask
+        // A newer search replaces one still running (still one at a time: this
+        // one waits for the cancelled one to let go of the engine).
+        previousReplay?.cancel()
         currentReplayTask = Task { @MainActor in
             await previousReplay?.value
+            // Overtaken while waiting: the newer replay covers this one.
+            guard generation == replayGeneration else { return }
             do {
                 let corpus = try Corpus(name: corpusName)
                 let queryCorpus: Corpus
@@ -412,6 +444,7 @@ final class ConcordanceDocument: NSDocument {
                 let live = try await LiveConcordance(corpus: queryCorpus, cql: query)
                 for op in operations {
                     try await op.apply(to: live)
+                    try Task.checkCancellation()
                 }
                 // search size, not the parent corpus's - openSubcorpus already
                 // makes this correctly reflect the restricted token count.
@@ -419,9 +452,12 @@ final class ConcordanceDocument: NSDocument {
                 let lines = try await live.kwicLines(
                     leftContext: leftContext, rightContext: rightContext, kwicAttr: kwicAttr,
                     secondaryAttributes: secondaryAttributes)
-                rows = await Self.buildRows(
+                let newRows = await Self.buildRows(
                     from: lines, live: live, descendingSort: descendingSort,
                     queryCorpus: queryCorpus, structuralAttributeToShow: structuralAttributeToShow)
+                try Task.checkCancellation()
+                guard generation == replayGeneration else { return }
+                rows = newRows
                 liveConcordance = live
                 self.queryCorpus = queryCorpus
                 let corpusDescription: String
@@ -434,11 +470,13 @@ final class ConcordanceDocument: NSDocument {
                 }
                 status = "\(lines.count) hit\(lines.count == 1 ? "" : "s") in a \(corpusDescription)"
             } catch {
+                guard generation == replayGeneration else { return }
                 rows = []
                 liveConcordance = nil
                 queryCorpus = nil
-                status = "\(error)"
+                status = error is CancellationError ? "Search cancelled." : "\(error)"
             }
+            isSearching = false
             onResultsChanged?(true)
         }
     }

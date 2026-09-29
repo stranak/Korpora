@@ -113,6 +113,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
+        // \u{2318}. is the classic Mac "stop what you're doing"; enabled only while
+        // the frontmost concordance window is searching.
+        let queryMenuItem = NSMenuItem()
+        main.addItem(queryMenuItem)
+        let queryMenu = NSMenu(title: "Query")
+        queryMenuItem.submenu = queryMenu
+        queryMenu.addItem(withTitle: "Cancel Search", action: #selector(ConcordanceViewController.cancelSearch(_:)), keyEquivalent: ".")
+
         let windowMenuItem = NSMenuItem()
         main.addItem(windowMenuItem)
         let windowMenu = NSMenu(title: "Window")

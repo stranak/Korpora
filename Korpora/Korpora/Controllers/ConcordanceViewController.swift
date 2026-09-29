@@ -12,6 +12,9 @@ final class ConcordanceViewController: NSViewController {
     /// `updateCompletionProvider`.
     private var completionCorpusName = ""
     private let statusLabel = NSTextField(labelWithString: "")
+    /// Right of the status while a search runs: the classic Mac cancel
+    /// gesture, which is also Query > Cancel Search.
+    let cancelHintLabel = NSTextField(labelWithString: "Press \u{2318}. to cancel")
     private let tableView = SortableTableView()
     private let scrollView = NSScrollView()
     private var dataSource: NSTableViewDiffableDataSource<Section, Int>!
@@ -82,7 +85,16 @@ final class ConcordanceViewController: NSViewController {
         statusLabel.lineBreakMode = .byTruncatingTail
 
         root.addSubview(queryField)
+        cancelHintLabel.translatesAutoresizingMaskIntoConstraints = false
+        cancelHintLabel.font = .systemFont(ofSize: 11)
+        cancelHintLabel.textColor = .secondaryLabelColor
+        cancelHintLabel.alignment = .right
+        cancelHintLabel.isHidden = true
+        cancelHintLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        cancelHintLabel.setContentHuggingPriority(.required, for: .horizontal)
+
         root.addSubview(statusLabel)
+        root.addSubview(cancelHintLabel)
         root.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
@@ -92,8 +104,10 @@ final class ConcordanceViewController: NSViewController {
 
             statusLabel.topAnchor.constraint(equalTo: queryField.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 8),
-            statusLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -8),
+            statusLabel.trailingAnchor.constraint(equalTo: cancelHintLabel.leadingAnchor, constant: -8),
             statusLabel.heightAnchor.constraint(equalToConstant: 16),
+            cancelHintLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -8),
+            cancelHintLabel.centerYAnchor.constraint(equalTo: statusLabel.centerYAnchor),
 
             scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 6),
             scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -859,6 +873,7 @@ final class ConcordanceViewController: NSViewController {
             collapseAllExpansions()
         }
         statusLabel.stringValue = document.status
+        cancelHintLabel.isHidden = !document.isSearching
         var snapshot = NSDiffableDataSourceSnapshot<Section, Int>()
         snapshot.appendSections([.main])
         let ids = document.rows.map(\.id)
@@ -1097,5 +1112,21 @@ private final class ExportAccessoryView: NSView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+// MARK: - Cancelling a search
+
+extension ConcordanceViewController: NSMenuItemValidation {
+    /// Query > Cancel Search (\u{2318}.): aborts the running search.
+    @objc func cancelSearch(_ sender: Any?) {
+        document.cancelSearch()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(cancelSearch(_:)) {
+            return document.isSearching
+        }
+        return true
     }
 }
