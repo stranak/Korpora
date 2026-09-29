@@ -4032,9 +4032,19 @@ prompt + value repair reaches 34/60 (Qwen3-4B) and 42/60 (Qwen3-8B); the
 phase 0 hand-written prompt reaches 41 / 40. The 4B's remaining gap is
 all position-structure errors, which is a fine-tuning target.
 
-Next: phase 3, `QueryAssistant` in Swift (MLX loading, guided generation,
-repair, validation + one retry), so the benchmark runs through the app's
-generation path too.
+Phase 3 (2026-09-29): generation in Swift, in a second local package
+`KorporaGeneration/` (MLX, so xcodebuild only): `LocalModel` +
+`QueryAssistant` (generate, repair, engine check, one retry), CLI
+`korpora-generate`, and `scripts/nl-spike/bench-swift.sh`. It matches the
+Python harness on dev (Qwen3-4B 34, Qwen3-8B 43 of 60). Two bugs in
+mlx-swift-lm's guided generation were worked around. Free JSON whitespace
+derails the model, so the app generates from its own compact EBNF
+(`QueryGrammar`). XGrammar's jump-forward corrupts output (15/60 with it
+on), so it's off.
+
+Next: phase 4 (app UI: "Describe…" popover, Settings pane with model
+download; KorporaGeneration linked into the app, Release stripping, Metal
+Toolchain precondition in the release script).
 
 ## Key files
 

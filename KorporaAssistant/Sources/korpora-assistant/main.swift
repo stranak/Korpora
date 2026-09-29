@@ -8,6 +8,7 @@ import ManateeKit
 //
 //   korpora-assistant profile CORPUS            attribute roles, tagset family
 //   korpora-assistant schema CORPUS             the generation JSON Schema
+//   korpora-assistant grammar CORPUS [--spaced] the same as compact EBNF
 //   korpora-assistant prompt CORPUS REQUEST...  system + user prompt
 //   korpora-assistant prompts CORPUS FILE.tsv   one JSON object per line:
 //                                               {"request", "system", "user"}
@@ -52,6 +53,11 @@ do {
     switch command {
     case "schema":
         print(QuerySchema.json(for: try await corpus.info()))
+    case "grammar":
+        let info = try await corpus.info()
+        print(QueryGrammar.ebnf(attributes: info.attributes,
+                                structureAttributes: QuerySchema.structureAttributeNames(info),
+                                spaced: rest.contains("--spaced")))
     case "profile":
         let profile = try await CorpusProfile.gather(from: corpus)
         print("tagset family: \(profile.tagsetFamily)")

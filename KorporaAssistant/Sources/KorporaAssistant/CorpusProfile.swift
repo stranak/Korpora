@@ -69,7 +69,7 @@ public struct CorpusProfile: Sendable {
         case ud, czechPositional, generic
     }
 
-    static let valueSampleSize = 120
+    public static let valueSampleSize = 120
     static let structureValueLimit = 30
 
     /// The attribute playing `role`, if any - the first one, in registry

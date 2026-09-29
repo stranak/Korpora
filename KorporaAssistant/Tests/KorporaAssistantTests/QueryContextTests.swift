@@ -315,3 +315,37 @@ enum Profiles {
         #expect(QueryRepair.match("new", in: ["news", "New"], plurals: true) == "New")
     }
 }
+
+@Suite struct QueryFeedbackTests {
+    @Test func precedence() {
+        let missing = [QueryFeedback.MissingValue(attribute: "feats", value: "PronType=Poss",
+                                                  similar: ["PronType=Prs", "PronType=Art"])]
+        #expect(QueryFeedback.message(engineError: "syntax error near position 3", missing: missing, hits: 0)
+            == "The corpus engine rejected the query: syntax error near position 3")
+        #expect(QueryFeedback.message(engineError: nil, missing: missing, hits: 0)
+            == #"No token has feats="PronType=Poss". Existing values like it: PronType=Prs, PronType=Art."#)
+        #expect(QueryFeedback.message(engineError: nil, missing: [], hits: 0)
+            == "The query finds nothing in this corpus.")
+        #expect(QueryFeedback.message(engineError: nil, missing: [], hits: 12) == nil)
+    }
+
+    @Test func wrongAttribute() {
+        let m = QueryFeedback.MissingValue(attribute: "feats", value: "aux:pass", similar: [], foundIn: ["deprel"])
+        #expect(QueryFeedback.message(engineError: nil, missing: [m], hits: 0)
+            == #"No token has feats="aux:pass". "aux:pass" is a value of deprel, not feats."#)
+    }
+
+    @Test func similarValues() {
+        let known = ["PronType=Prs", "PronType=Art", "Poss=Yes", "NOUN", "NUM"]
+        #expect(QueryFeedback.similar(to: "PronType=Poss", in: known) == ["PronType=Prs", "PronType=Art"])
+        #expect(QueryFeedback.similar(to: "Nou", in: known) == ["NOUN"])
+    }
+
+    @Test func onlyPlainEqualsAreChecked() {
+        let plan = QueryPlan(positions: [.init(conditions: [
+            .init(attribute: "upos", value: "NOUN"), .init(attribute: "word", value: ".*ly"),
+            .init(attribute: "lemma", op: .notEquals, value: "go"),
+        ])])
+        #expect(QueryFeedback.literalConditions(plan).map(\.value) == ["NOUN"])
+    }
+}

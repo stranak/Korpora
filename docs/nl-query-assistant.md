@@ -103,11 +103,11 @@ EBNF could instead constrain the model directly to CQL text. We're staying
 with JSON: the serializer already owns quoting, and QueryPlan JSON is the
 simpler fine-tuning target.
 
-Generation must pass `WhitespaceTokenBias` and `ClosingTokenBias` (both in
-`MLXGuidedGeneration`) and turn off the model's thinking mode (Qwen3:
-`additionalContext: ["enable_thinking": false]`). Without the biases the
-smoke test's model emitted whitespace forever between JSON tokens, which
-JSON grammar permits. `MLXFoundationModels` applies both internally.
+Generation uses `QueryGrammar`, a compact EBNF of the same language, not
+the JSON Schema, and runs **without jump-forward** (see "Phase 3
+results"). It keeps `ClosingTokenBias` and turns off the model's thinking
+mode (Qwen3: `additionalContext: ["enable_thinking": false]`). The JSON
+Schema (`QuerySchema`) is still what the Python harness constrains with.
 
 ### 2. Corpus facts in the prompt
 `QueryContextBuilder` assembles, within a token budget measured with the
@@ -408,6 +408,63 @@ Columns are subsets of the dev split: orig = `requests.tsv`, held =
 - With 60 items one standard error is about ±4. Differences under ~6 are
   not reliable.
 
+## Phase 3 results (2026-09-29)
+
+**`KorporaGeneration/`** is a second local package (macOS 14). It depends
+on KorporaAssistant, ManateeKit, `mlx-swift-lm` pinned to `c043fb3`
+(`MLXLLM`, `MLXLMCommon`, `MLXGuidedGeneration`) and `swift-transformers`
+(`Tokenizers`). It has to be built with xcodebuild, because MLX's Metal
+shaders don't build under plain SwiftPM; KorporaAssistant stays
+`swift test`.
+- `LocalModel`: loads an MLX model from a local snapshot directory. It
+  adapts swift-transformers' tokenizer by hand, with no MLXHuggingFace
+  macros. `generate(grammar:messages:)` does greedy, EBNF-constrained
+  decoding with thinking off.
+- `QueryAssistant.suggest(_:)`: prompt (token budget measured with the
+  model's tokenizer), generation, decode to `QueryPlan`, `QueryRepair`,
+  `CQLSerializer`, then `Corpus.probeQuery` (hits capped at 10k). One
+  retry with `QueryFeedback` when the engine rejects the query, a plain
+  `=` value doesn't exist, or nothing matches. The existence check uses
+  the sample, or the engine for values outside a partial sample. The
+  feedback names the attribute a misplaced value belongs to
+  (`feats="aux:pass"` → "a value of deprel").
+- `QueryGrammar` (in KorporaAssistant): the QueryPlan as compact EBNF.
+- CLI `korpora-generate ask|bench` and `scripts/nl-spike/bench-swift.sh`
+  (dev split through the Swift path, scored by `run.py --rescore`).
+
+Two generation bugs found on the way, both invisible in the prompt text:
+1. **Free whitespace.** The JSON Schema path in mlx-swift-lm compiles
+   with XGrammar's defaults (`any_whitespace=true`); the C shim doesn't
+   expose the option. Even with `WhitespaceTokenBias`, Qwen3-4B emitted a
+   run of newlines inside the first key and produced a wrong query.
+   Fixed with our own compact EBNF (`QueryGrammar`), which also allows
+   escaped `\\`/`\"` in values; XGrammar's `maxLength` strings forbid
+   backslashes, so a regex like `\?` couldn't be written.
+2. **Jump-forward** (`GrammarConstraint(fastForward: true)`) corrupted
+   generation: XGrammar inserts the grammar's forced text as tokens of its
+   own choosing, not the model's. With it on, the Swift path scored
+   **15/60** against Python's 34 with a token-identical prompt (checked
+   ids). It's off now (`KORPORA_FF=1` re-enables it). Worth reporting
+   upstream with a reproducer.
+
+Dev split, acceptable / 60, Swift path (Release build, M3 Ultra):
+
+| | Qwen3-4B | Qwen3-8B |
+|---|---|---|
+| Python harness, same prompt (bench-dev.sh) | 34 | 42 |
+| Swift, jump-forward on | 14–15 | |
+| Swift, compact / spaced JSON, no retry | 33 / 32 | |
+| Swift, compact, retry | 33 (8 retried) | 43 (6 retried) |
+| + "value of another attribute" feedback | 34 (8 retried) | |
+
+The Swift path matches Python within noise. Per request it takes 2.2–2.6 s
+(4B) and 3.3 s (8B), slower than Python's 1.3 / 2.1 s, which is worth
+profiling later (grammar mask per token without jump-forward, or the
+Debug-only diagnostics). The retry rarely changes the outcome: the model
+tends to repeat itself or swap one wrong value for another. Debug builds
+are about 15x slower (unoptimized MLX/XGrammar C++): always benchmark
+Release.
+
 ## Phases
 0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0
    results": go, default Qwen3-4B-4bit. Run ~20 English requests against a UD-annotated
@@ -423,11 +480,10 @@ Columns are subsets of the dev split: orig = `requests.tsv`, held =
    results". ~~Benchmark: 60 dev + 60 untouched test on UD English EWT~~ —
    done, see "Benchmark". Still open: a second corpus (other attribute
    names), more gap/alt/rep items.
-3. `QueryAssistant`: model loading, guided generation (with the biases
-   above), decode, validation/retry loop. A benchmark harness: ≥100 English
-   NL→CQL pairs on a UD corpus, scored by execution accuracy (same hit set
-   as the gold query). It runs from a test target, skipped without a local
-   model.
+3. ~~`QueryAssistant`: model loading, guided generation, decode,
+   repair, validation/retry loop; Swift benchmark path~~ — done, see
+   "Phase 3 results". Open: speed (2.2 s vs Python's 1.3 s for the 4B),
+   and a better retry (it rarely helps yet).
 4. UI (popover, both entry points) + Settings "Assistant" pane with model
    download/delete; the project.yml/`make-release.sh` changes from "Cost of
    MLX".
@@ -454,7 +510,10 @@ Columns are subsets of the dev split: orig = `requests.tsv`, held =
   `QuerySchema.swift`, `CorpusProfile.swift`, `QueryContextBuilder.swift`,
   `Resources/{TagsetGlosses,ExampleBank}.json`; later `QueryAssistant.swift`
   (loading, generation, retry) and `ModelStore.swift` (download/verify/
-  delete). `Sources/korpora-assistant/` is the dev CLI.
+  delete). `Sources/korpora-assistant/` is the dev CLI. Also
+  `QueryRepair.swift`, `QueryFeedback.swift`, `QueryGrammar.swift`.
+- `KorporaGeneration/` (Swift package, xcodebuild only): `LocalModel.swift`,
+  `QueryAssistant.swift`, CLI `korpora-generate`.
 - App (`Korpora/Korpora/`): `DescribeQueryPopoverController.swift`,
   `AssistantSettingsViewController.swift`; modified
   `Views/CQLQueryField.swift`, `Controllers/NewConcordanceSheetController.swift`,
