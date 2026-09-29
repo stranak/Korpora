@@ -1,0 +1,9 @@
+# Models benchmarked so far (docs/nl-query-assistant.md), at the Hugging
+# Face revisions used. fetch-models.sh downloads them into the HF cache
+# (HF_HUB_CACHE, default ~/.cache/huggingface/hub), where run.py and
+# bench-swift.sh find them. repo	revision	weights (GB)
+mlx-community/Qwen3-4B-4bit	4dcb3d101c2a062e5c1d4bb173588c54ea6c4d25	2.26
+mlx-community/Qwen3-8B-4bit	545dc4251c05440727734bcd94334791f6ab0192	4.61
+mlx-community/gemma-4-e4b-it-4bit	475b9088d29754a3379866cf5aeb6b41acd313c2	5.15
+mlx-community/Qwen3.5-2B-4bit	674aaa7240b91e8012fcad5d791b7dfe5ba90207	1.72
+mlx-community/Qwen3-1.7B-4bit	3b1b1768f8f8cf8351c712464f906e86c2b8269e	0.97

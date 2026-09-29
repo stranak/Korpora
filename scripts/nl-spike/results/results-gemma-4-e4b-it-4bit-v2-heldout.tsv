@@ -1,0 +1,20 @@
+adjectives	[upos="ADJ"]	[upos="ADJ"]	EXACT			All adjectives.	1.0
+past tense verbs	[upos="VERB" & feats="Tense=Past"]	[upos="VERB" & feats="Tense=Past"]	EXACT			Past tense verbs.	1.1
+the word "because" followed by a pronoun	[word="because"][upos="PRON"]	[word="because"][]	DIFF 230 vs 125			The word because followed by any word.	1.1
+plural nouns in weblogs	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	EXACT			Plural nouns in the weblog genre.	1.3
+any form of "have" followed by a past participle	[lemma="have"][feats="VerbForm=Part" & feats="Tense=Past"]	[lemma="have"][upos="VERB" & feats="VerbForm=Part"]	DIFF 864 vs 1204			Any form of 'have' followed by a past participle.	1.5
+a noun followed by a relative clause verb	[upos="NOUN"][deprel="acl:relcl"]	[upos="NOUN"][upos="VERB"]	DIFF 2324 vs 95			A noun followed by a verb.	1.3
+direct objects that are pronouns	[upos="PRON" & deprel="obj"]	[deprel="obj"]	DIFF 12254 vs 2695			Direct objects.	0.9
+modal verbs followed by "not"	[upos="AUX" & xpos="MD"][word="not"]	[upos="AUX"][word="not"]	DIFF 807 vs 236			A modal verb followed by the word not.	1.3
+words starting with "re" that are verbs	[word="re.*" & upos="VERB"]	[word="re.*" & upos="VERB"]	EXACT			Verbs whose form starts with re.	1.2
+infinitive verbs after "to"	[word="to"][upos="VERB" & feats="VerbForm=Inf"]	[upos="ADP" & word="to"][upos="VERB" & feats="VerbForm=Inf"]	DIFF 1 vs 3502			Verbs in infinitive form following the word to.	1.6
+possessive pronouns	[upos="PRON" & feats="Poss=Yes"]	[upos="PRON" & feats="Case=Gen"]	DIFF 3689 vs 3745			Pronouns used in the possessive case.	1.2
+an adjective, then any word, then a noun	[upos="ADJ"][][upos="NOUN"]	[upos="ADJ"][]?[upos="NOUN"]	DIFF 11146 vs 2493			An adjective, followed by any word (optional), followed by a noun.	1.4
+nouns except "time"	[upos="NOUN" & lemma!="time"]	[upos="NOUN" & word!="time"]	DIFF 42617 vs 42527			Nouns except the word time.	1.2
+coordinating conjunctions between two adjectives	[upos="ADJ"][upos="CCONJ"][upos="ADJ"]	[upos="CCONJ"]	DIFF 8203 vs 329			Coordinating conjunctions.	1.0
+the lemma "say" in the answers genre	[lemma="say"] within <doc genre="answers"/>	[lemma="say"] within <doc genre="answers"/>	EXACT			The lemma 'say' within the answers genre.	1.1
+proper nouns followed by a verb in the present tense	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	EXACT			Proper nouns followed by a verb in the present tense.	1.5
+one or more adjectives followed by a noun	[upos="ADJ"]+[upos="NOUN"]	[upos="ADJ"]+[upos="NOUN"]	EXACT			One or more adjectives followed by a noun.	1.3
+passive subjects	[deprel="nsubj:pass"]	[deprel="nsubj:pass"]	EXACT			A noun phrase functioning as the passive subject.	1.0
+the word "the" followed by a superlative adjective	[word="the"][feats="Degree=Sup"]	[word="the"][upos="ADJ" & feats="Degree=Cmp"]	DIFF 58 vs 321			The word 'the' followed by a superlative adjective.	1.4
+interjections	[upos="INTJ"]	[upos="INTJ"]	EXACT			Any interjection.	0.9

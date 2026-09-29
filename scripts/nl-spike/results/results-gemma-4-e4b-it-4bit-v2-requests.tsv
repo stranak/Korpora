@@ -1,0 +1,20 @@
+nouns	[upos="NOUN"]	[upos="NOUN"]	EXACT			All nouns.	1.0
+proper nouns in the plural	[upos="PROPN" & feats="Number=Plur"]	[upos="PROPN" & feats="Number=Plur"]	EXACT			Proper nouns in the plural.	1.2
+a determiner, an adjective and a noun	[upos="DET"][upos="ADJ"][upos="NOUN"]	[upos="DET"][upos="ADJ"][upos="NOUN"]	EXACT			A determiner followed by an adjective and then a noun.	1.6
+any form of the verb "make" followed by a noun	[lemma="make" & upos="VERB"][upos="NOUN"]	[lemma="make"][upos="NOUN"]	EXACT			Any form of the verb 'make' followed by a noun.	1.3
+superlative adjectives	[upos="ADJ" & feats="Degree=Sup"]	[upos="ADJ" & feats="Degree=Sup"]	EXACT			Adjectives in the superlative degree.	1.2
+comparative adjectives followed by "than"	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	EXACT			Comparative adjectives followed by the word than.	1.5
+passive auxiliaries	[deprel="aux:pass"]	[upos="AUX"]	DIFF 15925 vs 1643		retried (The query finds nothing in this corpus.; first: [upos="AUX" & feats="Voice=Pass"])	All occurrences of auxiliaries.	2.2
+verbs in the imperative in reviews	[upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	[upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	EXACT			Verbs in the imperative mood found within reviews.	1.3
+the word "very" followed by an adjective	[word="very"][upos="ADJ"]	[word="very"][upos="ADJ"]	EXACT			The word 'very' followed by an adjective.	1.3
+two adjectives in a row	[upos="ADJ"][upos="ADJ"]	[upos="ADJ"][upos="ADJ"]	EXACT			Two adjectives in a row.	1.3
+nouns that are the subject of a sentence	[upos="NOUN" & deprel="nsubj"]	[deprel="nsubj"]	DIFF 19888 vs 4793			Nouns that are the subject of a sentence.	1.0
+the preposition "of" between two nouns	[upos="NOUN"][word="of"][upos="NOUN"]	[upos="ADP" & word="of"][upos="NOUN" & feats="Number=Sing"][upos="NOUN" & feats="Number=Sing"]	DIFF 68 vs 970			A preposition 'of' between two singular nouns.	2.1
+gerunds	[feats="VerbForm=Ger"]	[upos="VERB" & feats="VerbForm=Ger"]	EXACT		retried (The query finds nothing in this corpus.; first: [upos="NOUN" & feats="VerbForm=Ger"])	Verbs that are gerunds.	2.4
+numbers written in digits	[upos="NUM" & feats="NumForm=Digit"]	[upos="NUM" & feats="NumForm=Digit"]	EXACT			Numbers written in digit form.	1.1
+personal pronouns in the first person	[upos="PRON" & feats="PronType=Prs" & feats="Person=1"]	[upos="PRON" & feats="Person=1"]	DIFF 7997 vs 7987			Personal pronouns in the first person.	1.1
+any form of "be" followed by "not"	[lemma="be"][word="not"]	[lemma="be"][word="not"]	EXACT			Any form of 'be' followed by 'not'.	1.3
+negated verbs in emails	[word="not|n't"][upos="VERB"] within <doc genre="email"/>	[upos="VERB" & feats="Polarity=Neg"] within <doc genre="email"/>	DIFF 0 vs 229		retried (The query finds nothing in this corpus.; first: [upos="VERB" & feats="Polarity=Neg"] within <doc genre="email"/>)	Verbs with negative polarity found in emails.	2.7
+words ending in "ly" that are adverbs	[word=".*ly" & upos="ADV"]	[word=".*ly" & upos="ADV"]	EXACT			Words ending in 'ly' that are adverbs.	1.2
+an adverb optionally followed by another adverb and then an adjective	[upos="ADV"][upos="ADV"]?[upos="ADJ"]	[upos="ADV"][]?[upos="ADJ"]	DIFF 2592 vs 1987			An adverb, optionally followed by another adverb, and then an adjective.	1.4
+the lemma "go" but not the word "going"	[lemma="go" & word!="going"]	[lemma="go" & word!="going"]	EXACT			The lemma 'go' but not the word 'going'.	1.2

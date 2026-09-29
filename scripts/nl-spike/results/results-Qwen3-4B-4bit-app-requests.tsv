@@ -1,0 +1,20 @@
+nouns	[upos="NOUN"]	[upos="NOUN"]	EXACT			Nouns.	1.1
+proper nouns in the plural	[upos="PROPN" & feats="Number=Plur"]	[upos="PROPN" & feats="Number=Plur"]+	DIFF 725 vs 723			One or more proper nouns in the plural form.	1.3
+a determiner, an adjective and a noun	[upos="DET"][upos="ADJ"][upos="NOUN"]	[upos="DET"][upos="ADJ"][upos="NOUN"]	EXACT			A determiner immediately followed by an adjective, which is immediately followed by a noun.	1.5
+any form of the verb "make" followed by a noun	[lemma="make" & upos="VERB"][upos="NOUN"]	[lemma="make"][upos="NOUN"]	EXACT			Any form of the verb 'make' immediately followed by a noun.	1.3
+superlative adjectives	[upos="ADJ" & feats="Degree=Sup"]	[upos="ADJ" & feats="Degree=Sup"]	EXACT			Superlative adjectives.	1.2
+comparative adjectives followed by "than"	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	EXACT			Comparative adjectives immediately followed by 'than'.	1.4
+passive auxiliaries	[deprel="aux:pass"]	[deprel="aux:pass"]	EXACT			Passive auxiliaries.	1.1
+verbs in the imperative in reviews	[upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	[upos="VERB" & feats="Mood=Imp"][upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	DIFF 0 vs 215			Verbs in the imperative mood, only where doc.genre is reviews.	1.7
+the word "very" followed by an adjective	[word="very"][upos="ADJ"]	[word="very"][upos="ADJ"]	EXACT			The word 'very' immediately followed by an adjective.	1.3
+two adjectives in a row	[upos="ADJ"][upos="ADJ"]	[upos="ADJ"][upos="ADJ"]	EXACT			Two adjectives in a row.	1.3
+nouns that are the subject of a sentence	[upos="NOUN" & deprel="nsubj"]	[upos="NOUN" & deprel="nsubj"]	EXACT			Nouns that are the subject of a sentence.	1.3
+the preposition "of" between two nouns	[upos="NOUN"][word="of"][upos="NOUN"]	[word="of"][upos="NOUN"][upos="NOUN"]	DIFF 128 vs 970			The preposition 'of' between two nouns.	1.5
+gerunds	[feats="VerbForm=Ger"] || [upos="VERB" & feats="VerbForm=Ger"]	[upos="VERB"]	DIFF 27888 vs 1230			Gerunds, which are verbs used as nouns.	1.1
+numbers written in digits	[upos="NUM" & feats="NumForm=Digit"]	[feats="NumForm=Digit"]	DIFF 3928 vs 3927			Numbers written in digits (e.g. 1, 2, 3).	1.2
+personal pronouns in the first person	[upos="PRON" & feats="PronType=Prs" & feats="Person=1"] || [upos="PRON" & feats="Person=1"]	[upos="PRON" & feats="Person=1"]	OK			Personal pronouns in the first person.	1.2
+any form of "be" followed by "not"	[lemma="be"][word="not"]	[lemma="be"][word="not"]	EXACT			Any form of 'be' immediately followed by the word 'not'.	1.3
+negated verbs in emails	[word="not|n't"][upos="VERB"] within <doc genre="email"/>	[feats="Mood=Imp"][feats="Polarity=Neg"] within <doc genre="email"/>	DIFF 17 vs 229			Negated verbs in email documents.	1.4
+words ending in "ly" that are adverbs	[word=".*ly" & upos="ADV"]	[word=".*ly" & upos="ADV"]	EXACT			Words whose form ends in ly that are adverbs.	1.2
+an adverb optionally followed by another adverb and then an adjective	[upos="ADV"][upos="ADV"]?[upos="ADJ"] || [upos="ADV"]?[upos="ADV"][upos="ADJ"]	[upos="ADV"]?[upos="ADV"]?[upos="ADJ"]	DIFF 18776 vs 1987			An adverb optionally followed by another adverb and then an adjective.	1.5
+the lemma "go" but not the word "going"	[lemma="go" & word!="going"]	[lemma="go"][word!="going"]	DIFF 764 vs 525			The lemma 'go' followed by any word that is not 'going'.	1.4

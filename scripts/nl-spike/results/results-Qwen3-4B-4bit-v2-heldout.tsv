@@ -1,0 +1,20 @@
+adjectives	[upos="ADJ"]	[upos="ADJ"]	EXACT			Adjectives.	1.0
+past tense verbs	[upos="VERB" & feats="Tense=Past"]	[upos="VERB" & feats="Tense=Past"]	EXACT			Past tense verbs.	1.1
+the word "because" followed by a pronoun	[word="because"][upos="PRON"]	[word="because"][upos="PRON"]	EXACT			The word 'because' immediately followed by a pronoun.	1.2
+plural nouns in weblogs	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	EXACT			Plural nouns in the weblog genre.	1.2
+any form of "have" followed by a past participle	[lemma="have"][feats="VerbForm=Part" & feats="Tense=Past"]	[lemma="have"][upos="VERB" & feats="Tense=Past"]	DIFF 861 vs 1204			Any form of 'have' followed by a past participle.	1.3
+a noun followed by a relative clause verb	[upos="NOUN"][deprel="acl:relcl"]	[upos="NOUN"][upos="VERB"]	DIFF 2324 vs 95			A noun immediately followed by a verb that is part of a relative clause.	1.2
+direct objects that are pronouns	[upos="PRON" & deprel="obj"]	[upos="NOUN"][upos="PRON"]	DIFF 1920 vs 2695			Direct objects that are pronouns.	1.1
+modal verbs followed by "not"	[upos="AUX" & xpos="MD"][word="not"]	[upos="AUX" & feats="Mood=Imp"][word="not"]	DIFF 26 vs 236			Modal verbs followed by the word not.	1.3
+words starting with "re" that are verbs	[word="re.*" & upos="VERB"]	[word="re.*" & upos="VERB"]	EXACT			Words whose form starts with re and are verbs.	1.1
+infinitive verbs after "to"	[word="to"][upos="VERB" & feats="VerbForm=Inf"]	[upos="VERB" & feats="VerbForm=Inf"][word="to"]	DIFF 654 vs 3502			Infinitive verbs immediately followed by the word to.	1.3
+possessive pronouns	[upos="PRON" & feats="Poss=Yes"]	[upos="PRON" & feats="PronType=Art"]	DIFF 0 vs 3745		retried (No token has feats="PronType=Poss". Existing values like it: PronType=Art, PronType=Dem, PronType=Prs, PronType=Rel, PronType=Ind, PronType=Neg, PronType=Tot, PronType=Int.; first: [upos="PRON" & feats="PronType=Poss"])	Possessive pronouns (using PronType=Art, which is the closest match for possessive pronouns in the corpus).	2.3
+an adjective, then any word, then a noun	[upos="ADJ"][][upos="NOUN"]	[upos="ADJ"][word=".*"]?[upos="NOUN"]	DIFF 11146 vs 2493			An adjective immediately followed by any word and then a noun.	1.3
+nouns except "time"	[upos="NOUN" & lemma!="time"]	[upos="NOUN"][word!="time"]	DIFF 43066 vs 42527			Nouns except the word time.	1.1
+coordinating conjunctions between two adjectives	[upos="ADJ"][upos="CCONJ"][upos="ADJ"]	[upos="CCONJ"][upos="ADJ"][upos="ADJ"]	DIFF 50 vs 329			Coordinating conjunctions between two adjectives.	1.3
+the lemma "say" in the answers genre	[lemma="say"] within <doc genre="answers"/>	[lemma="say"] within <doc genre="answers"/>	EXACT			The lemma 'say' in the answers genre.	1.1
+proper nouns followed by a verb in the present tense	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	EXACT			Proper nouns immediately followed by present-tense verbs.	1.3
+one or more adjectives followed by a noun	[upos="ADJ"]+[upos="NOUN"]	[upos="ADJ"]+[upos="NOUN"]	EXACT			One or more adjectives immediately followed by a noun.	1.2
+passive subjects	[deprel="nsubj:pass"]	[deprel="obl:unmarked"][deprel="nsubj:pass"]	DIFF 1 vs 1445			Passive subjects.	1.2
+the word "the" followed by a superlative adjective	[word="the"][feats="Degree=Sup"]	[word="the"][upos="ADJ" & feats="Degree=Sup"]	DIFF 256 vs 321			The word the immediately followed by a superlative adjective.	1.3
+interjections	[upos="INTJ"]	[upos="INTJ"]	EXACT			Interjections.	0.9

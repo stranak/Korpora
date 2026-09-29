@@ -7,7 +7,8 @@ Dev-only: the app does the same through mlx-swift-lm's MLXGuidedGeneration,
 which vendors the same XGrammar. Setup, once (data/ is gitignored):
 
     uv venv --python 3.12 data/.venv-nl
-    VIRTUAL_ENV=data/.venv-nl uv pip install mlx-lm xgrammar
+    VIRTUAL_ENV=data/.venv-nl uv pip install -r scripts/nl-spike/requirements.txt
+    scripts/nl-spike/build-ud-corpus.sh      # the corpus, into data/ud-en-ewt/
 
 Run (the model is fetched from Hugging Face into its cache on first use):
 

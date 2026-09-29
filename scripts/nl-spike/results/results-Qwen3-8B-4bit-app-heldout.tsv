@@ -1,0 +1,20 @@
+adjectives	[upos="ADJ"]	[upos="ADJ"]	EXACT			Adjectives.	1.8
+past tense verbs	[upos="VERB" & feats="Tense=Past"]	[upos="VERB" & feats="Tense=Past"]	EXACT			Verbs in the past tense.	2.0
+the word "because" followed by a pronoun	[word="because"][upos="PRON"]	[word="because"][upos="PRON"]	EXACT			The word because immediately followed by a pronoun.	2.1
+plural nouns in weblogs	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	EXACT			Plural nouns in weblogs.	2.1
+any form of "have" followed by a past participle	[lemma="have"][feats="VerbForm=Part" & feats="Tense=Past"] || [lemma="have"][upos="VERB" & feats="VerbForm=Part" & feats="Tense=Past"]	[lemma="have"][upos="VERB" & feats="VerbForm=Part" & feats="Tense=Past"]	OK			Any form of 'have' followed by a past participle.	2.5
+a noun followed by a relative clause verb	[upos="NOUN"][deprel="acl:relcl"]	[upos="NOUN"][upos="VERB" & deprel="acl:relcl"]	DIFF 79 vs 95			A noun immediately followed by a verb in the relative clause relation (acl:relcl).	2.4
+direct objects that are pronouns	[upos="PRON" & deprel="obj"]	[deprel="obj" & upos="PRON"]	EXACT			Direct objects that are pronouns.	1.9
+modal verbs followed by "not"	[upos="AUX" & xpos="MD"][word="not"] || [xpos="MD"][word="not"]	[upos="AUX" & lemma="will" & lemma="can" & lemma="shall"][word="not"]	DIFF 0 vs 236			Modal verbs such as will, can, or shall followed by the word not.	2.6
+words starting with "re" that are verbs	[word="re.*" & upos="VERB"]	[word="re.*" & upos="VERB"]	EXACT			Verbs whose form starts with re.	2.0
+infinitive verbs after "to"	[word="to"][upos="VERB" & feats="VerbForm=Inf"] || [word="to"][feats="VerbForm=Inf"]	[upos="ADP" & word="to"][upos="VERB" & feats="VerbForm=Inf"]	DIFF 1 vs 3502			The preposition 'to' immediately followed by an infinitive verb.	2.5
+possessive pronouns	[upos="PRON" & feats="Poss=Yes"]	[upos="PRON" & feats="PronType=Poss"]	DIFF 0 vs 3745			Possessive pronouns.	1.9
+an adjective, then any word, then a noun	[upos="ADJ"][][upos="NOUN"]	[upos="ADJ"][upos="NOUN"][]*	DIFF 873724 vs 2493			An adjective, followed by any word, followed by a noun.	2.2
+nouns except "time"	[upos="NOUN" & lemma!="time"] || [upos="NOUN" & word!="time"]	[upos="NOUN" & word!="time"]	OK			Nouns except the word 'time'.	2.0
+coordinating conjunctions between two adjectives	[upos="ADJ"][upos="CCONJ"][upos="ADJ"]	[upos="ADJ" & deprel="advcl"][upos="CCONJ"][upos="ADJ" & deprel="advcl"]	DIFF 0 vs 329			Two adjectives connected by a coordinating conjunction.	2.8
+the lemma "say" in the answers genre	[lemma="say"] within <doc genre="answers"/>	[lemma="say"] within <doc genre="answers"/>	EXACT			The lemma 'say' in documents of the answers genre.	2.0
+proper nouns followed by a verb in the present tense	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	EXACT			A proper noun immediately followed by a verb in the present tense.	2.3
+one or more adjectives followed by a noun	[upos="ADJ"]+[upos="NOUN"]	[upos!="NOUN"]+[upos="NOUN"]	DIFF 211671 vs 9354			One or more adjectives followed by a noun.	2.2
+passive subjects	[deprel="nsubj:pass"]	[deprel!="root" & deprel="nsubj:pass"]	EXACT			Passive subjects, where the word is the subject of a passive verb.	2.1
+the word "the" followed by a superlative adjective	[word="the"][feats="Degree=Sup"] || [word="the"][upos="ADJ" & feats="Degree=Sup"]	[word="the"][upos="ADJ" & feats="Degree=Sup"]	OK			The word 'the' followed by a superlative adjective.	2.3
+interjections	[upos="INTJ"]	[upos="INTJ"]	EXACT			Interjections.	1.7

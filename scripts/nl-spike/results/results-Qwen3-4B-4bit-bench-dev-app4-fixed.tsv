@@ -1,0 +1,60 @@
+nouns	[upos="NOUN"]	[upos="NOUN"]	EXACT			Nouns.	1.1
+proper nouns in the plural	[upos="PROPN" & feats="Number=Plur"]	[upos="PROPN"][feats="Number=Plur"]	DIFF 713 vs 723			Proper nouns in the plural.	1.3
+a determiner, an adjective and a noun	[upos="DET"][upos="ADJ"][upos="NOUN"]	[upos="DET"][upos="ADJ"][upos="NOUN"]	EXACT			A determiner immediately followed by an adjective and then a noun.	1.5
+any form of the verb "make" followed by a noun	[lemma="make" & upos="VERB"][upos="NOUN"]	[lemma="make"][upos="NOUN"]	EXACT			Any form of the verb 'make' immediately followed by a noun.	1.3
+superlative adjectives	[upos="ADJ" & feats="Degree=Sup"]	[upos="ADJ" & feats="Degree=Sup"]	EXACT			Superlative adjectives.	1.2
+comparative adjectives followed by "than"	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	EXACT		repaired (feats: Degree=cmp -> Degree=Cmp)	Comparative adjectives immediately followed by 'than'.	1.4
+passive auxiliaries	[deprel="aux:pass"]	[upos="AUX"][feats="Voice=Pass"]	DIFF 1344 vs 1643			Passive auxiliaries.	1.3
+verbs in the imperative in reviews	[upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	[upos="VERB" & xpos="VB" & feats="Mood=Imp"] within <doc genre="reviews"/>	DIFF 214 vs 215			Verbs in the imperative, only where doc.genre is reviews.	1.5
+the word "very" followed by an adjective	[word="very"][upos="ADJ"]	[word="very"][upos="ADJ"]	EXACT			The word 'very' immediately followed by an adjective.	1.3
+two adjectives in a row	[upos="ADJ"][upos="ADJ"]	[upos="ADJ"][upos="ADJ"]	EXACT			Two adjectives in a row.	1.3
+nouns that are the subject of a sentence	[upos="NOUN" & deprel="nsubj"]	[upos="NOUN"][deprel="nsubj"]	DIFF 2160 vs 4793			Nouns that are the subject of a sentence.	1.3
+the preposition "of" between two nouns	[upos="NOUN"][word="of"][upos="NOUN"]	[word="of"][upos="NOUN"]	DIFF 1080 vs 970			The preposition 'of' between two nouns.	1.3
+gerunds	[feats="VerbForm=Ger"] || [upos="VERB" & feats="VerbForm=Ger"]	[upos="VERB"]	DIFF 27888 vs 1230			Gerunds, which are verbs used as nouns.	1.1
+numbers written in digits	[upos="NUM" & feats="NumForm=Digit"]	[feats="NumForm=Digit"]	DIFF 3928 vs 3927			Numbers written in digits.	1.1
+personal pronouns in the first person	[upos="PRON" & feats="PronType=Prs" & feats="Person=1"] || [upos="PRON" & feats="Person=1"]	[upos="PRON" & feats="PronType=Prs"]	DIFF 18772 vs 7987			Personal pronouns in the first person.	1.2
+any form of "be" followed by "not"	[lemma="be"][word="not"]	[lemma="be"][word="not"]	EXACT			Any form of 'be' immediately followed by the word 'not'.	1.3
+negated verbs in emails	[word="not|n't"][upos="VERB"] within <doc genre="email"/>	[xpos="VB"]? within <doc genre="email"/>	DIFF 3184 vs 229			Negated verbs, only where doc.genre is email.	1.2
+words ending in "ly" that are adverbs	[word=".*ly" & upos="ADV"]	[word=".*ly"][upos="ADV"]	DIFF 104 vs 2536			Words ending in ly that are adverbs.	1.3
+an adverb optionally followed by another adverb and then an adjective	[upos="ADV"][upos="ADV"]?[upos="ADJ"] || [upos="ADV"]?[upos="ADV"][upos="ADJ"]	[upos="ADV"]?[upos="ADV"][upos="ADJ"]	EXACT			An adverb optionally followed by another adverb and then an adjective.	1.5
+the lemma "go" but not the word "going"	[lemma="go" & word!="going"]	[lemma="go" & word!="going"]	EXACT			The lemma 'go' but not the word 'going'.	1.2
+adjectives	[upos="ADJ"]	[upos="ADJ"]	EXACT			Adjectives.	1.0
+past tense verbs	[upos="VERB" & feats="Tense=Past"]	[upos="VERB" & feats="Tense=Past"]	EXACT			Past tense verbs.	1.2
+the word "because" followed by a pronoun	[word="because"][upos="PRON"]	[word="because"][upos="PRON"]	EXACT			The word 'because' immediately followed by a pronoun.	1.3
+plural nouns in weblogs	[upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	[upos="NOUN" & feats="Number=Plur"][upos="NOUN" & feats="Number=Plur"] within <doc genre="weblog"/>	DIFF 8 vs 2061		repaired (doc.genre: weblogs -> weblog)	Plural nouns in weblogs.	1.7
+any form of "have" followed by a past participle	[lemma="have"][feats="VerbForm=Part" & feats="Tense=Past"] || [lemma="have"][upos="VERB" & feats="VerbForm=Part" & feats="Tense=Past"]	[lemma="have"][upos="VERB" & feats="Tense=Past"]	OK			Any form of 'have' followed by a past participle.	1.5
+a noun followed by a relative clause verb	[upos="NOUN"][deprel="acl:relcl"]	[upos="NOUN"][upos="VERB"][deprel="acl"]	DIFF 2 vs 95			A noun immediately followed by a verb that is the head of a relative clause.	1.5
+direct objects that are pronouns	[upos="PRON" & deprel="obj"]	[upos="PRON"][deprel="obj"]	DIFF 900 vs 2695			Direct objects that are pronouns.	1.3
+modal verbs followed by "not"	[upos="AUX" & xpos="MD"][word="not"] || [xpos="MD"][word="not"]	[upos="AUX"][word="not"]	DIFF 807 vs 236			Modal verbs immediately followed by the word 'not'.	1.3
+words starting with "re" that are verbs	[word="re.*" & upos="VERB"]	[word="re.*" & upos="VERB"]	EXACT			Words whose form starts with re that are verbs.	1.2
+infinitive verbs after "to"	[word="to"][upos="VERB" & feats="VerbForm=Inf"] || [word="to"][feats="VerbForm=Inf"]	[xpos="TO"][upos="VERB" & feats="VerbForm=Inf"]	DIFF 3565 vs 3502			Infinitive verbs immediately following 'to'.	1.4
+possessive pronouns	[upos="PRON" & feats="Poss=Yes"]	[upos="PRON" & feats="PronType=Poss"]	DIFF 0 vs 3745			Possessive pronouns.	1.2
+an adjective, then any word, then a noun	[upos="ADJ"][][upos="NOUN"]	[upos="ADJ"][]?[upos="NOUN"]	DIFF 11146 vs 2493			An adjective immediately followed by any word (optional) and then a noun.	1.4
+nouns except "time"	[upos="NOUN" & lemma!="time"] || [upos="NOUN" & word!="time"]	[upos="NOUN"][word="time"]?	DIFF 43102 vs 42527			Nouns, except time.	1.2
+coordinating conjunctions between two adjectives	[upos="ADJ"][upos="CCONJ"][upos="ADJ"]	[upos="CCONJ"][upos="ADJ"][upos="ADJ"]	DIFF 50 vs 329			Coordinating conjunctions between two adjectives.	1.5
+the lemma "say" in the answers genre	[lemma="say"] within <doc genre="answers"/>	[lemma="say"] within <doc genre="answers"/>	EXACT			The lemma 'say' in the answers genre.	1.2
+proper nouns followed by a verb in the present tense	[upos="PROPN"][upos="VERB" & feats="Tense=Pres"]	[upos="PROPN"][upos="VERB"]	DIFF 1057 vs 366			Proper nouns immediately followed by verbs in the present tense.	1.3
+one or more adjectives followed by a noun	[upos="ADJ"]+[upos="NOUN"]	[upos="ADJ"]+[upos="NOUN"]	EXACT			One or more adjectives immediately followed by a noun.	1.3
+passive subjects	[deprel="nsubj:pass"]	[upos="NOUN"][deprel="nsubj:pass"]	DIFF 222 vs 1445			Passive subjects, where the noun is the subject of a passive verb.	1.4
+the word "the" followed by a superlative adjective	[word="the"][feats="Degree=Sup"] || [word="the"][upos="ADJ" & feats="Degree=Sup"]	[word="the"][upos="ADJ"][feats="Degree=Sup"]	DIFF 0 vs 321			The word 'the' immediately followed by a superlative adjective.	1.5
+interjections	[upos="INTJ"]	[upos="INTJ"]	EXACT			Interjections, anywhere in the text.	1.1
+modal verbs	[xpos="MD"] || [upos="AUX" & xpos="MD"]	[upos="AUX"]	DIFF 15925 vs 4050			Modal verbs, which are auxiliary verbs (AUX) in the corpus.	1.1
+adverbs ending in "ly" followed by an adjective	[word=".*ly" & upos="ADV"][upos="ADJ"]	[upos="ADV"][word="ly"][upos="ADJ"]	DIFF 0 vs 420			Adverbs ending in 'ly' immediately followed by an adjective.	1.5
+the phrase "a lot of"	[word="a"][word="lot"][word="of"]	[word="a"][word="lot"][word="of"]	EXACT			The exact phrase 'a lot of'.	1.4
+the subordinating conjunction "if"	[lemma="if" & upos="SCONJ"] || [word="if|If" & upos="SCONJ"]	[upos="SCONJ"] within <doc split="train"/>	DIFF 3819 vs 903			Subordinating conjunction if, only where doc.split is train.	1.2
+verbs in the past tense in emails	[upos="VERB" & feats="Tense=Past"] within <doc genre="email"/>	[upos="VERB" & feats="Tense=Past"] within <doc genre="email"/>	EXACT			Verbs in the past tense, only where doc.genre is email.	1.4
+two nouns in a row	[upos="NOUN"][upos="NOUN"]	[upos="NOUN"][upos="NOUN"]	EXACT			Two nouns in a row.	1.3
+pronouns in the accusative	[upos="PRON" & feats="Case=Acc"]	[upos="PRON" & feats="Case=Acc"]	EXACT			Pronouns in the accusative case.	1.2
+a number followed by the word "years"	[upos="NUM"][word="years"]	[upos="NUM"][word="years"]	EXACT			A number immediately followed by the word years.	1.3
+any form of "get" followed by an adjective	[lemma="get"][upos="ADJ"]	[lemma="get"][upos="ADJ"]	EXACT			Any form of get followed by an adjective.	1.3
+indirect objects	[deprel="iobj"]	[deprel="iobj"]	EXACT			Indirect objects, which are nouns or pronouns that receive the action of the verb.	1.2
+question marks	[word="\?"] || [upos="PUNCT" & word="\?"]	[xpos="."]	DIFF 24592 vs 1095			Question marks, only where the token is a punctuation mark.	1.1
+"much" followed by a comparative adjective	[word="much"][upos="ADJ" & feats="Degree=Cmp"]	[word="much"][upos="ADJ" & feats="Degree=Cmp"]	EXACT		repaired (feats: Degree=cmp -> Degree=Cmp)	The word 'much' immediately followed by a comparative adjective.	1.4
+the lemma "think" followed by "that"	[lemma="think"][word="that"]	[lemma="think"][word="that"]	EXACT			The lemma 'think' immediately followed by the word 'that'.	1.3
+proper nouns in newsgroup posts	[upos="PROPN"] within <doc genre="newsgroup"/>	[upos="PROPN"] within <doc genre="newsgroup"/>	EXACT			Proper nouns, only where doc.genre is newsgroup.	1.2
+a preposition followed by a determiner and a noun	[upos="ADP"][upos="DET"][upos="NOUN"]	[upos="ADP"][upos="DET"][upos="NOUN"]	EXACT			A preposition immediately followed by a determiner and then a noun.	1.5
+clausal complements	[deprel="ccomp"]	[deprel="ccomp"]	EXACT			Clausal complements, i.e., clauses that function as complements to a verb.	1.2
+interrogative pronouns	[upos="PRON" & feats="PronType=Int"]	[upos="INTJ"]	DIFF 931 vs 420			Interrogative pronouns.	1.1
+"I" followed by a verb, with an optional adverb in between	[word="I"][upos="ADV"]?[upos="VERB"]	[word="I"][upos="VERB"][upos="ADV"]?	DIFF 1796 vs 1888			The word 'I' immediately followed by a verb, with an optional adverb in between.	1.5
+words containing an apostrophe	[word=".*'.*"]	[word=".*'.*"]	EXACT			Words containing an apostrophe.	1.1
+nouns followed by something other than punctuation	[upos="NOUN"][upos!="PUNCT"]	[upos="NOUN"][xpos!="PUNCT"]	DIFF 43084 vs 30496			Nouns immediately followed by something other than punctuation.	1.3

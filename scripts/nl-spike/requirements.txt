@@ -1,0 +1,15 @@
+# Python environment for the benchmark harness (run.py), pinned to what
+# produced the results in docs/nl-query-assistant.md (2026-09-29, macOS 27,
+# Apple silicon, Python 3.12.12). Set up with:
+#   uv venv --python 3.12 data/.venv-nl
+#   VIRTUAL_ENV=data/.venv-nl uv pip install -r scripts/nl-spike/requirements.txt
+mlx==0.32.2
+mlx-metal==0.32.2
+mlx-lm==0.31.3
+xgrammar==0.2.8
+transformers==5.17.0
+tokenizers==0.23.2
+huggingface-hub==1.33.0
+safetensors==0.8.0
+numpy==2.5.3
+torch==2.14.0

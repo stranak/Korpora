@@ -483,19 +483,40 @@ vs 1.3 s per request for the 4B), and the retry rarely helps.
 
 ## Resuming
 
-- Python harness: `data/.venv-nl` (gitignored; recreate per `run.py`'s
-  header). Models are in the Hugging Face cache (on the dev Mac
-  `HF_HUB_CACHE=/Volumes/STORAGE/HF_Hub_Cache`).
-- `KorporaAssistant`: `swift build && swift test` (40 tests).
-- `KorporaGeneration`: xcodebuild Release (see `bench-swift.sh`'s header).
-  It needs the Metal Toolchain component (`xcodebuild -downloadComponent
-  MetalToolchain`), installed on the dev Mac 2026-09-29.
-- Corpora: UD English EWT at `data/ud-en-ewt/` (compiled, registry in
-  `data/ud-en-ewt/registry`); SYN2025 in the app's compiled corpora.
-- Dev loop: `scripts/nl-spike/bench-dev.sh` (Python, prompt variants) and
-  `bench-swift.sh` (the app's Swift path). The test split
-  (`bench/ud-en-ewt-test.tsv`) is still unread; keep it that way until a
-  milestone comparison.
+Everything needed is in the repo; on a new machine (Apple silicon):
+
+1. The usual project setup (`scripts/setup-dev-machine.sh`, a built
+   `manatee-open` checkout; see `docs/project-plan.md`).
+2. Benchmark corpus: `scripts/nl-spike/build-ud-corpus.sh`. It compiles
+   UD English EWT from the committed vertical
+   (`scripts/nl-spike/corpus/`, pinned to UD commit `4a4d77f`, CC BY-SA
+   4.0) into `data/ud-en-ewt/`, with a registry for this machine; then
+   `export MANATEE_REGISTRY=$PWD/data/ud-en-ewt/registry`. Verified
+   2026-09-29 from a fresh worktree: all 146 gold queries and alternatives
+   give identical hits. `--from-source` re-derives it from the pinned
+   CoNLL-U.
+3. Python harness: `uv venv --python 3.12 data/.venv-nl && VIRTUAL_ENV=
+   data/.venv-nl uv pip install -r scripts/nl-spike/requirements.txt`
+   (pinned).
+4. Models: `scripts/nl-spike/fetch-models.sh` (Qwen3-4B and -8B at pinned
+   revisions, `models.tsv`; `all` for the rest) into the Hugging Face
+   cache. On the original dev Mac the cache is
+   `HF_HUB_CACHE=/Volumes/STORAGE/HF_Hub_Cache`. Note that `run.py` loads
+   by repo id, i.e. the current `main`, while `bench-swift.sh` uses the
+   cached snapshot.
+5. `KorporaAssistant`: `swift build && swift test` (40 tests).
+6. `KorporaGeneration`: needs Xcode's Metal Toolchain once per machine
+   (`xcodebuild -downloadComponent MetalToolchain`, ~840 MB), then the
+   xcodebuild Release build in `bench-swift.sh`'s header.
+7. Dev loop: `scripts/nl-spike/bench-dev.sh` (Python, prompt variants)
+   and `bench-swift.sh` (the app's Swift path). Past runs are in
+   `scripts/nl-spike/results/` (index in its README). The test split
+   (`bench/ud-en-ewt-test.tsv`) is still unread; keep it that way until a
+   milestone comparison.
+
+Other corpora used so far: SYN2025 (Czech positional; the app's compiled
+corpora on the dev Mac, not redistributable), only for spot checks of the
+Czech tag glosses and role detection.
 
 ## Phases
 0. ~~**Feasibility spike (dev-only, no app UI).**~~ — done, see "Phase 0

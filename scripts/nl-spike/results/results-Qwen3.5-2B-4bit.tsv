@@ -1,0 +1,20 @@
+nouns	[upos="NOUN"]	[upos="NOUN"]*	DIFF 49248 vs 43084		Nouns.	1.0
+proper nouns in the plural	[upos="PROPN" & feats="Number=Plur"]	[upos="NOUN" & feats="Number=Plur"] within <doc genre="newsgroup"/>	DIFF 1997 vs 723		Proper nouns in the newsgroup genre.	0.6
+a determiner, an adjective and a noun	[upos="DET"][upos="ADJ"][upos="NOUN"]	[upos="DET" & upos="ADJ" & upos="NOUN"][upos="DET" & upos="ADJ" & upos="NOUN"]	DIFF 0 vs 3453		A determiner, an adjective, and a noun.	0.8
+any form of the verb "make" followed by a noun	[lemma="make" & upos="VERB"][upos="NOUN"]	[lemma="make"][word="NOUN"]	DIFF 0 vs 54		Any form of the verb 'make' followed by a noun.	0.6
+superlative adjectives	[upos="ADJ" & feats="Degree=Sup"]	[upos="ADJ" & feats="Degree=Sup"]	EXACT		Superlative adjectives.	0.5
+comparative adjectives followed by "than"	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	[upos="ADJ" & feats="Degree=Cmp"][word="than"]	EXACT		Comparative adjectives followed by 'than'.	0.6
+passive auxiliaries	[deprel="aux:pass"]	[upos="AUX"]* within <doc genre="newsgroup"/>	DIFF 2321 vs 1643		Passive auxiliaries in the newsgroup genre.	0.5
+verbs in the imperative in reviews	[upos="VERB" & feats="Mood=Imp"] within <doc genre="reviews"/>	[upos="VERB" & feats="Imper"][upos="VERB" & feats="Imper"]?[upos="VERB" & feats="Imper"]* within <doc genre="review"/>	DIFF 0 vs 215		Verbs in the imperative mood found in reviews.	0.9
+the word "very" followed by an adjective	[word="very"][upos="ADJ"]	[word="very"][upos="ADJ"]	EXACT		The word 'very' followed by an adjective.	0.6
+two adjectives in a row	[upos="ADJ"][upos="ADJ"]	[upos="ADJ" & upos="ADJ"]	DIFF 16789 vs 928		Two adjectives in a row.	0.5
+nouns that are the subject of a sentence	[upos="NOUN" & deprel="nsubj"]	[upos="NOUN" & deprel="nsubj"]	EXACT		Nouns that function as the subject of a sentence.	0.5
+the preposition "of" between two nouns	[upos="NOUN"][word="of"][upos="NOUN"]	[upos="NOUN" & upos="NOUN"]*[upos="PREP" & word="of"]	DIFF 0 vs 970		A preposition 'of' occurring between two nouns.	0.7
+gerunds	[feats="VerbForm=Ger"]	[upos="VERB"][feats="VerbForm=Ger"]	DIFF 212 vs 1230		Gerunds.	0.6
+numbers written in digits	[upos="NUM" & feats="NumForm=Digit"]	[upos="NUM"]	DIFF 5051 vs 3927		Numbers written in digits.	0.4
+personal pronouns in the first person	[upos="PRON" & feats="PronType=Prs" & feats="Person=1"]	[upos="PRON" & feats="PronType=Prs"]	DIFF 18772 vs 7987		Personal pronouns in the first person.	0.5
+any form of "be" followed by "not"	[lemma="be"][word="not"]	[lemma="be"][word="not"]	EXACT		Any form of 'be' followed by 'not'.	0.6
+negated verbs in emails	[word="not|n't"][upos="VERB"] within <doc genre="email"/>	[upos="VERB" & feats="Neg" & word!="said"] within <doc genre="email"/>	DIFF 0 vs 229		Negated verbs in the email genre.	0.6
+words ending in "ly" that are adverbs	[word=".*ly" & upos="ADV"]	[upos="ADV"][word="ly.*"]	DIFF 1 vs 2536		Adverbs whose form ends with ly.	0.6
+an adverb optionally followed by another adverb and then an adjective	[upos="ADV"][upos="ADV"]?[upos="ADJ"]	[upos="ADV"][upos="ADV" & upos="ADV"]?[upos="ADJ"]	EXACT		An adverb optionally followed by another adverb and then an adjective.	0.7
+the lemma "go" but not the word "going"	[lemma="go" & word!="going"]	[lemma!="go"][word!="going"]	DIFF 253815 vs 525		The lemma 'go' but not the word 'going'.	0.6
