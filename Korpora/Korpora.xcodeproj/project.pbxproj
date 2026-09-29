@@ -24,7 +24,6 @@
 		470EB5A8AA5C7EB0446D755D /* LegacyDefaultsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */; };
 		4AB1276625BB1338E6EEFCA0 /* UnicodeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */; };
 		4B12DE00ECB62CF1B94A5E85 /* ExtendedContextWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A93E62192681E88BFE51B2 /* ExtendedContextWindowController.swift */; };
-		52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */; };
 		5460A66C8408B07767556999 /* SamplePopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */; };
 		59997812E5187B68B3AB9863 /* SortableTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F115CEAC930466168A9217 /* SortableTableView.swift */; };
 		6277F53E976159C5958D88C6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2244ED579AEB14CE01DD800F /* AppDelegate.swift */; };
@@ -40,6 +39,7 @@
 		9E0E01C3DC4DE65D38AB17B9 /* CollocationSheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BC23CBE793C2ED01EFAE067 /* CollocationSheetController.swift */; };
 		9FEF942A2023A921E3D832A0 /* ConcordanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA20AB3943E5955AFF4F9E1 /* ConcordanceSettingsViewController.swift */; };
 		A1626887D340E9D9566D6217 /* AppearanceSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F142C472071C00A420ABC5 /* AppearanceSettingsViewController.swift */; };
+		A40489B556EC0F24714E0377 /* CorpusListSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580379B16410CA4C2D7CA4D0 /* CorpusListSettingsTests.swift */; };
 		A67B412E8379D165C7EB23DC /* FrequencySheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FC66C90A00125753A67D28 /* FrequencySheetController.swift */; };
 		ABB771AD9CD40A0BB1F5332E /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA396783428D5410E30C0F8 /* ConcordanceDocument.swift */; };
 		B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1FD3479E35618789EA56FC /* CQLQueryField.swift */; };
@@ -88,6 +88,7 @@
 		3E0DDF2767D8F85B6A2A9DAF /* ConcordanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceViewController.swift; sourceTree = "<group>"; };
 		50429E54926CEE548BDD9820 /* UnicodeScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScriptTests.swift; sourceTree = "<group>"; };
 		548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverController.swift; sourceTree = "<group>"; };
+		580379B16410CA4C2D7CA4D0 /* CorpusListSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusListSettingsTests.swift; sourceTree = "<group>"; };
 		5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
 		5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		5D9611D2AC5061EA2B01028F /* ManateeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ManateeKit; path = ../ManateeKit; sourceTree = SOURCE_ROOT; };
@@ -111,7 +112,6 @@
 		B674887DFEED6258891E125A /* OperationsPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsPopoverController.swift; sourceTree = "<group>"; };
 		BAA221175004C97F623B41C8 /* KorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
-		C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsViewController.swift; sourceTree = "<group>"; };
 		CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationWindowController.swift; sourceTree = "<group>"; };
 		CF1FD3479E35618789EA56FC /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
 		D0F115CEAC930466168A9217 /* SortableTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortableTableView.swift; sourceTree = "<group>"; };
@@ -205,6 +205,7 @@
 			children = (
 				5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */,
 				7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */,
+				580379B16410CA4C2D7CA4D0 /* CorpusListSettingsTests.swift */,
 				2228F90D33D19B13E69ABAC5 /* CQLAutoPairingTests.swift */,
 				7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */,
 				EAE6AD349C15F21FFD850145 /* ExtendedContextOverlayInsetTests.swift */,
@@ -250,7 +251,6 @@
 				8EA20AB3943E5955AFF4F9E1 /* ConcordanceSettingsViewController.swift */,
 				27FD96658F279E86467718F8 /* CorporaSettingsViewController.swift */,
 				AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */,
-				C64AC3CD10663F9310F165FA /* GeneralSettingsViewController.swift */,
 				EE1B3764D995C534F371A028 /* LegacyDefaultsMigration.swift */,
 				16B0CD5CB7FBE2BC4564AF4D /* QueryHistoryStore.swift */,
 				5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */,
@@ -387,6 +387,7 @@
 				C6212C93C0C81D9DD271EBD5 /* CQLCompletionContextTests.swift in Sources */,
 				97CB75829A78ECC1D477B9CE /* ConcordanceExporterTests.swift in Sources */,
 				6A762E1E423B189ABF712D47 /* ConcordanceOperationTests.swift in Sources */,
+				A40489B556EC0F24714E0377 /* CorpusListSettingsTests.swift in Sources */,
 				753C61BDF55CC67A1C13E23A /* ExtendedContextOverlayInsetTests.swift in Sources */,
 				45074C6E1CD3CB489C2A8F86 /* KWICFormatterTests.swift in Sources */,
 				247ED6676A2FED188F50DAF6 /* LegacyDefaultsMigrationTests.swift in Sources */,
@@ -422,7 +423,6 @@
 				1C1033F37ED198EBDCED9FED /* FilterSheetController.swift in Sources */,
 				A67B412E8379D165C7EB23DC /* FrequencySheetController.swift in Sources */,
 				FFC77053A7C5DCBD559DB120 /* FrequencyWindowController.swift in Sources */,
-				52BBB241C9224DCD4237A6DD /* GeneralSettingsViewController.swift in Sources */,
 				D2DB97BA102AA3F70C5066BF /* HistoryPopoverController.swift in Sources */,
 				8A9BD412E2BB01965893F7C1 /* KWICCellView.swift in Sources */,
 				6CDEB59F2FF4FA28D2BBBD5D /* KWICFormatter.swift in Sources */,

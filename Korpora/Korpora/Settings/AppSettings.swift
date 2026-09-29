@@ -7,7 +7,11 @@ final class AppSettings {
     static let didChangeNotification = Notification.Name("AppSettingsDidChange")
 
     private enum Key {
+        /// Retired: Settings once had a separate list of registry
+        /// directories. Read once by `migrateCorpusList()`, then removed.
         static let corpusRegistryDirectories = "corpusRegistryDirectories"
+        static let keepResidentCorpora = "keepResidentCorpora"
+        static let migratedCorpusList = "migratedCorpusList"
         static let resultsFontName = "resultsFontName"
         static let resultsFontSize = "resultsFontSize"
         static let compiledCorporaDirectory = "compiledCorporaDirectory"
@@ -30,16 +34,68 @@ final class AppSettings {
         self.defaults = defaults
     }
 
-    /// Mirrors Manatee's own `MANATEE_REGISTRY` grammar directly (an ordered
-    /// list of directories to search for corpus registry files - see
-    /// `corp/loadconf.cc` and `ManateeKit.CorpusRegistry`) rather than
-    /// inventing a different shape for the same concept.
-    var corpusRegistryDirectories: [String] {
-        get { defaults.stringArray(forKey: Key.corpusRegistryDirectories) ?? [] }
+    /// The `MANATEE_REGISTRY` this process started with: Xcode's scheme
+    /// (DevCorpus), a shell launch. Captured on first use, before
+    /// `applyEnvironment()` first overwrites the variable, so later calls
+    /// don't mistake our own directories for inherited ones.
+    private static let launchRegistry: [String] = {
+        (ProcessInfo.processInfo.environment["MANATEE_REGISTRY"] ?? "")
+            .split(separator: ":").map(String.init)
+    }()
+
+    /// Every corpus the app can open - built by Korpora, added from
+    /// elsewhere, or inherited from the environment (`ManateeKit.
+    /// CorpusLibrary`).
+    func corpusLibraryEntries() -> [CorpusLibrary.Entry] {
+        CorpusLibrary.entries(inherited: Self.launchRegistry)
+    }
+
+    /// Names of corpora to keep warm in memory - any corpus, whoever built
+    /// it (the data directory comes from its registry file's `PATH`).
+    var keepResidentCorpora: Set<String> {
+        get { Set(defaults.stringArray(forKey: Key.keepResidentCorpora) ?? []) }
         set {
-            defaults.set(newValue, forKey: Key.corpusRegistryDirectories)
-            applyEnvironment()
+            defaults.set(newValue.sorted(), forKey: Key.keepResidentCorpora)
             NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
+        }
+    }
+
+    func isKeepResident(_ name: String) -> Bool {
+        keepResidentCorpora.contains(name)
+    }
+
+    func setKeepResident(_ keep: Bool, for name: String) {
+        var names = keepResidentCorpora
+        if keep { names.insert(name) } else { names.remove(name) }
+        keepResidentCorpora = names
+    }
+
+    /// One-time carry-over into the unified corpus list (docs/project-plan.md,
+    /// "Corpus Settings UX"), run at launch after `applyEnvironment()`:
+    /// - the old "Corpus registry directories" become added corpora, one per
+    ///   registry file, and the setting is dropped;
+    /// - "Keep in Memory" flags, once stored per built corpus in
+    ///   `corpus-meta.json`, move into `keepResidentCorpora`.
+    /// The old files are left in place; the marker makes this run once.
+    func migrateCorpusList() {
+        guard !defaults.bool(forKey: Key.migratedCorpusList) else { return }
+        let entries = corpusLibraryEntries()
+        let taken = Set(entries.map(\.name))
+        let directories = defaults.stringArray(forKey: Key.corpusRegistryDirectories) ?? []
+        let result = CorpusLibrary.adoptRegistryDirectories(directories, taken: taken)
+        for directory in result.missing {
+            NSLog("Korpora: old corpus registry directory \"%@\" doesn't exist; not carried over.", directory)
+        }
+        defaults.removeObject(forKey: Key.corpusRegistryDirectories)
+
+        var resident = keepResidentCorpora
+        for entry in entries where CompiledCorpusStore.metadata(for: entry.name).keepResident {
+            if case .built = entry.origin { resident.insert(entry.name) }
+        }
+        defaults.set(resident.sorted(), forKey: Key.keepResidentCorpora)
+        defaults.set(true, forKey: Key.migratedCorpusList)
+        if !result.added.isEmpty {
+            applyEnvironment()
         }
     }
 
@@ -243,30 +299,19 @@ final class AppSettings {
         NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
     }
 
-    /// Applies `corpusRegistryDirectories`/`compiledCorporaDirectory` to the
-    /// process environment - the only thing Manatee's own registry lookup
-    /// actually reads, fresh on every call (see `CorpusRegistry`'s doc
-    /// comment). The compiled-corpora directory is always folded in (an
-    /// imported corpus should just work without a separate trip to General
-    /// settings), merged on top of whatever `MANATEE_REGISTRY` already is
-    /// rather than replacing it - so the Xcode-scheme dev override
-    /// (`Korpora/project.yml`, which points at `DevCorpus`) keeps working
-    /// until/alongside a real preference being set, instead of being
-    /// clobbered by this.
+    /// Applies the corpus locations to the process environment - the only
+    /// thing Manatee's own registry lookup actually reads, fresh on every
+    /// call (see `CorpusRegistry`'s doc comment). The search path is
+    /// `CorpusLibrary.searchPath`: corpora Korpora built, corpora added
+    /// from elsewhere, then whatever `MANATEE_REGISTRY` the app was
+    /// launched with, merged on top of rather than replaced - so the Xcode
+    /// scheme's dev override (`Korpora/project.yml`, DevCorpus) keeps
+    /// working alongside the real ones.
     func applyEnvironment() {
         let compiledDirectory = compiledCorporaDirectory?.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? compiledCorporaDirectory! : CompiledCorpusStore.baseDirectory.path
         setenv("KORPORA_COMPILED_CORPORA_DIRECTORY", compiledDirectory, 1)
-
-        var directories = corpusRegistryDirectories.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        let inherited = ProcessInfo.processInfo.environment["MANATEE_REGISTRY"]?
-            .split(separator: ":").map(String.init) ?? []
-        for directory in inherited where !directories.contains(directory) {
-            directories.append(directory)
-        }
-        if !directories.contains(compiledDirectory) {
-            directories.append(compiledDirectory)
-        }
-        setenv("MANATEE_REGISTRY", directories.joined(separator: ":"), 1)
+        setenv("MANATEE_REGISTRY",
+               CorpusLibrary.searchPath(inherited: Self.launchRegistry).joined(separator: ":"), 1)
     }
 }

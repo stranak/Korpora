@@ -20,10 +20,17 @@ final class CorpusResidencyManager {
         observeMemoryPressure()
     }
 
+    /// Corpora flagged "Keep in Memory" that can be found now, with their
+    /// data directories - built or added, no difference.
+    private func flaggedCorpora() -> [(name: String, directory: URL)] {
+        AppSettings.shared.corpusLibraryEntries().compactMap { entry in
+            guard AppSettings.shared.isKeepResident(entry.name), let directory = entry.dataDirectory else { return nil }
+            return (entry.name, directory)
+        }
+    }
+
     private func rewarmFlaggedCorpora() {
-        for name in CompiledCorpusStore.availableCorpusNames() {
-            guard CompiledCorpusStore.metadata(for: name).keepResident else { continue }
-            let directory = CompiledCorpusStore.dataDirectory(for: name)
+        for (name, directory) in flaggedCorpora() {
             let size = CorpusMemoryResidency.directorySize(directory)
             guard CorpusMemoryResidency.canKeepResident(
                 sizeBytes: size, currentlyAvailable: CorpusMemoryResidency.availableMemory(),
@@ -48,10 +55,9 @@ final class CorpusResidencyManager {
     }
 
     private func coolDownAllResidentCorpora() {
-        for name in CompiledCorpusStore.availableCorpusNames() {
-            guard CompiledCorpusStore.metadata(for: name).keepResident else { continue }
+        for (name, directory) in flaggedCorpora() {
             NSLog("Korpora: system memory pressure critical - releasing warmed pages for \"%@\".", name)
-            CorpusMemoryResidency.unwarm(directory: CompiledCorpusStore.dataDirectory(for: name))
+            CorpusMemoryResidency.unwarm(directory: directory)
         }
     }
 }

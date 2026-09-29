@@ -43,17 +43,22 @@ private final class MemoryBarView: NSView {
     }
 }
 
-/// Lets the user manage corpora imported via `CorpusImporter`: where they're
-/// compiled to, which ones exist, and (see `CorpusMemoryResidency`) which
-/// should be kept warm in the OS page cache when there's enough free RAM.
+/// Every corpus the app can open, in one list (docs/project-plan.md,
+/// "Corpus Settings UX"): the ones Korpora built from a vertical file, the
+/// ones compiled elsewhere and added here, and any inherited from the
+/// environment. They differ only in who compiled them and wrote the
+/// registry file, so they're listed, removed and kept in memory (see
+/// `CorpusMemoryResidency`) the same way.
 final class CorporaSettingsViewController: NSViewController {
     private struct Row {
-        let name: String
+        let entry: CorpusLibrary.Entry
         let sizeBytes: UInt64
         var keepResident: Bool
+
+        var name: String { entry.name }
     }
 
-    private enum Column: String { case name, size, resident }
+    private enum Column: String { case name, source, size, resident }
 
     private let directoryPathLabel = NSTextField(labelWithString: "")
     private let tableView = NSTableView()
@@ -61,14 +66,17 @@ final class CorporaSettingsViewController: NSViewController {
     private let memoryBar = MemoryBarView()
     private let memoryLabel = NSTextField(labelWithString: "")
     private let minimumFreeField = NSTextField(string: "")
+    private let removeButton = NSButton(
+        image: NSImage(systemSymbolName: "minus", accessibilityDescription: "Remove")!,
+        target: nil, action: nil)
 
     private var rows: [Row] = []
     private var refreshTimer: Timer?
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 420))
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 540, height: 440))
 
-        let directoryLabel = NSTextField(labelWithString: "Compiled corpora directory:")
+        let directoryLabel = NSTextField(labelWithString: "Corpora built by Korpora are stored in:")
         directoryPathLabel.lineBreakMode = .byTruncatingMiddle
         directoryPathLabel.font = .systemFont(ofSize: 11)
         directoryPathLabel.textColor = .secondaryLabelColor
@@ -77,14 +85,17 @@ final class CorporaSettingsViewController: NSViewController {
         tableView.headerView = NSTableHeaderView()
         let nameColumn = NSTableColumn(identifier: .init(Column.name.rawValue))
         nameColumn.title = "Name"
-        nameColumn.width = 180
+        nameColumn.width = 160
+        let sourceColumn = NSTableColumn(identifier: .init(Column.source.rawValue))
+        sourceColumn.title = "Source"
+        sourceColumn.width = 120
         let sizeColumn = NSTableColumn(identifier: .init(Column.size.rawValue))
         sizeColumn.title = "Size"
-        sizeColumn.width = 90
+        sizeColumn.width = 80
         let residentColumn = NSTableColumn(identifier: .init(Column.resident.rawValue))
         residentColumn.title = "Keep in Memory"
-        residentColumn.width = 130
-        for column in [nameColumn, sizeColumn, residentColumn] {
+        residentColumn.width = 120
+        for column in [nameColumn, sourceColumn, sizeColumn, residentColumn] {
             tableView.addTableColumn(column)
         }
         tableView.dataSource = self
@@ -96,11 +107,15 @@ final class CorporaSettingsViewController: NSViewController {
         scrollView.borderType = .bezelBorder
 
         let importButton = NSButton(
-            image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Import")!,
-            target: self, action: #selector(importCorpusTapped))
-        let removeButton = NSButton(
-            image: NSImage(systemSymbolName: "minus", accessibilityDescription: "Remove")!,
-            target: self, action: #selector(removeSelectedCorpus))
+            image: NSImage(systemSymbolName: "plus", accessibilityDescription: "Add")!,
+            target: self, action: #selector(showAddMenu(_:)))
+        removeButton.target = self
+        removeButton.action = #selector(removeSelectedCorpus)
+        removeButton.isEnabled = false
+        let addHint = NSTextField(labelWithString:
+            "+ imports a vertical file, or adds a corpus compiled elsewhere.")
+        addHint.font = .systemFont(ofSize: 11)
+        addHint.textColor = .secondaryLabelColor
 
         let memoryTitle = NSTextField(labelWithString: "Memory:")
         memoryLabel.font = .systemFont(ofSize: 11)
@@ -112,7 +127,7 @@ final class CorporaSettingsViewController: NSViewController {
 
         let views: [NSView] = [
             directoryLabel, directoryPathLabel, chooseDirectoryButton,
-            scrollView, importButton, removeButton,
+            scrollView, importButton, removeButton, addHint,
             memoryTitle, memoryBar, memoryLabel,
             minimumFreeLabel, minimumFreeField, minimumFreeSuffix,
         ]
@@ -144,6 +159,10 @@ final class CorporaSettingsViewController: NSViewController {
             removeButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
             removeButton.leadingAnchor.constraint(equalTo: importButton.trailingAnchor, constant: 2),
 
+            addHint.centerYAnchor.constraint(equalTo: importButton.centerYAnchor),
+            addHint.leadingAnchor.constraint(equalTo: removeButton.trailingAnchor, constant: 10),
+            addHint.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+
             memoryTitle.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: 20),
             memoryTitle.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             memoryBar.centerYAnchor.constraint(equalTo: memoryTitle.centerYAnchor),
@@ -163,7 +182,7 @@ final class CorporaSettingsViewController: NSViewController {
         ])
 
         view = root
-        preferredContentSize = NSSize(width: 480, height: 420)
+        preferredContentSize = NSSize(width: 540, height: 440)
     }
 
     override func viewDidLoad() {
@@ -189,11 +208,15 @@ final class CorporaSettingsViewController: NSViewController {
     }
 
     private func reloadCorpora() {
-        rows = CompiledCorpusStore.availableCorpusNames().map { name in
-            let size = CorpusMemoryResidency.directorySize(CompiledCorpusStore.dataDirectory(for: name))
-            return Row(name: name, sizeBytes: size, keepResident: CompiledCorpusStore.metadata(for: name).keepResident)
-        }
+        rows = AppSettings.shared.corpusLibraryEntries()
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map { entry in
+                Row(entry: entry,
+                    sizeBytes: entry.dataDirectory.map(CorpusMemoryResidency.directorySize) ?? 0,
+                    keepResident: AppSettings.shared.isKeepResident(entry.name))
+            }
         tableView.reloadData()
+        updateRemoveButton()
         updateMemoryBar()
     }
 
@@ -222,6 +245,16 @@ final class CorporaSettingsViewController: NSViewController {
         }
     }
 
+    @objc private func showAddMenu(_ sender: NSButton) {
+        let menu = NSMenu()
+        for (title, action) in [("Import Vertical File\u{2026}", #selector(importCorpusTapped)),
+                                ("Add Existing Corpus\u{2026}", #selector(addExistingCorpusTapped))] {
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+            item.target = self
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
+    }
+
     @objc private func importCorpusTapped() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
@@ -237,11 +270,123 @@ final class CorporaSettingsViewController: NSViewController {
         }
     }
 
+    /// A corpus compiled elsewhere (`encodevert`, a NoSketch or KonText
+    /// installation): pick its registry file, or a folder of them. Korpora
+    /// links to the files; nothing is copied.
+    @objc private func addExistingCorpusTapped() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose a corpus registry file, or a folder of them."
+        panel.prompt = "Add"
+        guard let window = view.window else { return }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK else { return }
+            addCorpora(at: panel.urls)
+        }
+    }
+
+    private func addCorpora(at urls: [URL]) {
+        var taken = Set(AppSettings.shared.corpusLibraryEntries().map(\.name))
+        var problems: [String] = []
+        for url in urls {
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if isDirectory.boolValue {
+                let result = CorpusLibrary.addAll(inDirectory: url, taken: taken)
+                taken.formUnion(result.added.map(\.name))
+                // Other files in a folder (a README) aren't worth a complaint.
+                problems += result.skipped.compactMap { skipped in
+                    if case .nameTaken = skipped.reason { return "\(skipped.name): \(skipped.reason)" }
+                    return nil
+                }
+                if result.added.isEmpty && problems.isEmpty {
+                    problems.append("\u{201C}\(url.lastPathComponent)\u{201D} has no corpus registry files.")
+                }
+            } else {
+                do {
+                    taken.insert(try CorpusLibrary.add(registryFile: url, taken: taken).name)
+                } catch {
+                    problems.append("\(error)")
+                }
+            }
+        }
+        reloadCorpora()
+        if !problems.isEmpty, let window = view.window {
+            let alert = NSAlert()
+            alert.messageText = "Some corpora weren\u{2019}t added"
+            alert.informativeText = problems.joined(separator: "\n")
+            alert.beginSheetModal(for: window)
+        }
+    }
+
+    private func updateRemoveButton() {
+        let index = tableView.selectedRow
+        removeButton.isEnabled = rows.indices.contains(index) && rows[index].entry.isRemovable
+    }
+
+    /// Both kinds of corpus are removed the same way: the user chooses
+    /// whether the data goes too.
     @objc private func removeSelectedCorpus() {
         let index = tableView.selectedRow
-        guard rows.indices.contains(index) else { return }
-        try? CompiledCorpusStore.remove(rows[index].name)
-        reloadCorpora()
+        guard rows.indices.contains(index), rows[index].entry.isRemovable, let window = view.window else { return }
+        let row = rows[index]
+        let size = ByteCountFormatter().string(fromByteCount: Int64(row.sizeBytes))
+        let alert = NSAlert()
+        alert.messageText = "Remove \u{201C}\(row.name)\u{201D}?"
+        var text: String
+        switch row.entry.origin {
+        case .built:
+            text = "Korpora built this corpus. Its data (\(size)) is in "
+                + "\(row.entry.dataDirectory?.path ?? "the compiled corpora directory"). "
+                + "Keeping the data moves it to the \u{201C}Removed\u{201D} folder there; "
+                + "add it back later with Add Existing Corpus\u{2026}."
+        case .added(let registryFile):
+            text = "This corpus was compiled outside Korpora (registry file \(registryFile.path), "
+                + "data \(size)). Keeping the data only takes it off this list; the files stay where they are."
+        case .environment:
+            return
+        }
+        alert.informativeText = text + " Deleting the data can\u{2019}t be undone."
+        alert.addButton(withTitle: "Remove, Keep Data")
+        let deleteButton = alert.addButton(withTitle: "Remove and Delete Data")
+        deleteButton.hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            switch response {
+            case .alertFirstButtonReturn: self?.remove(row, deleteData: false)
+            case .alertSecondButtonReturn: self?.remove(row, deleteData: true)
+            default: break
+            }
+        }
+    }
+
+    private func remove(_ row: Row, deleteData: Bool) {
+        // Release the warmed pages first: a kept built corpus moves, and a
+        // deleted one is gone.
+        if AppSettings.shared.isKeepResident(row.name) {
+            AppSettings.shared.setKeepResident(false, for: row.name)
+            if let directory = row.entry.dataDirectory { CorpusMemoryResidency.unwarm(directory: directory) }
+        }
+        let entry = row.entry
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let failure: Error?
+            do {
+                try CorpusLibrary.remove(entry, deleteData: deleteData)
+                failure = nil
+            } catch {
+                failure = error
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.reloadCorpora()
+                if let failure, let window = self.view.window {
+                    let alert = NSAlert(error: failure)
+                    alert.beginSheetModal(for: window)
+                }
+            }
+        }
     }
 
     @objc private func minimumFreeChanged() {
@@ -251,15 +396,11 @@ final class CorporaSettingsViewController: NSViewController {
     }
 
     @objc private func keepResidentToggled(_ sender: NSButton) {
-        guard rows.indices.contains(sender.tag) else { return }
-        let name = rows[sender.tag].name
+        guard rows.indices.contains(sender.tag), let directory = rows[sender.tag].entry.dataDirectory else { return }
         let newValue = sender.state == .on
-        var metadata = CompiledCorpusStore.metadata(for: name)
-        metadata.keepResident = newValue
-        try? CompiledCorpusStore.setMetadata(metadata, for: name)
+        AppSettings.shared.setKeepResident(newValue, for: rows[sender.tag].name)
         rows[sender.tag].keepResident = newValue
 
-        let directory = CompiledCorpusStore.dataDirectory(for: name)
         Task.detached(priority: .utility) {
             if newValue {
                 try? await CorpusMemoryResidency.warm(directory: directory)
@@ -273,6 +414,27 @@ final class CorporaSettingsViewController: NSViewController {
 extension CorporaSettingsViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        updateRemoveButton()
+    }
+
+    static func sourceTitle(_ origin: CorpusLibrary.Origin) -> String {
+        switch origin {
+        case .built: return "Built by Korpora"
+        case .added: return "Added"
+        case .environment: return "Environment"
+        }
+    }
+
+    static func sourceDetail(_ origin: CorpusLibrary.Origin) -> String {
+        switch origin {
+        case .built: return "Compiled by Korpora from a vertical file."
+        case .added(let file): return "Compiled elsewhere; registry file \(file.path)"
+        case .environment(let dir):
+            return "Found through MANATEE_REGISTRY (\(dir.path)); Korpora can\u{2019}t remove it."
+        }
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let identifier = tableColumn.flatMap({ Column(rawValue: $0.identifier.rawValue) }) else { return nil }
         let corpus = rows[row]
@@ -280,6 +442,12 @@ extension CorporaSettingsViewController: NSTableViewDataSource, NSTableViewDeleg
         case .name:
             let field = NSTextField(labelWithString: corpus.name)
             field.font = .systemFont(ofSize: 12)
+            return field
+        case .source:
+            let field = NSTextField(labelWithString: Self.sourceTitle(corpus.entry.origin))
+            field.font = .systemFont(ofSize: 12)
+            field.textColor = .secondaryLabelColor
+            field.toolTip = Self.sourceDetail(corpus.entry.origin)
             return field
         case .size:
             let field = NSTextField(labelWithString: ByteCountFormatter().string(fromByteCount: Int64(corpus.sizeBytes)))
@@ -289,11 +457,14 @@ extension CorporaSettingsViewController: NSTableViewDataSource, NSTableViewDeleg
             let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(keepResidentToggled(_:)))
             checkbox.tag = row
             checkbox.state = corpus.keepResident ? .on : .off
-            checkbox.isEnabled = corpus.keepResident || CorpusMemoryResidency.canKeepResident(
+            let fits = CorpusMemoryResidency.canKeepResident(
                 sizeBytes: corpus.sizeBytes, currentlyAvailable: CorpusMemoryResidency.availableMemory(),
                 minimumFreeAfter: AppSettings.shared.minimumFreeMemoryAfterResidency)
-            checkbox.toolTip = checkbox.isEnabled
-                ? nil : "Not enough free memory to keep this corpus resident without going under the minimum."
+            checkbox.isEnabled = corpus.entry.dataDirectory != nil && (corpus.keepResident || fits)
+            checkbox.toolTip = corpus.entry.dataDirectory == nil
+                ? "This corpus's registry file has no readable PATH."
+                : (checkbox.isEnabled
+                    ? nil : "Not enough free memory to keep this corpus resident without going under the minimum.")
             return checkbox
         }
     }

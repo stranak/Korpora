@@ -7,11 +7,10 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     static let shared = SettingsWindowController()
 
     private enum Pane: String, CaseIterable {
-        case general, appearance, concordance, corpora
+        case corpora, appearance, concordance
 
         var title: String {
             switch self {
-            case .general: return "General"
             case .appearance: return "Appearance"
             case .concordance: return "Concordance"
             case .corpora: return "Corpora"
@@ -20,7 +19,6 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
         var symbol: String {
             switch self {
-            case .general: return "gearshape"
             case .appearance: return "textformat"
             case .concordance: return "text.alignleft"
             case .corpora: return "internaldrive"
@@ -31,7 +29,6 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
         func makeViewController() -> NSViewController {
             switch self {
-            case .general: return GeneralSettingsViewController()
             case .appearance: return AppearanceSettingsViewController()
             case .concordance: return ConcordanceSettingsViewController()
             case .corpora: return CorporaSettingsViewController()
@@ -53,7 +50,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         window.toolbar = toolbar
         window.toolbarStyle = .preference
 
-        showPane(.general)
+        showPane(.corpora)
     }
 
     private func showPane(_ pane: Pane) {
