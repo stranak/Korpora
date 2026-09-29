@@ -200,6 +200,7 @@ final class NewConcordanceSheetController: NSViewController {
         let popover = NSPopover()
         let controller = NewSubcorpusPopoverController()
         controller.corpusInfo = currentCorpusInfo
+        controller.corpusName = corpusName
         controller.onCreate = { [weak self, weak popover] name, structure, query in
             guard let self else { return }
             Task { @MainActor in

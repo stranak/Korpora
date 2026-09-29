@@ -12,10 +12,19 @@ struct TestCorpusFixture {
     // SubcorpusTests' teardown deleting that directory for "testcorp" once
     // deleted a real subcorpus created via manual UI testing. A name unique
     // to this fixture can never collide with a real corpus again.
-    let corpusName = "mkittest"
+    let corpusName: String
     private let tempDir: URL
 
-    static func build() throws -> TestCorpusFixture {
+    /// - Parameters:
+    ///   - corpusName: unique per fixture (see the note above).
+    ///   - vertical: the vertical file's text; the default is the 4-sentence
+    ///     two-`<doc>` corpus most tests use.
+    ///   - docAttributes: the `<doc>` structure's attributes, matching
+    ///     `vertical`.
+    static func build(
+        corpusName: String = "mkittest", vertical: String = vertContent,
+        docAttributes: [String] = ["id"]
+    ) throws -> TestCorpusFixture {
         let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("ManateeKitTests-\(UUID().uuidString)")
         let vertDir = tempDir.appendingPathComponent("vert")
@@ -26,7 +35,7 @@ struct TestCorpusFixture {
         }
 
         let vertPath = vertDir.appendingPathComponent("test.vert")
-        try vertContent.write(to: vertPath, atomically: true, encoding: .utf8)
+        try vertical.write(to: vertPath, atomically: true, encoding: .utf8)
 
         let registryContent = """
         NAME "Test Corpus"
@@ -42,13 +51,13 @@ struct TestCorpusFixture {
         ATTRIBUTE tag {
         }
         STRUCTURE doc {
-            ATTRIBUTE id
+        \(docAttributes.map { "    ATTRIBUTE \($0)" }.joined(separator: "\n"))
         }
         STRUCTURE s {
         }
         """
         try registryContent.write(
-            to: registryDir.appendingPathComponent("mkittest"), atomically: true, encoding: .utf8)
+            to: registryDir.appendingPathComponent(corpusName), atomically: true, encoding: .utf8)
 
         // mtc_corpus_open reads MANATEE_REGISTRY via getenv() on every call (not
         // cached), so setting it here for this process is enough for the whole
@@ -64,7 +73,7 @@ struct TestCorpusFixture {
 
         let process = Process()
         process.executableURL = encodevert
-        process.arguments = ["-v", "-c", "mkittest"]
+        process.arguments = ["-v", "-c", corpusName]
         let outputPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = outputPipe
@@ -76,7 +85,7 @@ struct TestCorpusFixture {
             throw FixtureError("encodevert exited \(process.terminationStatus): \(output)")
         }
 
-        return TestCorpusFixture(tempDir: tempDir)
+        return TestCorpusFixture(corpusName: corpusName, tempDir: tempDir)
     }
 
     func cleanUp() {

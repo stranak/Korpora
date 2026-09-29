@@ -295,27 +295,28 @@ Confirmed product decisions (from earlier in this project):
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
 | 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | import through the UI was exercised in the 0.1 and 0.2 macOS 15 smoke tests, and Keep in Memory now covers every corpus (0.2); the remaining Phase 4 click-through notes below are historical |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
-| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8a done, builds cleanly, 86/86 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); 6.8 click-tested and **found broken (completion never appeared) — fixed in 6.8a, awaiting re-test**; 6.9-6.11 not started |
+| 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9 built (2026-09-29, tests in ManateeKit and the app); 6.10-6.11 not started | 6.1-6.8a done, builds cleanly, 86/86 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); 6.8 click-tested and **found broken (completion never appeared) — fixed in 6.8a, awaiting re-test**; 6.9-6.11 not started |
 | Settings: one corpus list (0.2) | `CorpusLibrary`, 18 tests | done (#10), General tab removed | yes — clicked through by the user on macOS 15 and 27 in the 0.2 smoke test; one bug found and fixed |
 | Goal — signed release | n/a | v0.1 (2026-09-26) and v0.2 (2026-09-29) published | yes — macOS 15.7.7 VM smoke tests, incl. an upgrade 0.1 → 0.2 |
 
 Test counts in the rows above are as of each phase's completion. Today:
-ManateeKit 82 (XCTest), app 94 (Swift Testing).
+ManateeKit 94 (XCTest), app 108 (Swift Testing).
 
 All Swift/C++ code builds cleanly and all tests pass (`swift test` in
-`ManateeKit` → 82/82; app suite 94/94, 2026-09-29).
+`ManateeKit` → 94/94; app suite 108/108, 2026-09-29).
 
 ## Open goals (refreshed 2026-09-29)
 
-**Feature work on main, none started** (all Phase 6, agreed roadmap):
-1. **6.9** Text-Types-style subcorpus creation: an attribute picker and a
-   checklist of real values in place of the free-text CQL field. Small and
-   self-contained; the engine primitive (6.7) exists.
-2. **6.10** Charts: Table | Chart toggle for Collocations and Frequency,
+**Feature work on main** (all Phase 6, agreed roadmap):
+1. **6.9** Text-Types-style subcorpus creation: **built 2026-09-29**, an
+   attribute picker and a checklist of real values (the free-text CQL
+   field stays as a second mode). Needs a click-through in the running
+   app; see its section.
+2. **6.10** (not started) Charts: Table | Chart toggle for Collocations and Frequency,
    plus a concordance dispersion plot. Design reviewed 2026-09-29 (see
    6.10): keep Swift Charts in an `NSHostingView`, isolated, and spike
    printing and hover first.
-3. **6.11** Concordance pagination/streaming: the biggest change, last.
+3. **6.11** (not started) Concordance pagination/streaming: the biggest change, last.
 
 **Known bugs**
 - **#11, tooltips** (KWIC hover and toolbar) don't appear until the app has
@@ -2448,7 +2449,7 @@ again"): not investigated further unless it recurs, at which point
 capture Xcode console output (`GetConsoleOutput`) during the failing run
 itself, since that's the one class of evidence not yet gathered.
 
-## Phase 6 — Concordance UX, round 2 (KonText comparison) (in progress: 6.1–6.8a done; 6.9–6.11 not started)
+## Phase 6 — Concordance UX, round 2 (KonText comparison) (in progress: 6.1–6.8a done; 6.9 built, needs click-test; 6.10–6.11 not started)
 
 Phase 5 closed out the user's first KonText-comparison pass. This is
 round 2: another functional comparison against KonText (specifically
@@ -3512,7 +3513,7 @@ more, all in `CQLQueryField`/`ConcordanceViewController`:
 
 Verified by hand in the Debug build (macOS 27) and on macOS 15.7 (VM).
 
-### 6.9 — Text-Types-style subcorpus creation (not started)
+### 6.9 — Text-Types-style subcorpus creation (built 2026-09-29; awaiting click-through)
 
 Today, `NewSubcorpusPopoverController` takes a free-text CQL restriction
 (`author="Twain"`, `queryField` is a plain `CQLQueryField`). KonText
@@ -3536,6 +3537,52 @@ reuses 6.7's new `Corpus` methods.
 doesn't change); manual test creating a subcorpus via checkboxes and
 confirming its size/content matches picking the same values by hand via
 free-text CQL today.
+
+**Built (2026-09-29).** The New Subcorpus popover now has two modes.
+- **Choose values** (default): an attribute pop-up for the chosen
+  structure, a search field, a checklist of that attribute's distinct
+  values, a status line ("12 values · 3 selected"), Clear, and a live
+  preview of the restriction being built. Values ticked for one attribute
+  are alternatives (`OR`); different attributes all have to hold (`AND`),
+  as in KonText, and picks are kept when switching attributes. The result
+  is `(genre="essay"|genre="fiction") & year="1876"`, handed to the
+  unchanged `Corpus.createSubcorpus`. I checked against the engine that
+  `create_subcorpus` accepts `&`, `|` and parentheses (it evaluates the
+  restriction as an ordinary one-position expression over the structure's
+  own attributes).
+- **CQL expression**: the old free-text field, kept rather than removed
+  (ranges, regular expressions and negation can't be ticked). Switching to
+  it starts from what was picked.
+- Values are shown with `Corpus.attributeValues` (6.7). An attribute with
+  up to 500 distinct values is listed whole and the search filters it
+  locally; with more (`doc.id` in a big corpus) the first 500 are shown and
+  the search asks the engine (`matching:`, case-insensitive, whole list).
+  **No value counts**: the count primitive (`topAttributeValues`) exists
+  only on the research branch, and this design didn't need it; adding
+  counts later is a small change once it's on main.
+- **Escaping matters and is tested.** CQL compares a *regular expression*
+  against the whole value, so a picked `Smith (Jr.)` is regex-escaped
+  before being quoted (`SubcorpusRestriction.literal`); raw, it would match
+  "Smith Jrx" and not itself. Manatee also keeps XML entities in attribute
+  values literally (`&quot;` stays `&quot;`), so the picker offers, and
+  matches, the stored text.
+- Code: `ManateeKit.SubcorpusRestriction` (string building and escaping),
+  app `SubcorpusValuePickerModel` (UI-free: list, search, picks, dropping
+  slow answers to superseded questions) and the rewritten
+  `NewSubcorpusPopoverController`.
+- Tests: ManateeKit +12 (94 in all), including real subcorpora built from
+  generated restrictions: single value, `OR` within an attribute, `AND`
+  across attributes, and values full of regex metacharacters, quotes and
+  backslashes, each selecting exactly its own document. App +14 (108 in
+  all): the model with fake loaders (including a mutation check that the
+  stale-answer guard is what makes its test pass) and the popover driven
+  like a click: layout at its real size, Create's enabling rules, what
+  `onCreate` receives in both modes, and a corpus that won't open.
+- **Not yet done: a click-through in the running app** (Xcode agent's
+  job): open New Concordance → Subcorpus → New Subcorpus…, tick values
+  and watch the preview, create it, run a query in it and compare its size
+  with the same restriction typed by hand; try an attribute with many
+  values (search), a value with punctuation, and CQL mode.
 
 ### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (not started; design reviewed 2026-09-29)
 
