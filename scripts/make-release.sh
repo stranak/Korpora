@@ -143,8 +143,16 @@ notarize() {  # <file-to-submit> <what-to-staple> <label>
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/korpora-release.XXXXXX")"
 # The staged copy of the app must not outlive the run: Launch Services
 # registers every Korpora.app it sees under its bundle id, and stale copies
-# in temp directories can leave the Dock showing an old icon.
-cleanup() { hdiutil detach "$STAGE/mnt" >/dev/null 2>&1 || true; rm -rf "$STAGE"; }
+# in temp directories may leave the Dock showing an old icon.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+cleanup() {
+    hdiutil detach "$STAGE/mnt" >/dev/null 2>&1 || true
+    # Deleting the files isn't enough: spctl/stapler/mounting register them.
+    for stale in "$STAGE/dmgroot/Korpora.app" "$STAGE/mnt/Korpora.app"; do
+        "$LSREGISTER" -u "$stale" >/dev/null 2>&1 || true
+    done
+    rm -rf "$STAGE"
+}
 trap cleanup EXIT
 mkdir "$STAGE/dmgroot"
 ditto "$APP" "$STAGE/dmgroot/Korpora.app"
