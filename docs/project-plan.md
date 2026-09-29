@@ -293,12 +293,60 @@ Confirmed product decisions (from earlier in this project):
 | Settings (Cmd-,) | n/a | done | yes (screenshots, earlier session) |
 | 2 — corpus info + subcorpus management | done, 17/17 tests passing | done, builds & launches cleanly | **yes — Settings, Sort, subcorpus creation/query, and quit/close-anytime behavior all confirmed by user; see verification log** |
 | 3 — collocations, frequency distributions | done, 25/25 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **yes — both toolbar buttons, sheets, sorting, and disposability all confirmed by user; see verification log** |
-| 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | **not yet — needs manual click-through, see Phase 4 writeup** |
+| 4 — corpus import & memory residency | done, 32/32 ManateeKit tests passing | done, builds cleanly, 8/8 CorporaTests passing | import through the UI was exercised in the 0.1 and 0.2 macOS 15 smoke tests, and Keep in Memory now covers every corpus (0.2); the remaining Phase 4 click-through notes below are historical |
 | 5 — concordance UX (context/history/KWIC attrs/doc info/export) | done, 42/42 ManateeKit tests passing | done, builds cleanly, 32/32 CorporaTests passing | **partial — 5.1-5.4 confirmed by user (see Phase 5 writeup, incl. an accepted non-blocking hover-tooltip bug); 5.5 not yet manually click-tested** |
 | 6 — concordance UX round 2 (KonText comparison, 11 items) | 6.1-6.8 done, 59/59 ManateeKit tests passing; 6.9-6.11 not started | 6.1-6.8a done, builds cleanly, 86/86 KorporaTests passing; 6.9-6.11 not started | partial — 6.1-6.6a all confirmed working by user; 6.7 is engine-only (tests, nothing to click); 6.8 click-tested and **found broken (completion never appeared) — fixed in 6.8a, awaiting re-test**; 6.9-6.11 not started |
+| Settings: one corpus list (0.2) | `CorpusLibrary`, 18 tests | done (#10), General tab removed | yes — clicked through by the user on macOS 15 and 27 in the 0.2 smoke test; one bug found and fixed |
+| Goal — signed release | n/a | v0.1 (2026-09-26) and v0.2 (2026-09-29) published | yes — macOS 15.7.7 VM smoke tests, incl. an upgrade 0.1 → 0.2 |
 
-All Swift/C++ code builds cleanly and all ManateeKit tests pass (`swift
-test` → 17/17).
+Test counts in the rows above are as of each phase's completion. Today:
+ManateeKit 82 (XCTest), app 94 (Swift Testing).
+
+All Swift/C++ code builds cleanly and all tests pass (`swift test` in
+`ManateeKit` → 82/82; app suite 94/94, 2026-09-29).
+
+## Open goals (refreshed 2026-09-29)
+
+**Feature work on main, none started** (all Phase 6, agreed roadmap):
+1. **6.9** Text-Types-style subcorpus creation: an attribute picker and a
+   checklist of real values in place of the free-text CQL field. Small and
+   self-contained; the engine primitive (6.7) exists.
+2. **6.10** Charts: Table | Chart toggle for Collocations and Frequency,
+   plus a concordance dispersion plot. Design reviewed 2026-09-29 (see
+   6.10): keep Swift Charts in an `NSHostingView`, isolated, and spike
+   printing and hover first.
+3. **6.11** Concordance pagination/streaming: the biggest change, last.
+
+**Known bugs**
+- **#11, tooltips** (KWIC hover and toolbar) don't appear until the app has
+  been deactivated and reactivated once per launch. Confirmed real by the
+  user on macOS 27 (0.2); the investigation in Phase 5.3 ruled out the
+  tooltip mechanism, so it's something about the app's window setup or the
+  OS. Not yet checked on macOS 15.
+- A one-off 0-hit result (Phase 5.5) was seen once and never reproduced.
+
+**Release and distribution**
+- Out of scope for now: auto-updates (Sparkle), Mac App Store, an Intel or
+  universal build.
+- macOS 16–26 is covered by the macOS 15 floor but has never been run;
+  tested on 15.7 and 27.
+- The `manatee-open` heap-corruption fix is on the fork's
+  `macos-arm64-portability` branch; the user declined an upstream PR.
+
+**Housekeeping**
+- Several writeups below end with "not yet click-tested". They were
+  written mid-session; the status table says which items were later
+  confirmed by use. A sweep to close the rest out hasn't been done.
+
+**Not on main:** the natural-language query assistant (Phase 7) is on the
+long-term research branch `feat/nl-query-assistant`, paused after phase 3
+with three open decisions (default model, download source, what the
+button does before a model is installed). Its plan is
+`docs/nl-query-assistant.md` on that branch.
+
+**Closed 2026-09-29:** Settings' two corpus lists became one (#10); the
+typed `[]` arriving as `a0` in the VM was a VNC keyboard-forwarding issue,
+not the app; release 0.2 shipped.
 
 ## Phase 0 — AppKit shell, NSDocument model, query parity (done)
 
@@ -1597,7 +1645,7 @@ harmless and left in place. The compiled-corpora directory's "Choose…"
 still only changes where *new* imports go; corpora already built in the
 old place drop off the list until re-added with Add Existing Corpus….
 
-## Phase 5 — Concordance UX enhancements, KonText-inspired (in progress)
+## Phase 5 — Concordance UX enhancements, KonText-inspired (done; click-test status per item below)
 
 Prompted by the user asking to compare this app's concordance view against
 KonText's and add what's missing. Five features, agreed with the user in
@@ -2194,6 +2242,10 @@ narrowed further and closed as a known, accepted, non-blocking issue:**
   or a non-beta macOS to test against for comparison) - not chased
   further given the low severity (one manual workaround, once per launch)
   relative to the time already invested.
+- **Update 2026-09-29:** the user confirms this is a real bug that is
+  still there on macOS 27 (0.2), not a beta artefact. Tracked as
+  [issue #11](https://github.com/stranak/Korpora/issues/11), which lists
+  everything ruled out above and what hasn't been tried.
 - **Process note**: this session initially told the user it had no way to
   read the app's live console output, which was wrong - `GetConsoleOutput`
   (part of the same xcode-tools MCP surface already used for `BuildProject`/
@@ -2396,7 +2448,7 @@ again"): not investigated further unless it recurs, at which point
 capture Xcode console output (`GetConsoleOutput`) during the failing run
 itself, since that's the one class of evidence not yet gathered.
 
-## Phase 6 — Concordance UX, round 2 (KonText comparison) (not started)
+## Phase 6 — Concordance UX, round 2 (KonText comparison) (in progress: 6.1–6.8a done; 6.9–6.11 not started)
 
 Phase 5 closed out the user's first KonText-comparison pass. This is
 round 2: another functional comparison against KonText (specifically
@@ -3485,7 +3537,7 @@ doesn't change); manual test creating a subcorpus via checkboxes and
 confirming its size/content matches picking the same values by hand via
 free-text CQL today.
 
-### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (not started)
+### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (not started; design reviewed 2026-09-29)
 
 **User-confirmed approach**: Swift Charts + `NSHostingView` - the
 project's first SwiftUI usage, confirmed feasible with zero project-level
@@ -3520,6 +3572,28 @@ new files are picked up).
   including an `NSHostingView`; "export" for these windows = print/export
   whatever's currently shown (table or chart), matching the concordance
   window's own existing behavior rather than adding a second code path.
+
+**Design review (2026-09-29): is mixing AppKit and SwiftUI worth it?**
+Yes for the bar charts, with the mix kept small.
+- Swift Charts has no AppKit API, so any native chart means hosting
+  SwiftUI. A hand-drawn `NSView` bar chart is possible (~150 lines) but
+  would re-implement axes, labels, dark mode and VoiceOver, which Charts
+  gives for free. `NSHostingView` is a mature bridge, Charts needs macOS 13
+  (the floor is 15), and the data are plain value arrays with no shared
+  state, so the seam is one hosting view per window behind one small type
+  (`BarChartView` taking label/value pairs).
+- Risks to test in a **spike before building everything** (Frequency
+  window first): (1) the "printing is close to free" claim above is
+  untested; a hosted SwiftUI chart may rasterize or clip under
+  `NSPrintOperation`, and `ImageRenderer` is the alternative; (2) hover
+  inside a hosted view, next to the unresolved app-activation behavior
+  ([issue #11](https://github.com/stranak/Korpora/issues/11)), so check it
+  on a fresh launch; (3) layout and resizing inside the existing window
+  controllers; (4) dark mode and VoiceOver defaults, on the macOS 15 VM as
+  well as macOS 27.
+- **Fallback:** a hand-drawn `NSView` bar chart if the spike shows print or
+  hover problems. The dispersion plot is a simple strip plot and could be
+  hand-drawn either way.
 
 **Key files**: new `Views/BarChartView.swift` (SwiftUI), new bridge
 function for dispersion positions, `CollocationWindowController.swift`,
@@ -3778,7 +3852,10 @@ can be verified on its own.
      release");
    - the per-launch tooltips quirk (Phase 5.3) and the one-off 0-hit
      result (Phase 5.5) were both attributed to macOS 27 beta / left
-     unreproduced — re-verify both on the floor OS before tagging;
+     unreproduced — re-verify both on the floor OS before tagging.
+     *(2026-09-29: the tooltip one is a real bug, not a beta artefact —
+     [issue #11](https://github.com/stranak/Korpora/issues/11); the 0-hit
+     one is still unreproduced.)*;
    - ~~**no app icon exists**~~ *(done 2026-09-29, `feat/app-icon`)*: the
      "Monogram" icon — a K whose stem is a stack of gold KWIC keyword
      pills and whose arms are lines of context, on oxblood. Source is
@@ -4005,10 +4082,10 @@ can be verified on its own.
    `fix/query-field-macos15` and confirmed by the user.
    Not re-checked, and open: the two decision-7 "beta quirk" items
    (per-launch tooltips, one-off 0-hit result) weren't specifically
-   exercised; one unexplained report of typed `[]` arriving as `a0`
-   (stored verbatim as U+0061 U+0030 in query history, so it's what the
-   app received) was set aside by the user — possibly VM keyboard
-   forwarding, unconfirmed. Settings persistence: the VM's domain held the
+   exercised; one report of typed `[]` arriving as `a0` (stored verbatim as U+0061
+   U+0030 in query history) was **resolved by the user, 2026-09-29: a
+   keyboard problem of the VNC connection used for the VM, not the app**.
+   Settings persistence: the VM's domain held the
    user's changed `resultsFontName` after relaunch.
 7. Cut the GitHub Release: DMG + SHA-256 + notes + tag via
    `gh release create`. GitHub Actions CI (with cert/API-key secrets) is
@@ -4044,8 +4121,9 @@ Step 4's config followed on `feat/release-signing` (2026-09-26) — see
 its status (verified with the real Developer ID identity), then step 5
 (first notarized DMG) and step 1's remaining decisions, then step 6 (the
 macOS 15 VM smoke test — four bugs found and fixed, then passed), then
-step 7: v0.1 is published. The goal is complete. Step 1's bundle-id and API-key choices are still open; arch
-scope is de facto arm64-only v1 (pinned by step 4).
+step 7: v0.1 is published. The goal is complete. Step 1's decisions were settled during it (bundle id
+`cz.cuni.mff.ufal.korpora`, notary credentials in the `korpora-notary`
+keychain profile); arch scope is arm64-only (pinned by step 4).
 
 Keeping recursive-delete and remote-fetch-and-build content out of this
 repo's script bodies, comments, and commit messages is a live workaround
@@ -4127,7 +4205,10 @@ itself (`release/notes-0.2.md` locally, gitignored).
   Dock tile for the running app, while the same bundle has the right icon
   everywhere else (Finder, Xcode, a release build, the macOS 15 VM).
   Launch Services also knew 15 stray copies of the app then (old
-  DerivedData, temp builds); unregistering them didn't change it.
+  DerivedData, temp builds); unregistering them didn't change it. It may
+  share a cause with the tooltip bug ([issue #11](https://github.com/stranak/Korpora/issues/11)),
+  unproven: both look like the app not being fully activated from the
+  window server's point of view.
 - **Tooling notes for the next run.** `tart` is not in Homebrew's working
   formula: 2.40.0 from the release tarball (checksum and notarization
   checked) is in `~/.local/opt/tart.app`, linked at `~/.local/bin/tart`.
