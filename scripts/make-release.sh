@@ -147,7 +147,10 @@ STAGE="$(mktemp -d "${TMPDIR:-/tmp}/korpora-release.XXXXXX")"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 cleanup() {
     hdiutil detach "$STAGE/mnt" >/dev/null 2>&1 || true
-    # Deleting the files isn't enough: spctl/stapler/mounting register them.
+    # Deleting the files isn't enough: spctl/stapler/mounting register them,
+    # and Launch Services registers the mounted copy asynchronously, so give
+    # it a moment before unregistering.
+    sleep 3
     for stale in "$STAGE/dmgroot/Korpora.app" "$STAGE/mnt/Korpora.app"; do
         "$LSREGISTER" -u "$stale" >/dev/null 2>&1 || true
     done
