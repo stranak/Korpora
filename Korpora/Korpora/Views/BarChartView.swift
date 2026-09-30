@@ -71,13 +71,6 @@ final class BarChartView: NSView {
         }
     }
 
-    /// Faint enough to sit behind the numbers, on screen (either appearance)
-    /// and on paper.
-    private static let gridColor = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(white: 1, alpha: 0.16) : NSColor(white: 0, alpha: 0.13)
-    }
-
     private static let labelFont = NSFont.systemFont(ofSize: 11)
     private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
 
@@ -113,13 +106,7 @@ final class BarChartView: NSView {
     // MARK: Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        // Print and PDF go on white paper whatever the screen looks like: with
-        // the view in dark mode its text would come out white on white.
-        if NSGraphicsContext.current?.isDrawingToScreen == false {
-            NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance { drawChart() }
-        } else {
-            drawChart()
-        }
+        drawingForScreenOrPaper { drawChart() }
     }
 
     private func drawChart() {
@@ -133,9 +120,11 @@ final class BarChartView: NSView {
         let plotBottom = info.plot.maxY
 
         // Gridlines and the value axis.
-        Self.gridColor.setStroke()
         let axisText: [NSAttributedString.Key: Any] = [.font: Self.numberFont, .foregroundColor: NSColor.secondaryLabelColor]
         for tick in info.ticks {
+            // Set for every line: drawing text (the tick labels) changes the
+            // stroke color, and every gridline after the first came out dark.
+            ChartColors.grid.setStroke()
             let x = info.plot.minX + info.plot.width * CGFloat(info.axisMaximum > 0 ? tick / info.axisMaximum : 0)
             let line = NSBezierPath()
             line.move(to: NSPoint(x: x.rounded() + 0.5, y: info.plot.minY))

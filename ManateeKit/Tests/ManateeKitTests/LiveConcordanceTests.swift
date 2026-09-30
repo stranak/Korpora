@@ -181,3 +181,77 @@ final class LiveConcordanceTests: XCTestCase {
         XCTAssertEqual(kwics(lines), ["brown fox", "curious cat", "sleepy cat"])
     }
 }
+
+/// Phase 6.10: the data of the dispersion plot. The 17-token fixture's nouns
+/// (fox, dog, cat, cat) are at positions 3, 7, 11 and 15.
+final class HitHistogramTests: XCTestCase {
+    private static var fixture: TestCorpusFixture!
+
+    override class func setUp() {
+        super.setUp()
+        do {
+            fixture = try TestCorpusFixture.build(corpusName: "mkithist")
+        } catch {
+            XCTFail("failed to build test corpus fixture: \(error)")
+        }
+    }
+
+    override class func tearDown() {
+        fixture?.cleanUp()
+        fixture = nil
+        super.tearDown()
+    }
+
+    private func nouns() async throws -> (Corpus, LiveConcordance) {
+        let corpus = try await Corpus(name: Self.fixture.corpusName)
+        return (corpus, try await LiveConcordance(corpus: corpus, cql: #"[tag="NN"]"#))
+    }
+
+    func testHitsAreBinnedByPosition() async throws {
+        let (corpus, live) = try await nouns()
+        let size = try await corpus.size
+        XCTAssertEqual(size, 17)
+        // One bin per token: a hit in the bin of its own position.
+        let perToken = try await live.hitHistogram(bins: 17, corpusSize: size)
+        XCTAssertEqual(perToken.enumerated().filter { $0.element > 0 }.map(\.offset), [3, 7, 11, 15])
+        XCTAssertEqual(perToken.reduce(0, +), 4)
+        // Four bins: one hit in each quarter. Two bins: two in each half.
+        let quarters = try await live.hitHistogram(bins: 4, corpusSize: size)
+        XCTAssertEqual(quarters, [1, 1, 1, 1])
+        let halves = try await live.hitHistogram(bins: 2, corpusSize: size)
+        XCTAssertEqual(halves, [2, 2])
+        let whole = try await live.hitHistogram(bins: 1, corpusSize: size)
+        XCTAssertEqual(whole, [4])
+    }
+
+    /// The histogram is of what the concordance shows now, not of the raw query.
+    func testItFollowsSampleAndFilter() async throws {
+        let (corpus, live) = try await nouns()
+        let size = try await corpus.size
+        try await live.sample(lines: 2)
+        let sampled = try await live.hitHistogram(bins: 17, corpusSize: size)
+        XCTAssertEqual(sampled.reduce(0, +), 2)
+    }
+
+    /// A parent corpus's positions but a smaller "corpus size" (or a hit past
+    /// the end) must not index out of range.
+    func testAHitPastTheEndLandsInTheLastBin() async throws {
+        let (_, live) = try await nouns()
+        // Positions 3, 7, 11, 15 in ten tokens: bins 3*4/10 = 1, 7*4/10 = 2, and
+        // 11 and 15 are past the end (4 and 6, clamped to bin 3).
+        let counts = try await live.hitHistogram(bins: 4, corpusSize: 10)
+        XCTAssertEqual(counts, [0, 1, 1, 2])
+    }
+
+    func testBadArgumentsThrow() async throws {
+        let (_, live) = try await nouns()
+        do {
+            _ = try await live.hitHistogram(bins: 0, corpusSize: 17)
+            XCTFail("expected an error")
+        } catch {}
+        do {
+            _ = try await live.hitHistogram(bins: 4, corpusSize: 0)
+            XCTFail("expected an error")
+        } catch {}
+    }
+}

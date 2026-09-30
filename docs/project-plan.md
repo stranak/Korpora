@@ -3697,7 +3697,7 @@ free-text CQL today.
   with the same restriction typed by hand; try an attribute with many
   values (search), a value with punctuation, and CQL mode.
 
-### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (bar charts built 2026-09-30, hand-drawn; dispersion plot in progress)
+### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (built 2026-09-30, hand-drawn; needs click-test)
 
 **User-confirmed approach**: Swift Charts + `NSHostingView` - the
 project's first SwiftUI usage, confirmed feasible with zero project-level
@@ -3796,8 +3796,25 @@ frequency"). Frequencies chart frequency (a multi-level key's tab shows as
 and `CollocationItem` got public initializers. Tests (app +16): tick
 computation, geometry, drawing in light and dark, the PDF, empty data,
 accessibility, the container's toggle/measure/ranking/cut, and both real
-windows. **Not yet done:** the dispersion plot, and a look at it in the
-running app.
+windows.
+
+**Dispersion plot built.** A toolbar button (chart.bar.xaxis, after
+Frequencies) opens a window with a column chart of where the current view's
+hits fall across the corpus: 100 equal stretches, x axis 0-100% with the token
+position under each tick, y axis hit counts. The binning is done in the
+engine (`mtc_concordance_hit_histogram` / `LiveConcordance.hitHistogram`:
+one pass over `RS(true)`, so it respects sample/filter/sort and never
+depends on which rows the table has loaded, which keeps it correct once 6.11
+lands). The corpus size for the axis is the parent corpus's, so a subcorpus
+plot shows its hits against the whole. `DispersionView` shares the print-safe
+drawing with `BarChartView` (`PaperSafeDrawing.swift`). Tests: ManateeKit
+`HitHistogramTests` (known positions, bin edges, sample, bad arguments), app
+`DispersionTests` (13: summary, geometry, light/dark drawing, PDF, gridline
+color, accessibility, window, toolbar). Bug found by looking: gridlines
+were drawn with the wrong (dark) color because drawing text resets the
+stroke color; it is now set per line (the test fails without that).
+Totals: app 154, ManateeKit 112. **Not yet done:** a click-through of both
+charts in the running app (visual check on macOS 15 and 27).
 
 ### 6.11 — Concordance result pagination/streaming (not started)
 

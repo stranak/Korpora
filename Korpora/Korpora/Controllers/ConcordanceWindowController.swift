@@ -15,6 +15,7 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
         static let attributes = NSToolbarItem.Identifier("attributes")
         static let collocations = NSToolbarItem.Identifier("collocations")
         static let frequencies = NSToolbarItem.Identifier("frequencies")
+        static let dispersion = NSToolbarItem.Identifier("dispersion")
         static let operations = NSToolbarItem.Identifier("operations")
     }
 
@@ -48,7 +49,8 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [ItemID.history, ItemID.sort, ItemID.filter, ItemID.shuffle, ItemID.sample, ItemID.viewMode, ItemID.context,
-         ItemID.attributes, ItemID.collocations, ItemID.frequencies, .flexibleSpace, ItemID.operations]
+         ItemID.attributes, ItemID.collocations, ItemID.frequencies, ItemID.dispersion, .flexibleSpace,
+         ItemID.operations]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -155,6 +157,12 @@ final class ConcordanceWindowController: NSWindowController, NSToolbarDelegate {
                 tooltip: "Show a frequency distribution for an attribute", target: viewController,
                 action: #selector(ConcordanceViewController.frequenciesTapped(_:)))
             return makeItem(identifier, label: "Frequencies", view: button)
+        case ItemID.dispersion:
+            let button = makeButton(
+                symbol: "chart.bar.xaxis", label: "Dispersion",
+                tooltip: "Show where the hits fall across the corpus", target: viewController,
+                action: #selector(ConcordanceViewController.dispersionTapped(_:)))
+            return makeItem(identifier, label: "Dispersion", view: button)
         case ItemID.operations:
             // Icon carried over from the old standalone "Clear Groups"
             // button - merged into this one, since both are fundamentally

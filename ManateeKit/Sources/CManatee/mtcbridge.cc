@@ -294,6 +294,34 @@ void mtc_concordance_close(MTCConcordance *conc) {
     });
 }
 
+long long mtc_concordance_hit_histogram(MTCConcordance *conc, long long corpus_size, int bins,
+                                        long long *counts, char **error) {
+    if (!conc || !counts || bins <= 0 || corpus_size <= 0) {
+        set_error(error, "invalid arguments for the hit histogram");
+        return -1;
+    }
+    try {
+        std::fill(counts, counts + bins, 0);
+        std::unique_ptr<RangeStream> view(conc->conc->RS(true));
+        long long total = 0;
+        for (; view && !view->end(); view->next()) {
+            long long position = view->peek_beg();
+            long long bin = position * bins / corpus_size;
+            if (bin < 0) bin = 0;
+            if (bin >= bins) bin = bins - 1;
+            ++counts[bin];
+            ++total;
+        }
+        return total;
+    } catch (std::exception &e) {
+        set_error(error, e);
+        return -1;
+    } catch (...) {
+        set_error(error, "unknown error reading hit positions");
+        return -1;
+    }
+}
+
 long long mtc_concordance_size(MTCConcordance *conc) {
     if (!conc)
         return -1;

@@ -337,6 +337,18 @@ final class ConcordanceViewController: NSViewController {
         presentAsSheet(sheet)
     }
 
+    /// Where the current view's hits fall across the corpus.
+    @objc func dispersionTapped(_ sender: Any) {
+        Task { @MainActor in
+            do {
+                let distribution = try await document.hitDistribution()
+                show(DispersionWindowController(query: document.initialQuery, distribution: distribution))
+            } catch {
+                showErrorAlert(error)
+            }
+        }
+    }
+
     /// File-menu action (see `AppDelegate.makeMainMenu`) - resolved via the
     /// responder chain rather than a direct target, so it's only enabled
     /// while a concordance window is key.

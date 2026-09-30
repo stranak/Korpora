@@ -299,6 +299,23 @@ public actor LiveConcordance {
         Int(mtc_concordance_size(handle))
     }
 
+    /// How many of the current view's hits (after any sample, filter or
+    /// removed line) start in each of `bins` equal stretches of a corpus of
+    /// `corpusSize` tokens: the data of a dispersion plot. `corpusSize` is
+    /// the size of the corpus the hits' positions are numbered in, which for
+    /// a subcorpus is the parent corpus's, not the subcorpus's own.
+    public func hitHistogram(bins: Int, corpusSize: Int) throws -> [Int] {
+        var counts = [Int64](repeating: 0, count: max(bins, 1))
+        var error: UnsafeMutablePointer<CChar>?
+        let total = counts.withUnsafeMutableBufferPointer {
+            mtc_concordance_hit_histogram(handle, Int64(corpusSize), Int32(bins), $0.baseAddress, &error)
+        }
+        guard total >= 0 else {
+            throw ManateeError.failure(consumeError(error))
+        }
+        return counts.map(Int.init)
+    }
+
     public func sort(_ criteria: SortCriteria, unique: Bool = false) throws {
         var error: UnsafeMutablePointer<CChar>?
         guard mtc_concordance_sort(handle, criteria.criteriaString, unique ? 1 : 0, &error) != 0 else {

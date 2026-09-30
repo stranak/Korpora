@@ -49,6 +49,16 @@ void mtc_cancel_token_free(MTCCancelToken *token);
  * until it reaches the next hit. */
 MTCConcordance *mtc_query_cancellable(MTCCorpus *corp, const char *cql, MTCCancelToken *token, char **error);
 void mtc_concordance_close(MTCConcordance *conc);
+
+/* Where the hits fall across the corpus: counts, into the caller's array of
+ * `bins` entries, how many hits of the concordance's *current view* (so a
+ * sample, filter or removed line is respected) start in each of `bins` equal
+ * stretches of a corpus of `corpus_size` tokens. Returns the number of hits
+ * counted, or -1 with *error set. Binning is done here so a result of
+ * millions of hits never has to be copied out. A hit at or beyond
+ * `corpus_size` lands in the last bin. */
+long long mtc_concordance_hit_histogram(MTCConcordance *conc, long long corpus_size, int bins,
+                                        long long *counts, char **error);
 long long mtc_concordance_size(MTCConcordance *conc);
 
 /* KWIC iteration over a concordance. left_ctx/right_ctx are Manatee context

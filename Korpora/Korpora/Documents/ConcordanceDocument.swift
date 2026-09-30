@@ -564,6 +564,18 @@ final class ConcordanceDocument: NSDocument {
         return try await liveConcordance.collocations(spec)
     }
 
+    /// Where the current view's hits start across the corpus, in `bins`
+    /// equal stretches (`DispersionView`). The axis is the corpus the query
+    /// was run against, whole, even when the query ran in a subcorpus: hit
+    /// positions are numbered in the parent, so the subcorpus's own size
+    /// would put them off the end.
+    func hitDistribution(bins: Int = 100) async throws -> HitDistribution {
+        guard let liveConcordance else { throw AnalysisError.noResultsYet }
+        let corpusSize = try await Corpus(name: corpusName).size
+        let counts = try await liveConcordance.hitHistogram(bins: bins, corpusSize: corpusSize)
+        return HitDistribution(counts: counts, corpusSize: corpusSize)
+    }
+
     /// Frequency distribution of the current query's hits - see
     /// `FrequencyCriterion`. Same "reflects the current view" behavior as
     /// `collocations(_:)`.
@@ -709,5 +721,22 @@ final class ConcordanceDocument: NSDocument {
         structuralAttributeToShow = state.structuralAttributeToShow
         viewMode = state.viewMode ?? .kwic
         operations = state.operations
+    }
+}
+
+/// How many hits start in each equal stretch of the corpus.
+struct HitDistribution: Equatable {
+    let counts: [Int]
+    let corpusSize: Int
+
+    var hits: Int { counts.reduce(0, +) }
+    var tokensPerBin: Int { max(corpusSize / max(counts.count, 1), 1) }
+
+    /// One line for the window: how much is plotted, and how it's cut up.
+    var summary: String {
+        let perMillion = corpusSize > 0 ? Double(hits) / Double(corpusSize) * 1_000_000 : 0
+        return "\(hits.formatted()) hit\(hits == 1 ? "" : "s") in a \(corpusSize.formatted())-token corpus "
+            + "(\(perMillion.formatted(.number.precision(.fractionLength(0...2)))) per million), "
+            + "in \(counts.count) parts of about \(tokensPerBin.formatted()) tokens"
     }
 }
