@@ -4450,7 +4450,9 @@ user click-tested the charts, dispersion plot and printing before the release.
 [`docs/pando-analysis.md`](pando-analysis.md) compares `ufal/pando` (dependency-tree queries, `dcoll`,
 C FFI; single author, no license yet, no large-corpus evidence) as a second engine or a full
 replacement of Manatee. Recommendation: keep Manatee, run a measurement spike (Phase A), then only if
-it holds up an engine seam, a PandoKit bridge, and parse-based word profiles. Nothing built yet.
+it holds up an engine seam, a PandoKit bridge, and parse-based word profiles. Phase A spike done: builds in 11 s, 1B tokens indexed in 15 min (41 GB), sub-second to a few seconds
+for most queries, C API works on macOS 27 and 15 but drops `dcoll` relations and needs many file
+descriptors; see the analysis for numbers and the caveats (synthetic corpora, warm cache).
 
 ### Explicitly out of scope for this goal
 
