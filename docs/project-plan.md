@@ -4445,6 +4445,13 @@ checks 9/9, exec checks 6/6. The first-launch Gatekeeper click was not repeated
 for 0.3 (the notarization, ticket and `syspolicy_check` checks cover it). The
 user click-tested the charts, dispersion plot and printing before the release.
 
+### Under analysis: pando as a second engine (2026-09-30)
+
+[`docs/pando-analysis.md`](pando-analysis.md) compares `ufal/pando` (dependency-tree queries, `dcoll`,
+C FFI; single author, no license yet, no large-corpus evidence) as a second engine or a full
+replacement of Manatee. Recommendation: keep Manatee, run a measurement spike (Phase A), then only if
+it holds up an engine seam, a PandoKit bridge, and parse-based word profiles. Nothing built yet.
+
 ### Explicitly out of scope for this goal
 
 Mac App Store (needs sandbox, decision 6); Sparkle/auto-updates (GitHub
