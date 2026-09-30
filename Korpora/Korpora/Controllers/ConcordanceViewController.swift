@@ -380,7 +380,7 @@ final class ConcordanceViewController: NSViewController {
     /// straight to the standard macOS print panel rather than building a
     /// bespoke PDF export: the print panel already offers "Save as PDF",
     /// so this covers both without a second code path.
-    @objc func printConcordance(_ sender: Any?) {
+    @objc func printWindowContents(_ sender: Any?) {
         guard let window = view.window else { return }
         tableView.printHeaderLines = [
             CQLQueryField.syntaxColoredAttributedString(

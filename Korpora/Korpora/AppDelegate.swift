@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // disables the item whenever no concordance window is key.
         fileMenu.addItem(withTitle: "Export Concordance…", action: #selector(ConcordanceViewController.exportConcordance(_:)), keyEquivalent: "e")
         fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "Print…", action: #selector(ConcordanceViewController.printConcordance(_:)), keyEquivalent: "p")
+        fileMenu.addItem(withTitle: "Print…", action: #selector(ConcordanceViewController.printWindowContents(_:)), keyEquivalent: "p")
 
         let editMenuItem = NSMenuItem()
         main.addItem(editMenuItem)

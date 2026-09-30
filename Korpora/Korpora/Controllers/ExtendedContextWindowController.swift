@@ -28,6 +28,7 @@ final class ExtendedContextWindowController: NSWindowController {
 private final class ExtendedContextDetailViewController: NSViewController {
     private let info: ConcordanceDocument.ExtendedContextInfo
     private let attributedText: NSAttributedString
+    private var textView: NSTextView?
 
     init(info: ConcordanceDocument.ExtendedContextInfo, before: String, match: String, after: String) {
         self.info = info
@@ -58,6 +59,7 @@ private final class ExtendedContextDetailViewController: NSViewController {
         // for a plain "scrollable block of text" use like this one.
         let scrollView = NSTextView.scrollableTextView()
         let textView = scrollView.documentView as! NSTextView
+        self.textView = textView
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -84,6 +86,12 @@ private final class ExtendedContextDetailViewController: NSViewController {
 
         view = root
         preferredContentSize = NSSize(width: 520, height: 340)
+    }
+
+    /// File > Print… (see `WindowPrinting`): the passage.
+    @objc func printWindowContents(_ sender: Any?) {
+        guard let textView else { return }
+        WindowPrinting.run(textView, jobTitle: view.window?.title ?? "Extended Context", in: view.window)
     }
 
     private static func makeAttributedString(before: String, match: String, after: String) -> NSAttributedString {

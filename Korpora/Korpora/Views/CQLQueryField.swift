@@ -134,7 +134,7 @@ final class CQLQueryField: NSView {
 
     /// The same CQL syntax coloring `recolor()` applies live, factored out
     /// so a non-editable rendering (e.g. `ConcordanceViewController
-    /// .printConcordance`'s printed/PDF'd page header) can match it exactly
+    /// .printWindowContents`'s printed/PDF'd page header) can match it exactly
     /// without needing a real `NSTextView` to hang it off of.
     static func syntaxColoredAttributedString(for query: String, font: NSFont) -> NSAttributedString {
         let text = query as NSString

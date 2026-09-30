@@ -18,7 +18,7 @@ final class SortableTableView: NSTableView {
     /// e.g. the query and its hit-count/corpus-size status line, styled to
     /// match how they look live above the table on screen (see
     /// `CQLQueryField.syntaxColoredAttributedString`) rather than plain
-    /// black text. `ConcordanceViewController.printConcordance(_:)` sets
+    /// black text. `ConcordanceViewController.printWindowContents(_:)` sets
     /// this right before printing; on-screen drawing never calls
     /// `drawPageBorder`, so this has no effect outside an actual print/PDF
     /// operation.

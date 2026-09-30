@@ -30,6 +30,11 @@ private final class DispersionViewController: NSViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// File > Print… (see `WindowPrinting`): the plot.
+    @objc func printWindowContents(_ sender: Any?) {
+        WindowPrinting.run(plot, jobTitle: view.window?.title ?? "Dispersion", in: view.window)
+    }
+
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 340))
         root.autoresizingMask = [.width, .height]

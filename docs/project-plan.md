@@ -3813,7 +3813,9 @@ drawing with `BarChartView` (`PaperSafeDrawing.swift`). Tests: ManateeKit
 color, accessibility, window, toolbar). Bug found by looking: gridlines
 were drawn with the wrong (dark) color because drawing text resets the
 stroke color; it is now set per line (the test fails without that).
-Totals: app 154, ManateeKit 112. **Not yet done:** a click-through of both
+Totals: app 157, ManateeKit 112.
+
+File > Print… now works in every results window: the menu action is `printWindowContents(_:)`, implemented by the concordance, Frequencies, Collocations (chart or table, whichever shows), Dispersion and Extended Context windows (`WindowPrinting.swift`; before, only the concordance window implemented it, so it was greyed out elsewhere). **Not yet done:** a click-through of both
 charts in the running app (visual check on macOS 15 and 27).
 
 ### 6.11 — Concordance result pagination/streaming (not started)

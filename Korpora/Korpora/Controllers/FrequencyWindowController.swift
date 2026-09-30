@@ -47,6 +47,11 @@ private final class FrequencyViewController: NSViewController {
         view = container
     }
 
+    /// File > Print… (see `WindowPrinting`): the chart or the table, whichever shows.
+    @objc func printWindowContents(_ sender: Any?) {
+        WindowPrinting.run(container.printableView, jobTitle: view.window?.title ?? "Frequency", in: view.window)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         tableView.usesAlternatingRowBackgroundColors = true
