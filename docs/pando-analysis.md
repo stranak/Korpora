@@ -186,8 +186,7 @@ typical lemmas, up to ~1 min for the most frequent lemmas at 1B tokens.
   corpora have many more). macOS's default soft limit is 256, so on the VM 4 concurrent opens failed in
   most runs; after `ulimit -n 4096`, 48/48 passed. A GUI app can raise its own limit, but mmap does not
   need the descriptor after mapping, so this is an easy upstream fix.
-- Minor: options are keyed by undocumented names (`min-freq` vs `min_freq` both accepted silently, neither
-  tested as effective), and errors carry no message.
+- Minor: errors carry no message (`"query execution failed"`), and the option keys for `pando_run` are not documented (I did not establish which are honoured).
 
 ### Query-language compatibility (24 Manatee/KonText-style queries, native and `--cql cwb`)
 Works in both: `[form="x"]`, `[lemma=..]`, `&`, `|` inside `[ ]`, regex, `{m,n}` on `[]`, `!=`, `%c`,
