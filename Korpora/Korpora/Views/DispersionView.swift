@@ -6,7 +6,7 @@ import Cocoa
 /// the corpus (a chapter, a period, a genre) shows as a hump.
 ///
 /// Hand-drawn like `BarChartView`, for the same reasons.
-final class DispersionView: NSView {
+final class DispersionView: NSView, PrintHeaderDrawing {
     var counts: [Int] = [] {
         didSet { needsDisplay = true; NSAccessibility.post(element: self, notification: .valueChanged) }
     }
@@ -19,6 +19,13 @@ final class DispersionView: NSView {
     static let bottomInset: CGFloat = 50
 
     override var isFlipped: Bool { true }
+
+    var printHeaderLines: [NSAttributedString] = []
+
+    override func drawPageBorder(with borderSize: NSSize) {
+        super.drawPageBorder(with: borderSize)
+        PrintHeader.draw(printHeaderLines, borderSize: borderSize)
+    }
 
     struct Layout {
         var plot: NSRect

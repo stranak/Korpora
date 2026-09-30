@@ -311,7 +311,7 @@ final class ConcordanceViewController: NSViewController {
             Task { @MainActor in
                 do {
                     let items = try await self.document.collocations(spec)
-                    self.show(CollocationWindowController(spec: spec, items: items))
+                    self.show(CollocationWindowController(spec: spec, items: items, context: self.document.printContext("Collocations")))
                 } catch {
                     self.showErrorAlert(error)
                 }
@@ -328,7 +328,7 @@ final class ConcordanceViewController: NSViewController {
             Task { @MainActor in
                 do {
                     let items = try await self.document.frequencyDistribution([criterion], minFrequency: minFrequency)
-                    self.show(FrequencyWindowController(criterion: criterion, items: items))
+                    self.show(FrequencyWindowController(criterion: criterion, items: items, minFrequency: minFrequency, context: self.document.printContext("Frequencies")))
                 } catch {
                     self.showErrorAlert(error)
                 }
@@ -342,7 +342,7 @@ final class ConcordanceViewController: NSViewController {
         Task { @MainActor in
             do {
                 let distribution = try await document.hitDistribution()
-                show(DispersionWindowController(query: document.initialQuery, distribution: distribution))
+                show(DispersionWindowController(query: document.initialQuery, distribution: distribution, context: document.printContext("Dispersion")))
             } catch {
                 showErrorAlert(error)
             }
@@ -382,21 +382,17 @@ final class ConcordanceViewController: NSViewController {
     /// so this covers both without a second code path.
     @objc func printWindowContents(_ sender: Any?) {
         guard let window = view.window else { return }
-        tableView.printHeaderLines = [
+        // The corpus, then the query as it looks on screen, then the hit
+        // count; the print panel has a checkbox to leave them out (see
+        // `WindowPrinting`, which also makes room for them at the page top).
+        let header = PrintHeader.attributed(["Concordance \u{2013} \(document.corpusLabel)"]) + [
             CQLQueryField.syntaxColoredAttributedString(
                 for: document.initialQuery, font: .monospacedSystemFont(ofSize: 12, weight: .regular)),
             NSAttributedString(string: document.status, attributes: [
-                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor,
+                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.darkGray,
             ]),
         ]
-        let operation = NSPrintOperation(view: tableView)
-        // Room for `printHeaderLines`, drawn in `drawPageBorder` - without
-        // widening this, the header text would overlap the table's own
-        // first row rather than sitting above it.
-        operation.printInfo.topMargin = 54
-        operation.printInfo.horizontalPagination = .fit
-        operation.printInfo.verticalPagination = .automatic
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        WindowPrinting.run(tableView, jobTitle: window.title, header: header, in: window)
     }
 
     /// Shows a disposable auxiliary results window and keeps it alive (see
@@ -990,7 +986,7 @@ final class ConcordanceViewController: NSViewController {
                     if !allowsMultipleExtendedContexts {
                         closeExtendedContextWindows()
                     }
-                    show(ExtendedContextWindowController(info: info, before: before, match: match, after: after))
+                    show(ExtendedContextWindowController(info: info, before: before, match: match, after: after, context: self.document.printContext("Extended context")))
                 } catch {
                     self.showErrorAlert(error)
                 }

@@ -108,6 +108,21 @@ final class ConcordanceDocument: NSDocument {
     private(set) var rows: [ConcordanceRow] = []
     private(set) var status: String = ""
 
+    /// The corpus (and subcorpus) the results are from, for headings.
+    var corpusLabel: String {
+        guard let subcorpusPath else { return corpusName }
+        let name = (subcorpusPath as NSString).lastPathComponent.replacingOccurrences(of: ".subc", with: "")
+        return "\(corpusName), subcorpus \u{201C}\(name)\u{201D}"
+    }
+
+    /// What every printout says about where it came from: what it is, the
+    /// corpus, the query, and how many hits (`status`).
+    func printContext(_ what: String) -> [String] {
+        var lines = ["\(what) \u{2013} \(corpusLabel)", "Query: \(initialQuery)"]
+        if !status.isEmpty { lines.append(status) }
+        return lines
+    }
+
     /// The `LiveConcordance` behind the most recently *successful* replay -
     /// kept around (rather than discarded once `rows` is fetched, as before)
     /// so Phase 3 features (collocations, frequency distributions) have a

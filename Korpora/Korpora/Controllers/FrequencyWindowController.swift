@@ -5,8 +5,13 @@ import ManateeKit
 /// frequencyDistribution(_:minFrequency:)` - same non-document rationale as
 /// `CollocationWindowController`.
 final class FrequencyWindowController: NSWindowController {
-    convenience init(criterion: FrequencyCriterion, items: [FrequencyItem]) {
-        let viewController = FrequencyViewController(items: items)
+    convenience init(criterion: FrequencyCriterion, items: [FrequencyItem], minFrequency: Int = 1, context: [String] = []) {
+        var lines = context
+        lines.append("Frequencies of \(criterion.attribute)"
+            + (criterion.contextOffset == 0 ? "" : " at offset \(criterion.contextOffset)")
+            + (criterion.caseInsensitive ? ", ignoring case" : "")
+            + (minFrequency > 1 ? ", frequency at least \(minFrequency)" : ""))
+        let viewController = FrequencyViewController(items: items, context: lines)
         let window = NSWindow(contentViewController: viewController)
         window.setContentSize(NSSize(width: 400, height: 360))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -19,10 +24,12 @@ private final class FrequencyViewController: NSViewController {
     private enum Column: String { case word, freq, norm }
 
     private var items: [FrequencyItem]
-    private let tableView = NSTableView()
+    private let tableView = SortableTableView()
+    private let context: [String]
     private let scrollView = NSScrollView()
 
-    init(items: [FrequencyItem]) {
+    init(items: [FrequencyItem], context: [String]) {
+        self.context = context
         self.items = items
         super.init(nibName: nil, bundle: nil)
     }
@@ -49,7 +56,8 @@ private final class FrequencyViewController: NSViewController {
 
     /// File > Print… (see `WindowPrinting`): the chart or the table, whichever shows.
     @objc func printWindowContents(_ sender: Any?) {
-        WindowPrinting.run(container.printableView, jobTitle: view.window?.title ?? "Frequency", in: view.window)
+        WindowPrinting.run(container.printableView, jobTitle: view.window?.title ?? "Frequencies",
+                           header: container.printHeader(context), in: view.window)
     }
 
     override func viewDidLoad() {

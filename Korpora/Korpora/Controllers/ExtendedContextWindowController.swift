@@ -15,8 +15,10 @@ import ManateeKit
 /// these can be open side by side, nothing else on screen says which
 /// window belongs to which line.
 final class ExtendedContextWindowController: NSWindowController {
-    convenience init(info: ConcordanceDocument.ExtendedContextInfo, before: String, match: String, after: String) {
-        let viewController = ExtendedContextDetailViewController(info: info, before: before, match: match, after: after)
+    convenience init(info: ConcordanceDocument.ExtendedContextInfo, before: String, match: String, after: String,
+                     context: [String] = []) {
+        let viewController = ExtendedContextDetailViewController(
+            info: info, before: before, match: match, after: after, context: context)
         let window = NSWindow(contentViewController: viewController)
         window.setContentSize(NSSize(width: 520, height: 340))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -28,9 +30,10 @@ final class ExtendedContextWindowController: NSWindowController {
 private final class ExtendedContextDetailViewController: NSViewController {
     private let info: ConcordanceDocument.ExtendedContextInfo
     private let attributedText: NSAttributedString
-    private var textView: NSTextView?
+    private let context: [String]
 
-    init(info: ConcordanceDocument.ExtendedContextInfo, before: String, match: String, after: String) {
+    init(info: ConcordanceDocument.ExtendedContextInfo, before: String, match: String, after: String, context: [String]) {
+        self.context = context
         self.info = info
         attributedText = Self.makeAttributedString(before: before, match: match, after: after)
         super.init(nibName: nil, bundle: nil)
@@ -59,7 +62,6 @@ private final class ExtendedContextDetailViewController: NSViewController {
         // for a plain "scrollable block of text" use like this one.
         let scrollView = NSTextView.scrollableTextView()
         let textView = scrollView.documentView as! NSTextView
-        self.textView = textView
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -90,8 +92,11 @@ private final class ExtendedContextDetailViewController: NSViewController {
 
     /// File > Print… (see `WindowPrinting`): the passage.
     @objc func printWindowContents(_ sender: Any?) {
-        guard let textView else { return }
-        WindowPrinting.run(textView, jobTitle: view.window?.title ?? "Extended Context", in: view.window)
+        // A copy laid out for the page: the window's own text view is as wide
+        // as the window, and can't carry a page header.
+        let page = PrintableTextView.laidOut(attributedText, width: 468)
+        let header = PrintHeader.attributed(context.isEmpty ? info.headerLines : context + info.headerLines)
+        WindowPrinting.run(page, jobTitle: view.window?.title ?? "Extended Context", header: header, in: view.window)
     }
 
     private static func makeAttributedString(before: String, match: String, after: String) -> NSAttributedString {

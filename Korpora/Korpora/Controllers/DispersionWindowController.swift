@@ -4,8 +4,8 @@ import Cocoa
 /// (`DispersionView`). A disposable snapshot window like Collocations and
 /// Frequencies: re-run it from the toolbar to refresh it.
 final class DispersionWindowController: NSWindowController {
-    convenience init(query: String, distribution: HitDistribution) {
-        let viewController = DispersionViewController(distribution: distribution)
+    convenience init(query: String, distribution: HitDistribution, context: [String] = []) {
+        let viewController = DispersionViewController(distribution: distribution, context: context)
         let window = NSWindow(contentViewController: viewController)
         window.setContentSize(NSSize(width: 640, height: 340))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -18,10 +18,12 @@ final class DispersionWindowController: NSWindowController {
 
 private final class DispersionViewController: NSViewController {
     private let distribution: HitDistribution
+    private let context: [String]
     private let plot = DispersionView()
     private let summary = NSTextField(wrappingLabelWithString: "")
 
-    init(distribution: HitDistribution) {
+    init(distribution: HitDistribution, context: [String]) {
+        self.context = context
         self.distribution = distribution
         super.init(nibName: nil, bundle: nil)
     }
@@ -32,7 +34,8 @@ private final class DispersionViewController: NSViewController {
 
     /// File > Print… (see `WindowPrinting`): the plot.
     @objc func printWindowContents(_ sender: Any?) {
-        WindowPrinting.run(plot, jobTitle: view.window?.title ?? "Dispersion", in: view.window)
+        WindowPrinting.run(plot, jobTitle: view.window?.title ?? "Dispersion",
+                           header: PrintHeader.attributed(context + [distribution.summary]), in: view.window)
     }
 
     override func loadView() {

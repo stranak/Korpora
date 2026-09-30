@@ -11,7 +11,7 @@ import Cocoa
 /// check, and that its look is the OS's to change (the app runs on macOS 15
 /// to 27). This draws the same on screen, in print and in a PDF, follows
 /// light/dark mode through dynamic colors, and is tested by rendering it.
-final class BarChartView: NSView {
+final class BarChartView: NSView, PrintHeaderDrawing {
     struct Bar: Equatable {
         let label: String
         let value: Double
@@ -42,6 +42,13 @@ final class BarChartView: NSView {
     }
 
     override var isFlipped: Bool { true }
+
+    var printHeaderLines: [NSAttributedString] = []
+
+    override func drawPageBorder(with borderSize: NSSize) {
+        super.drawPageBorder(with: borderSize)
+        PrintHeader.draw(printHeaderLines, borderSize: borderSize)
+    }
 
     /// Tall enough for every bar (a scroll view takes it from here); the
     /// width is the container's business.

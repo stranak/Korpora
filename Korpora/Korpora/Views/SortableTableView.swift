@@ -7,7 +7,7 @@ import Cocoa
 /// forwarding, so observing the property directly via Swift's override
 /// syntax is the reliable way to hear about a header click regardless of
 /// which data source class is in use.
-final class SortableTableView: NSTableView {
+final class SortableTableView: NSTableView, PrintHeaderDrawing {
     var onSortDescriptorsChange: (([NSSortDescriptor]) -> Void)?
 
     override var sortDescriptors: [NSSortDescriptor] {
@@ -26,16 +26,9 @@ final class SortableTableView: NSTableView {
 
     override func drawPageBorder(with borderSize: NSSize) {
         super.drawPageBorder(with: borderSize)
-        // AppKit can invoke this during a page-count/preview pass with no
-        // real drawing context set up yet - `NSAttributedString.draw(at:)`
-        // relies on `NSGraphicsContext.current` internally, and calling it
-        // with none current logged `CGContextClipToRect: invalid context
-        // 0x0` during manual testing 2026-09-07.
-        guard NSGraphicsContext.current != nil else { return }
-        var y = borderSize.height - 16
-        for line in printHeaderLines {
-            line.draw(at: NSPoint(x: 0, y: y))
-            y -= 16
-        }
+        // (Skips a page-count/preview pass with no drawing context, which
+        // logged `CGContextClipToRect: invalid context 0x0` in manual testing
+        // 2026-09-07; also honors the print panel's header checkbox.)
+        PrintHeader.draw(printHeaderLines, borderSize: borderSize)
     }
 }

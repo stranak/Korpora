@@ -3813,9 +3813,10 @@ drawing with `BarChartView` (`PaperSafeDrawing.swift`). Tests: ManateeKit
 color, accessibility, window, toolbar). Bug found by looking: gridlines
 were drawn with the wrong (dark) color because drawing text resets the
 stroke color; it is now set per line (the test fails without that).
-Totals: app 157, ManateeKit 112.
+Totals: app 160, ManateeKit 112.
 
-File > Print… now works in every results window: the menu action is `printWindowContents(_:)`, implemented by the concordance, Frequencies, Collocations (chart or table, whichever shows), Dispersion and Extended Context windows (`WindowPrinting.swift`; before, only the concordance window implemented it, so it was greyed out elsewhere). **Not yet done:** a click-through of both
+File > Print… now works in every results window: the menu action is `printWindowContents(_:)`, implemented by the concordance, Frequencies, Collocations (chart or table, whichever shows), Dispersion and Extended Context windows (`WindowPrinting.swift`; before, only the concordance window implemented it, so it was greyed out elsewhere).
+Every printout has a header saying what it is: kind and corpus (with subcorpus), the query, the hit count, and the window's own settings (collocation measure/window/thresholds, frequency attribute/offset/case/minimum, dispersion summary, the chart's "Top N of M" cut). The print panel has a "Print header…" checkbox (accessory pane, remembered in UserDefaults `printHeader`, on by default) that also re-sizes the top margin. `PrintHeaderDrawing` views (`SortableTableView`, `BarChartView`, `DispersionView`, `PrintableTextView`) draw it in `drawPageBorder`; tests print to a real PDF and read its text with the header on and off. The panel checkbox itself is not click-tested. **Not yet done:** a click-through of both
 charts in the running app (visual check on macOS 15 and 27).
 
 ### 6.11 — Concordance result pagination/streaming (not started)

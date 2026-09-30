@@ -7,8 +7,8 @@ import ManateeKit
 /// (see docs/project-plan.md's Phase 3 writeup). Closing it just discards
 /// the snapshot; re-run via the toolbar's Collocations button anytime.
 final class CollocationWindowController: NSWindowController {
-    convenience init(spec: CollocationSpec, items: [CollocationItem]) {
-        let viewController = CollocationViewController(spec: spec, items: items)
+    convenience init(spec: CollocationSpec, items: [CollocationItem], context: [String] = []) {
+        let viewController = CollocationViewController(spec: spec, items: items, context: context)
         let window = NSWindow(contentViewController: viewController)
         window.setContentSize(NSSize(width: 480, height: 360))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -22,10 +22,12 @@ private final class CollocationViewController: NSViewController {
 
     private let spec: CollocationSpec
     private var items: [CollocationItem]
-    private let tableView = NSTableView()
+    private let tableView = SortableTableView()
+    private let context: [String]
     private let scrollView = NSScrollView()
 
-    init(spec: CollocationSpec, items: [CollocationItem]) {
+    init(spec: CollocationSpec, items: [CollocationItem], context: [String]) {
+        self.context = context
         self.spec = spec
         self.items = items
         super.init(nibName: nil, bundle: nil)
@@ -55,7 +57,8 @@ private final class CollocationViewController: NSViewController {
 
     /// File > Print… (see `WindowPrinting`): the chart or the table, whichever shows.
     @objc func printWindowContents(_ sender: Any?) {
-        WindowPrinting.run(container.printableView, jobTitle: view.window?.title ?? "Collocation", in: view.window)
+        WindowPrinting.run(container.printableView, jobTitle: view.window?.title ?? "Collocation",
+                           header: container.printHeader(context + spec.printLines), in: view.window)
     }
 
     override func viewDidLoad() {
@@ -129,5 +132,14 @@ extension CollocationViewController: NSTableViewDataSource, NSTableViewDelegate 
             }
         }
         tableView.reloadData()
+    }
+}
+
+extension CollocationSpec {
+    /// What was asked for, as header lines for a printout.
+    var printLines: [String] {
+        let window = "\(leftWindow)\u{2026}+\(rightWindow) tokens"
+        return ["Collocates by \(attribute), measure \(measure), window \(window)",
+                "At least \(minFrequency) in the corpus, \(minCollocateFrequency) co-occurrences; top \(maxItems)"]
     }
 }
