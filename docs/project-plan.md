@@ -4434,6 +4434,17 @@ itself (`release/notes-0.2.md` locally, gitignored).
   used to leave its staged app copies registered with Launch Services
   (they can confuse icon lookup); it now unregisters and deletes them.
 
+### Release 0.3 - build and test record (2026-09-30) - published
+
+`Korpora 0.3 (3)`, built with `scripts/make-release.sh` (full, notarized) from
+the commit that bumped the version. Tests: app 160, ManateeKit 112. Notarization
+submissions `152a2f01-...` (app), `fac7581f-...` (DMG), both accepted and
+stapled; Gatekeeper accepts a quarantined copy. `Korpora-0.3.dmg` SHA-256
+`e1a2b199...9d2a09`. macOS 15.7.7 VM (upgrading a 0.2 install): scripted install
+checks 9/9, exec checks 6/6. The first-launch Gatekeeper click was not repeated
+for 0.3 (the notarization, ticket and `syspolicy_check` checks cover it). The
+user click-tested the charts, dispersion plot and printing before the release.
+
 ### Explicitly out of scope for this goal
 
 Mac App Store (needs sandbox, decision 6); Sparkle/auto-updates (GitHub
