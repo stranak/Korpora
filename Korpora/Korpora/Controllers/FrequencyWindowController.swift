@@ -31,17 +31,20 @@ private final class FrequencyViewController: NSViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private var container: TableChartContainerView!
+
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 360))
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(scrollView)
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: root.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+        container = TableChartContainerView(table: scrollView)
+        container.setMeasures([
+            .init(title: "Frequency") { [weak self] in
+                // A multi-level key is tab-joined; a tab doesn't draw.
+                (self?.items ?? []).map {
+                    BarChartView.Bar(label: $0.word.replacingOccurrences(of: "\t", with: " \u{00B7} "),
+                                     value: Double($0.freq))
+                }
+            },
         ])
-        view = root
+        view = container
     }
 
     override func viewDidLoad() {

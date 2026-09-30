@@ -3697,7 +3697,7 @@ free-text CQL today.
   with the same restriction typed by hand; try an attribute with many
   values (search), a value with punctuation, and CQL mode.
 
-### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (not started; design reviewed 2026-09-29)
+### 6.10 — Charts: Collocations/Frequency + concordance dispersion plot (bar charts built 2026-09-30, hand-drawn; dispersion plot in progress)
 
 **User-confirmed approach**: Swift Charts + `NSHostingView` - the
 project's first SwiftUI usage, confirmed feasible with zero project-level
@@ -3765,6 +3765,39 @@ auxiliary window, same `show(_:)` pattern as Collocations/Frequency).
 SwiftUI/AppKit bridge compiles cleanly; manual visual check (first
 SwiftUI content in the app - check dark mode, VoiceOver labels default
 reasonably); `ManateeKitTests` for the new position-fetch primitive.
+
+**Spike result and decision (2026-09-30): the bar chart is hand-drawn in
+AppKit, not Swift Charts.** The design review above chose Swift Charts and
+named a hand-drawn `NSView` as the fallback if the spike found problems.
+It found them:
+- **Printing:** an `NSHostingView` prints (`dataWithPDF`) as an 836-byte
+  blank page. (`ImageRenderer` on the chart alone does render, and can
+  make a PDF, but not through a scroll view.)
+- **Look:** in both `cacheDisplay` and `ImageRenderer` the chart came out
+  with category labels above thin bars, and `.ratio`, custom axis marks and
+  the like changed nothing, even for a bare chart. The live window can't be
+  captured unattended here, so I couldn't tell whether that is how the OS
+  draws Charts or an artefact of the renderers, and the app has to look
+  right on macOS 15 and 27, where Charts' defaults may differ.
+So `BarChartView` is drawn by hand (labels left, bars, the number at each
+bar's end, a value axis with nice ticks and faint gridlines, an axis
+title), rendered to PNG and looked at in light and dark mode, prints
+natively, and has per-bar accessibility elements. One real bug found and
+fixed on the way, by looking at the PDF: printed with the view in dark mode
+its text came out white on white; it now always draws light when not
+drawing to the screen (the test fails without the fix: 0 vs 483 dark
+pixels in the label column).
+
+**Built.** `TableChartContainerView` puts a Table | Chart switch over each
+results table (and a measure pop-up when there's a choice); the chart ranks
+by the chosen measure, best first, at most 40, with a note ("Top 40 of 75 by
+frequency"). Frequencies chart frequency (a multi-level key's tab shows as
+" · "); Collocations chart Score, Co-occurrences or Frequency. `FrequencyItem`
+and `CollocationItem` got public initializers. Tests (app +16): tick
+computation, geometry, drawing in light and dark, the PDF, empty data,
+accessibility, the container's toggle/measure/ranking/cut, and both real
+windows. **Not yet done:** the dispersion plot, and a look at it in the
+running app.
 
 ### 6.11 — Concordance result pagination/streaming (not started)
 

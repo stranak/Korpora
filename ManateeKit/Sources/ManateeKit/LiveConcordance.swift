@@ -170,6 +170,13 @@ public struct CollocationItem: Sendable, Equatable {
     public let cnt: Int
     /// The requested `CollocationSpec.measure`'s value for this row.
     public let score: Double
+
+    public init(word: String, freq: Int, cnt: Int, score: Double) {
+        self.word = word
+        self.freq = freq
+        self.cnt = cnt
+        self.score = score
+    }
 }
 
 /// One grouping key for `LiveConcordance.frequencyDistribution(_:minFrequency:)`.
@@ -207,6 +214,12 @@ public struct FrequencyItem: Sendable {
     /// criterion is a structural attribute - usable to compute a relative/
     /// normalized frequency. `nil` for a plain positional-attribute criterion.
     public let norm: Int?
+
+    public init(word: String, freq: Int, norm: Int? = nil) {
+        self.word = word
+        self.freq = freq
+        self.norm = norm
+    }
 }
 
 /// A single Manatee corpus query, kept open and mutable so sort/shuffle/

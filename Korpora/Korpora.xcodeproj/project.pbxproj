@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		060E5D3B9CA606588879B548 /* SortPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4005D8384BD2DA78535DA1 /* SortPopoverController.swift */; };
 		13E3136A6E77E54771C201BB /* CQLCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA90C45CF4B5BD7C43B5398D /* CQLCompletion.swift */; };
+		142D4FC3DACFDD4E01C046D6 /* BarChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B048437C8F65313F1536E878 /* BarChartView.swift */; };
 		1646290BB74EF2EF5D5A25C7 /* ContextPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE414BB1705FBC35C5E276F /* ContextPopoverController.swift */; };
 		16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194EBAFB6892689A6B616369 /* AttributeDisplayPopoverController.swift */; };
 		171B94927CACB5FA8C25D710 /* SettingsWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC33C652F154E0B0ACAAAF16 /* SettingsWindowTests.swift */; };
@@ -45,9 +46,11 @@
 		A40489B556EC0F24714E0377 /* CorpusListSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580379B16410CA4C2D7CA4D0 /* CorpusListSettingsTests.swift */; };
 		A67B412E8379D165C7EB23DC /* FrequencySheetController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FC66C90A00125753A67D28 /* FrequencySheetController.swift */; };
 		ABB771AD9CD40A0BB1F5332E /* ConcordanceDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA396783428D5410E30C0F8 /* ConcordanceDocument.swift */; };
+		AEAACF157ADF3C9E631B3A24 /* BarChartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65D6B6A3CFABE26AD74F85D5 /* BarChartTests.swift */; };
 		B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1FD3479E35618789EA56FC /* CQLQueryField.swift */; };
 		C402FCCB69C646D7D3C8E729 /* ConcordanceDocumentCancelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F194B5057DE1CD8400800B9E /* ConcordanceDocumentCancelTests.swift */; };
 		C6212C93C0C81D9DD271EBD5 /* CQLCompletionContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC95A179DFFA46D1C19AA43 /* CQLCompletionContextTests.swift */; };
+		C9273B1C6C8F464645CCBFE4 /* TableChartContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8BD92725D214DE0958CDD0 /* TableChartContainerView.swift */; };
 		CF4A6809B074F7507F882CB0 /* SettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE440FCBF2248C9252300CE /* SettingsLayout.swift */; };
 		D2292F83A25C875C1174CC94 /* ActiveImportTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */; };
 		D2DB97BA102AA3F70C5066BF /* HistoryPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548B42C845A6C7B07CCE870F /* HistoryPopoverController.swift */; };
@@ -97,6 +100,7 @@
 		5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporterTests.swift; sourceTree = "<group>"; };
 		5D6B7C9CED354613F83E8A50 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		5D9611D2AC5061EA2B01028F /* ManateeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ManateeKit; path = ../ManateeKit; sourceTree = SOURCE_ROOT; };
+		65D6B6A3CFABE26AD74F85D5 /* BarChartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarChartTests.swift; sourceTree = "<group>"; };
 		6B1A2B39864F42D3B7BF38A7 /* SamplePopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplePopoverController.swift; sourceTree = "<group>"; };
 		6E43418276694BEE9E6FD9C7 /* ActiveImportTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveImportTracker.swift; sourceTree = "<group>"; };
 		6EE043A10DE130AB36BA0F1C /* ConcordanceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcordanceExporter.swift; sourceTree = "<group>"; };
@@ -116,9 +120,11 @@
 		AC4BF85C4540BAB954E61CCC /* UnicodeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScript.swift; sourceTree = "<group>"; };
 		AD2EE2396662652C35562289 /* SubcorpusValuePickerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubcorpusValuePickerModel.swift; sourceTree = "<group>"; };
 		AD9F1A60D4DB64C1116DAE9F /* CorpusResidencyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusResidencyManager.swift; sourceTree = "<group>"; };
+		B048437C8F65313F1536E878 /* BarChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarChartView.swift; sourceTree = "<group>"; };
 		B5A2ABBCF839D0C66351D969 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		B674887DFEED6258891E125A /* OperationsPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsPopoverController.swift; sourceTree = "<group>"; };
 		BAA221175004C97F623B41C8 /* KorporaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KorporaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC8BD92725D214DE0958CDD0 /* TableChartContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableChartContainerView.swift; sourceTree = "<group>"; };
 		BDE8E2FD74049DA17A699E82 /* FrequencyWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyWindowController.swift; sourceTree = "<group>"; };
 		CA5B7A3F4ED9EF879F25E81A /* CollocationWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollocationWindowController.swift; sourceTree = "<group>"; };
 		CF1FD3479E35618789EA56FC /* CQLQueryField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CQLQueryField.swift; sourceTree = "<group>"; };
@@ -214,6 +220,7 @@
 		779D82994C6A303E2DDC3D8B /* KorporaTests */ = {
 			isa = PBXGroup;
 			children = (
+				65D6B6A3CFABE26AD74F85D5 /* BarChartTests.swift */,
 				F194B5057DE1CD8400800B9E /* ConcordanceDocumentCancelTests.swift */,
 				5CB085B52C1CC64F2C18D6D2 /* ConcordanceExporterTests.swift */,
 				7F2DB228AD53B0694A7A7C2C /* ConcordanceOperationTests.swift */,
@@ -234,10 +241,12 @@
 		908803DD9C3C6921806E9206 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B048437C8F65313F1536E878 /* BarChartView.swift */,
 				DA90C45CF4B5BD7C43B5398D /* CQLCompletion.swift */,
 				CF1FD3479E35618789EA56FC /* CQLQueryField.swift */,
 				36AD3505A6B115D835CFF1D6 /* KWICCellView.swift */,
 				D0F115CEAC930466168A9217 /* SortableTableView.swift */,
+				BC8BD92725D214DE0958CDD0 /* TableChartContainerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -398,6 +407,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEAACF157ADF3C9E631B3A24 /* BarChartTests.swift in Sources */,
 				FE3E752BE968D4DE9C1779B1 /* CQLAutoPairingTests.swift in Sources */,
 				C6212C93C0C81D9DD271EBD5 /* CQLCompletionContextTests.swift in Sources */,
 				C402FCCB69C646D7D3C8E729 /* ConcordanceDocumentCancelTests.swift in Sources */,
@@ -423,6 +433,7 @@
 				29B81AF1A74883E0E7A12393 /* AppSettings.swift in Sources */,
 				A1626887D340E9D9566D6217 /* AppearanceSettingsViewController.swift in Sources */,
 				16C6AB39D6B4B024D56DB595 /* AttributeDisplayPopoverController.swift in Sources */,
+				142D4FC3DACFDD4E01C046D6 /* BarChartView.swift in Sources */,
 				13E3136A6E77E54771C201BB /* CQLCompletion.swift in Sources */,
 				B6EEF2C1FAA3E75434B49D69 /* CQLQueryField.swift in Sources */,
 				9E0E01C3DC4DE65D38AB17B9 /* CollocationSheetController.swift in Sources */,
@@ -456,6 +467,7 @@
 				060E5D3B9CA606588879B548 /* SortPopoverController.swift in Sources */,
 				59997812E5187B68B3AB9863 /* SortableTableView.swift in Sources */,
 				7493A2B00E35294C4A83B5DF /* SubcorpusValuePickerModel.swift in Sources */,
+				C9273B1C6C8F464645CCBFE4 /* TableChartContainerView.swift in Sources */,
 				4AB1276625BB1338E6EEFCA0 /* UnicodeScript.swift in Sources */,
 				9706A787B7D8B81891AC6D95 /* main.swift in Sources */,
 			);

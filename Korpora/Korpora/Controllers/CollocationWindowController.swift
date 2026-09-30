@@ -35,17 +35,22 @@ private final class CollocationViewController: NSViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private var container: TableChartContainerView!
+
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 360))
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(scrollView)
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: root.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+        container = TableChartContainerView(table: scrollView)
+        container.setMeasures([
+            .init(title: "Score") { [weak self] in
+                (self?.items ?? []).map { BarChartView.Bar(label: $0.word, value: $0.score) }
+            },
+            .init(title: "Co-occurrences") { [weak self] in
+                (self?.items ?? []).map { BarChartView.Bar(label: $0.word, value: Double($0.cnt)) }
+            },
+            .init(title: "Frequency") { [weak self] in
+                (self?.items ?? []).map { BarChartView.Bar(label: $0.word, value: Double($0.freq)) }
+            },
         ])
-        view = root
+        view = container
     }
 
     override func viewDidLoad() {
