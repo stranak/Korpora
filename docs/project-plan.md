@@ -308,18 +308,17 @@ All Swift/C++ code builds cleanly and all tests pass (`swift test` in
 ## Open goals (refreshed 2026-09-29)
 
 **Feature work on main** (all Phase 6, agreed roadmap):
-1. **6.9** Text-Types-style subcorpus creation: **built 2026-09-29**, an
-   attribute picker and a checklist of real values (the free-text CQL
-   field stays as a second mode). Needs a click-through in the running
-   app; see its section.
+1. **6.9** Text-Types-style subcorpus creation: **done, click-tested**, an
+   attribute picker and a checklist of real values with counts (the
+   free-text CQL field stays as a second mode); see its section.
 2. **6.10** (not started) Charts: Table | Chart toggle for Collocations and Frequency,
    plus a concordance dispersion plot. Design reviewed 2026-09-29 (see
    6.10): keep Swift Charts in an `NSHostingView`, isolated, and spike
    printing and hover first.
 3. **6.11** (not started) Concordance pagination/streaming: the biggest change, last.
 
-**Fixed on main since 0.2** (2026-09-30, committed but not pushed or
-released; the user tests before anything is pushed):
+**Fixed on main since 0.2** (2026-09-30; all verified by the user by hand,
+not yet released):
 - `.DS_Store` showed up as a corpus in the picker (hidden files are now
   skipped in `CorpusRegistry`).
 - The Settings window is resizable (see "Settings window" below).
@@ -1654,7 +1653,7 @@ harmless and left in place. The compiled-corpora directory's "Choose…"
 still only changes where *new* imports go; corpora already built in the
 old place drop off the list until re-added with Add Existing Corpus….
 
-### Cancel a running query (built 2026-09-30; awaiting click-through)
+### Cancel a running query (done; verified by the user on SYN2025, 2026-09-30)
 
 Asked for by the user: a way to stop a search that runs too long, ⌘. as on
 classic Mac OS, with the status line saying "Searching…" and
@@ -1721,9 +1720,9 @@ and nil target; that it validates only while searching; and that both
 actions travel from the focused query field to the view controller and
 cancel a search held open by a test hook (`beforeSearchHook`). The actual
 key press stays a manual check.
-**Not yet done:** ⌘. on SYN2025 again, in the running app.
+**Verified by the user** on SYN2025 after this fix: ⌘. and Esc cancel a long search.
 
-### Settings window: resizable (built 2026-09-30; awaiting a look)
+### Settings window: resizable (done; verified by the user, 2026-09-30)
 
 Panes open at the size they were designed for, which is also their
 minimum; the Corpora list and Appearance's per-script list take extra
@@ -3618,7 +3617,7 @@ more, all in `CQLQueryField`/`ConcordanceViewController`:
 
 Verified by hand in the Debug build (macOS 27) and on macOS 15.7 (VM).
 
-### 6.9 — Text-Types-style subcorpus creation (built 2026-09-29; awaiting click-through)
+### 6.9 — Text-Types-style subcorpus creation (done; click-tested by the user on SYN2025, 2026-09-29/30)
 
 Today, `NewSubcorpusPopoverController` takes a free-text CQL restriction
 (`author="Twain"`, `queryField` is a plain `CQLQueryField`). KonText
